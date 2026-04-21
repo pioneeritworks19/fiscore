@@ -39,7 +39,7 @@ Admins help manage the tenant without necessarily being the original tenant owne
 
 ### 3. Manager
 
-Managers are responsible for restaurant operations, team oversight, responses to findings, and final closure of violations.
+Managers are responsible for restaurant operations, team oversight, responses to findings and actions, and final closure of action items.
 
 ### 4. Auditor
 
@@ -49,7 +49,7 @@ They may also help manage checklist templates and scoring configuration.
 
 ### 5. Staff
 
-Staff members participate in operational follow-up, including responding to violations and supporting remediation work.
+Staff members participate in operational follow-up, including responding to actions and supporting remediation work.
 
 They are not final approvers for closure-sensitive workflows.
 
@@ -75,7 +75,7 @@ Although the role is tenant-wide, the app experience is restaurant-specific. Use
 
 ### 4. Sensitive Actions Need Stronger Roles
 
-Actions such as closing violations, managing tenant settings, or adding restaurants should be restricted to higher-trust roles.
+Actions such as closing action items, managing tenant settings, or adding restaurants should be restricted to higher-trust roles.
 
 ## Capability Matrix
 
@@ -94,15 +94,19 @@ The table below summarizes the intended version 1 permissions.
 | Edit tenant settings | Yes | Yes | No | No | No |
 | View analytics and reports | Yes | Yes | Yes | Yes | No |
 | Upload onsite health inspection report | Yes | Yes | Yes | Yes | No |
+| Schedule one-time audits | No | No | Yes | Yes | No |
+| Create recurring audit schedules | No | No | Yes | Yes | No |
 | Create internal audits | No | No | Yes | Yes | No |
 | Complete internal audits | No | No | Yes | Yes | No |
 | Create or edit checklist templates | No | Yes | Yes | Yes | No |
 | Create or edit scoring rules | No | Yes | Yes | Yes | No |
-| Respond to violations | No | No | Yes | Yes | Yes |
-| Submit violation response for review | No | No | Yes | Yes | Yes |
-| Approve violation response | No | No | Yes | No | No |
-| Close violation | No | No | Yes | No | No |
-| Reopen violation | No | No | Yes | No | No |
+| Create standalone action | No | Yes | Yes | Yes | No |
+| Create recurring action | No | Yes | Yes | No | No |
+| Respond to actions | No | No | Yes | Yes | Yes |
+| Submit action response for review | No | No | Yes | Yes | Yes |
+| Approve action response | No | No | Yes | No | No |
+| Close action | No | No | Yes | No | No |
+| Reopen action | No | No | Yes | No | No |
 
 ## Detailed Role Definitions
 
@@ -159,21 +163,23 @@ Managers are operational leaders who oversee audit completion, remediation work,
 ### Key Permissions
 
 - create and complete internal audits
+- create standalone actions
+- create recurring actions
 - invite team members
 - change roles
 - deactivate users
 - create or edit checklist templates and scoring rules
-- respond to violations
-- approve violation responses
-- close violations
-- reopen violations
+- respond to actions
+- approve action responses
+- close actions
+- reopen actions
 - view analytics and reports
 - upload onsite health inspection reports
 
 ### Notes
 
-- manager is the only role allowed to close violations in version 1
-- manager is also the key review role for violation responses submitted by staff or auditors
+- manager is the only role allowed to close actions in version 1
+- manager is also the key review role for action responses submitted by staff or auditors
 - this role should be able to guide daily restaurant compliance activity
 
 ## Auditor
@@ -185,17 +191,18 @@ Auditors are focused on internal inspections, checklist execution, and audit pro
 ### Key Permissions
 
 - create and complete internal audits
+- create standalone actions
 - create or edit checklist templates
 - create or edit scoring rules
-- respond to violations
-- submit violation responses for review
+- respond to actions
+- submit action responses for review
 - view analytics and reports
 - upload onsite health inspection reports
 
 ### Notes
 
 - auditors can create findings through audit workflows
-- auditors cannot close violations in version 1
+- auditors cannot close actions in version 1
 - auditors can participate deeply in compliance operations without having final managerial approval authority
 
 ## Staff
@@ -207,12 +214,12 @@ Staff members support corrective action work and day-to-day operational follow-u
 ### Key Permissions
 
 - view their accessible restaurant context
-- respond to violations
+- respond to actions
 - submit responses for review
 
 ### Notes
 
-- staff cannot close violations
+- staff cannot close actions
 - staff do not manage tenant settings, restaurants, or user administration
 - staff should remain focused on execution rather than approval
 
@@ -276,6 +283,16 @@ This is important because adding a restaurant creates a connection between the t
 - manager
 - auditor
 
+### Roles Allowed to Schedule Audits
+
+- manager
+- auditor
+
+### Roles Allowed to Create Recurring Audit Schedules
+
+- manager
+- auditor
+
 ### Roles Allowed to Manage Checklist Templates and Scoring
 
 - admin
@@ -287,16 +304,28 @@ This is important because adding a restaurant creates a connection between the t
 - this allows operational and compliance-focused users to own the audit program
 - staff do not control audit design in version 1
 
-## Violation Permissions
+## Action Permissions
 
-Violations may come from:
+Actions may come from:
 
 - public inspection data
 - internal audits
 - audit-triggered findings
 - manual operational identification
+- recurring operational work
 
-### Roles Allowed to Respond to Violations
+### Roles Allowed to Create Standalone Actions
+
+- admin
+- manager
+- auditor
+
+### Roles Allowed to Create Recurring Actions
+
+- admin
+- manager
+
+### Roles Allowed to Respond to Actions
 
 - manager
 - auditor
@@ -308,13 +337,13 @@ Violations may come from:
 - auditor
 - staff
 
-### Roles Allowed to Approve, Close, or Reopen Violations
+### Roles Allowed to Approve, Close, or Reopen Actions
 
 - manager
 
 ### Important Rule
 
-Violation closure should always be controlled by a manager in version 1.
+Action closure should always be controlled by a manager in version 1.
 
 This matches your intended product direction:
 
@@ -366,7 +395,8 @@ Recommended enforcement areas:
 - tenant membership validation for all tenant reads
 - role-based write checks for restaurant add/remove
 - role-based checks for user invites, deactivation, and role changes
-- manager-only checks for violation closure
+- role-based checks for standalone and recurring action creation
+- manager-only checks for action closure
 - read-only access to public inspection projections
 - admin/manager/auditor checks for checklist editing
 - tenant-owner/admin/manager/auditor checks for onsite public inspection report uploads
@@ -396,4 +426,4 @@ These questions do not need to block version 1, but should be revisited later:
 
 ## Summary
 
-FiScore version 1 should use a tenant-wide role model with five main roles: `tenant_owner`, `admin`, `manager`, `auditor`, and `staff`. Tenant owner and admin handle tenant-wide setup and restaurant portfolio control. Managers oversee operational compliance, including final violation closure. Auditors manage audit execution and checklist logic. Staff support remediation work without final approval authority.
+FiScore version 1 should use a tenant-wide role model with five main roles: `tenant_owner`, `admin`, `manager`, `auditor`, and `staff`. Tenant owner and admin handle tenant-wide setup and restaurant portfolio control. Managers oversee operational compliance, including final action closure. Auditors manage audit execution and checklist logic while also participating in action workflows. Staff support remediation work without final approval authority.

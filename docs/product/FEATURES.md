@@ -8,7 +8,7 @@ Version 1 is centered on:
 
 - public health department inspections
 - internal audits
-- violations
+- actions and violations
 - corrective action workflows
 
 However, the product should leave room for future operational modules such as:
@@ -19,46 +19,60 @@ However, the product should leave room for future operational modules such as:
 
 This direction should influence navigation, data boundaries, and overall app structure from the beginning so the platform can grow without needing a full redesign later.
 
-## Violation Management Module
+## Actions Module
 
 ### Feature Summary
 
-The Violation Management module gives FiScore a unified workflow for tracking, responding to, reviewing, and closing violations regardless of how they were created. Violations may originate from health department inspections harvested from government websites, from internal audits conducted by restaurant staff, or from manual entry by users during day-to-day operations.
+The Actions module gives FiScore a unified workflow for tracking, assigning, responding to, reviewing, and closing follow-up work across restaurant operations and compliance. Actions may originate from health department inspections harvested from government websites, from internal audits conducted by restaurant staff, from manual entry during day-to-day operations, or from recurring operational needs that are not tied to a specific inspection or audit.
 
-Every violation should follow a clear lifecycle so teams can move from identification to remediation with full traceability. Users should be able to respond with either a simple response or a more detailed Corrective and Preventive Action (CAPA) workflow, attach lightweight evidence such as photos, short videos, or supporting documents, and route the violation for review when needed.
+Violation is one action type within this broader module. Every action should follow a clear lifecycle so teams can move from identification to remediation with full traceability. Users should be able to respond with either a simple response or a more detailed Corrective and Preventive Action (CAPA) workflow, attach lightweight evidence such as photos, short videos, or supporting documents, collaborate with teammates, and route the action for review when needed.
 
 ### Business Value
 
-- Centralizes violation handling across external inspections and internal audits
+- Centralizes follow-up work across external inspections, internal audits, and operational tasks
 - Helps restaurants respond consistently to food safety issues
 - Supports accountability through assignment, review, and closure workflows
 - Creates traceable remediation records for compliance and operational follow-up
 - Gives owners and managers visibility into unresolved, recurring, and high-risk issues
 
-### Violation Sources
+### Action Types
 
-FiScore should support violations originating from multiple sources while preserving source context.
+FiScore should support multiple action types under one common workflow framework.
+
+Initial action types should include:
+
+- violation
+- operational task
+- recurring task
+
+This allows FiScore to evolve beyond inspection-specific follow-up into a broader restaurant operations system.
+
+### Action Sources
+
+FiScore should support actions originating from multiple sources while preserving source context.
 
 Supported sources include:
 
 - Health department inspections harvested from government websites
 - Internal audits conducted by restaurant staff
 - Auto-created violations triggered from audit checklist responses
-- Manually created violations entered by users
+- Manually created actions entered by users
+- Recurring operational tasks created by the system or administrators
 
-Each violation should retain source metadata so users can understand where it came from and report on it accurately.
+Each action should retain source metadata so users can understand where it came from and report on it accurately.
 
 Suggested source fields:
 
+- action type
 - source type
 - source system or agency
 - source inspection or audit id
 - originating checklist question when applicable
 - date identified
 
-### Violation Lifecycle
+### Action Lifecycle
 
-Every violation should have a clear lifecycle regardless of source.
+Every action should have a clear lifecycle regardless of source.
 
 Recommended lifecycle states:
 
@@ -70,12 +84,30 @@ Recommended lifecycle states:
 
 Best-practice expectations:
 
-- New violations begin in `Open` unless created as draft records
-- Work performed by staff can move a violation to `In Progress`
+- New actions begin in `Open` unless created as draft records
+- Work performed by staff can move an action to `In Progress`
 - Users can submit a completed response for manager review, moving it to `Pending Review`
-- Restaurant managers or owners can approve and close violations
-- Closed violations can be reopened if the issue recurs, the response is insufficient, or the condition fails verification
+- Restaurant managers or owners can approve and close actions
+- Closed actions can be reopened if the issue recurs, the response is insufficient, or the condition fails verification
 - Lifecycle transitions should be traceable by user, timestamp, and device
+
+### Recurring Actions and Tasks
+
+The system should support recurring actions and tasks for operational work that needs to happen on a repeated cadence.
+
+Capabilities include:
+
+- create recurring actions for repeatable operational work
+- assign recurring actions to one or more restaurants
+- define recurrence patterns such as daily, weekly, or monthly
+- create individual action instances from the recurring definition
+- track completion history of recurring tasks over time
+
+Examples:
+
+- weekly line check
+- monthly equipment check
+- recurring sanitation verification task
 
 ### Response Types
 
@@ -113,7 +145,7 @@ This allows teams to document not only how they fixed the issue, but also how th
 
 ### Evidence Attachments
 
-Violation responses should support lightweight supporting evidence without creating excessive storage or sync problems.
+Action responses should support lightweight supporting evidence without creating excessive storage or sync problems.
 
 Supported evidence types:
 
@@ -127,7 +159,20 @@ Best-practice expectations:
 - Limit video length and optimize files for mobile capture
 - Support background upload and sync for media when the device reconnects
 - Show attachment status such as saved locally, uploading, synced, or failed
-- Keep evidence tied to the specific violation and response event
+- Keep evidence tied to the specific action and response event
+
+### Collaboration and Chat
+
+The system should support built-in collaboration on follow-up work.
+
+Capabilities include:
+
+- conversation or comment thread within an action
+- timestamped discussion history
+- collaboration between assignees, managers, and reviewers
+- activity visibility for updates, evidence uploads, and status changes
+
+This allows users to coordinate work inside the action itself rather than relying on external messaging tools.
 
 ### Review and Closure Workflow
 
@@ -135,15 +180,29 @@ FiScore should support a flexible but controlled closeout process.
 
 Capabilities include:
 
-- Users can resolve a violation and close it directly if allowed by role and policy
-- Users can submit a violation response for review instead of closing it directly
-- Restaurant managers or owners can review submitted responses and close the violation
+- Users can resolve an action and close it directly if allowed by role and policy
+- Users can submit an action response for review instead of closing it directly
+- Restaurant managers or owners can review submitted responses and close the action
 - Reviewers should be able to reject the response, request more work, or reopen the violation
 - Closure should preserve who closed the violation, when it was closed, and what evidence supported closure
 
+### Configurable Action Workflows
+
+FiScore should support configurable action types and action workflows.
+
+Capabilities include:
+
+- define action types such as violation, operational task, and recurring task
+- configure which fields are required for each action type
+- configure status transitions by action type
+- configure review requirements by action type
+- configure evidence or collaboration requirements by action type
+
+Violation should be one action type within this broader action framework.
+
 ### Source-Specific Context
 
-Although all violations share a common lifecycle, source type still matters for reporting and user context.
+Although all actions share a common lifecycle, source type still matters for reporting and user context.
 
 #### Health Department Violations
 
@@ -164,13 +223,22 @@ These are created from restaurant-led audits or manual operational findings and 
 - whether the violation was auto-created or manually added
 - the response that triggered the finding when applicable
 
-### Violation Display and Representation
+#### Standalone Operational Actions
 
-Violations should support different display formats depending on their source and level of detail. Not every violation will have the same structure, and the UI should be able to present both simple and richly contextualized violations without forcing them into one rigid format.
+These are not tied directly to a public inspection or internal audit and should preserve:
+
+- manually created action source
+- restaurant context
+- action type
+- assignment and recurrence context if applicable
+
+### Action Display and Representation
+
+Actions should support different display formats depending on their type, source, and level of detail. Not every action will have the same structure, and the UI should be able to present both simple and richly contextualized records without forcing them into one rigid format.
 
 Common display patterns include:
 
-- plain-text violation title with a violation type
+- plain-text action title with an action type
 - official health department clause or code with descriptive text
 - checklist-based context such as section, question, and response
 - a combined representation that includes both a user-friendly summary and the underlying structured source details
@@ -181,37 +249,43 @@ Examples:
 - `Handwashing sink not properly stocked`
 - `Clause 3-501.16: Cold holding temperatures above safe limit`
 - `Food Storage > Are raw and ready-to-eat foods separated? > No`
+- `Weekly sanitizer test verification`
 
 Best-practice expectations:
 
-- The system should always store a readable violation summary for list views and notifications
+- The system should always store a readable action summary for list views and notifications
 - The system should also preserve structured source context when available
-- Users should be able to see both the normalized violation record and the source details behind it
+- Users should be able to see both the normalized action record and the source details behind it
 - Health department violations should preserve official language where available
 - Internal audit violations should preserve checklist context such as section, question, and triggering response where available
 
 ### Functional Expectations
 
-The Violation Management module should support the following user outcomes:
+The Actions module should support the following user outcomes:
 
-- View violations from health department inspections and internal audits in one system
-- Filter violations by source, restaurant, status, assignee, severity, and due date
-- Create violations manually
-- Auto-create violations from audit responses
+- View actions from health department inspections, internal audits, and standalone operational work in one system
+- Filter actions by type, source, restaurant, status, assignee, severity, and due date
+- Create actions manually outside audits when supported
+- Create recurring actions/tasks
+- Auto-create violation-type actions from audit responses
 - Add a simple response or a detailed CAPA response
 - Attach lightweight photos, short videos, and documents
-- Save and update violation responses offline
-- Submit violations for review
-- Allow managers or owners to review and close violations
-- Reopen violations when needed
+- Collaborate through built-in action comments or chat
+- Save and update action responses offline where applicable
+- Submit actions for review
+- Allow managers or owners to review and close actions
+- Reopen actions when needed
 - Maintain a full response and status history
 
 ### Recommended Best-Practice Positioning
 
-From an industry best-practice perspective, this feature should be positioned as a closed-loop violation remediation system rather than a simple issue list. The value comes from combining:
+From an industry best-practice perspective, this feature should be positioned as a closed-loop action and remediation system rather than a simple issue list. The value comes from combining:
 
-- unified violation intake across multiple sources
+- unified action intake across multiple sources
 - structured remediation workflows
+- configurable action types
+- recurring operational tasks
+- collaboration on follow-up work
 - flexible response depth
 - evidence-based verification
 - manager review and controlled closure
@@ -286,6 +360,34 @@ This feature is designed to help restaurant teams standardize audit execution, i
 - Creates more consistent and traceable audit records
 - Supports analytics and trend reporting across repeated audits
 
+#### 1A. Audit Scheduling and Recurrence
+
+The system should support scheduling audits for specific dates and recurring inspections by restaurant or site.
+
+Capabilities include:
+
+- schedule an audit for a specific date
+- assign a scheduled audit to a specific restaurant or site
+- create recurring inspections by restaurant or site
+- support recurrence patterns such as daily, weekly, monthly, or custom operational cadence
+- generate scheduled audit instances from the recurring definition
+- track schedule status clearly
+
+Recommended schedule states include:
+
+- `Scheduled`
+- `In Progress`
+- `Completed`
+- `Overdue`
+- `Missed`
+
+Best-practice expectations:
+
+- scheduled audits should be visible before the due date
+- overdue audits should remain actionable
+- missed audits should remain historically visible and reportable
+- recurring schedules should create predictable operational accountability across locations
+
 ### Core Capabilities
 
 #### 1. Configurable Checklist Structure
@@ -296,9 +398,19 @@ Capabilities include:
 
 - Checklists with multiple sections
 - Multiple questions within each section
+- Support for custom checklists and forms
 - Support for reusable checklist templates
+- Support for FiScore-provided pre-built templates
 - Support for location-specific or restaurant-specific checklist variations
 - Ordered presentation of sections and questions
+- Template metadata such as name, version, owner, tags, and assigned locations
+
+Recommended pre-built template examples:
+
+- food safety
+- cleaning and sanitation
+- compliance
+- daily operational checks
 
 #### 2. Flexible Response Capture
 
@@ -307,10 +419,16 @@ The system should support rich response capture so auditors can document finding
 Capabilities include:
 
 - Multiple answer types such as pass/fail, yes/no, score, text, numeric, date, and selection-based answers
+- Support for short text and long text
+- Support for multiple choice and dropdown selection
+- Support for numeric measurements with units and threshold validation
 - Free-form notes entered by the auditor
 - Predefined notes or recommended observations for faster entry
 - Optional comments tied to a specific question response
 - Evidence capture through images and short videos
+- Signature capture where compliance sign-off requires it
+- Barcode or QR scan support where the audit program requires it
+- Configurable location capture such as GPS where verification needs it
 - Lightweight media handling so uploaded evidence does not consume excessive device storage or bandwidth
 
 Media capture best-practice expectations:
@@ -330,6 +448,9 @@ Capabilities include:
 
 - Trigger questions that appear based on previous answers
 - Conditional follow-up questions for failed or non-compliant responses
+- Force photo upload when certain responses are selected
+- Force comment entry when certain responses are selected
+- Force action creation when certain responses are selected
 - Required follow-up actions when certain responses are selected
 - Configurable business rules that map specific answers to risk conditions
 
@@ -369,6 +490,8 @@ Capabilities include:
 - Record who created a violation and whether it was auto-created or manual
 - Preserve response history for key compliance-related updates
 - Maintain an audit trail for edits, closures, and follow-up actions
+- Preserve template version history for compliance-sensitive audits
+- Support stable cross-version linkage using question identifiers where the logical question remains the same
 
 #### 7. Offline Audit Execution
 
@@ -392,6 +515,23 @@ Capabilities include:
 - Reporting on repeat failures and recurring violations
 - Visibility into completion rates and outstanding corrective actions
 - Comparisons across locations and audit periods
+- Prior-response lookup by site and stable question id
+
+#### 8A. Prior Response Intelligence
+
+The checklist engine should help auditors work faster and with better context by using previous audit information intelligently.
+
+Capabilities include:
+
+- Smart pre-fill of prior answers for the same restaurant or site where configured
+- Clear display of the previous audit response at the question level during data entry
+- Cross-version linkage within an audit type based on stable question id
+
+Best-practice expectations:
+
+- pre-fill should be assistive rather than silently accepted
+- the auditor should always confirm or change the current response
+- prior-response lookups should use stable question identity rather than only matching question text
 
 #### 9. Score and Grade Calculation
 
@@ -443,6 +583,8 @@ This allows FiScore to support different audit programs without forcing all rest
 The Audit Checklist feature should support the following user outcomes:
 
 - Start an audit from a predefined checklist template
+- Schedule an audit for a specific date
+- Create recurring inspections by restaurant or site
 - Move through sections in a structured sequence
 - Answer questions with the appropriate response type
 - Add notes, images, and short videos as evidence
@@ -453,6 +595,7 @@ The Audit Checklist feature should support the following user outcomes:
 - Save progress during the audit, including offline
 - Resume an in-progress audit later
 - Submit a completed audit and sync it automatically
+- Track audits in schedule states such as scheduled, overdue, missed, or completed
 
 ### Recommended Best-Practice Positioning
 
@@ -488,3 +631,7 @@ Potential future improvements may include:
 - Checklist scoring models and weighted risk calculations
 - Shared checklist libraries by restaurant type or regulatory framework
 - Supervisor review and sign-off workflows
+
+### Related Design Reference
+
+See [AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md) for the more detailed checklist-engine design covering template metadata, versioning, question types, conditional logic, required evidence rules, and prior-response behavior.

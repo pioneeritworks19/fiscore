@@ -9,6 +9,7 @@ This schema is designed for:
 - tenant-scoped restaurant operations
 - mobile-first app usage
 - offline-first workflows
+- scheduled and recurring audits
 - audit execution
 - checklist scoring and grading
 - violation lifecycle management
@@ -146,8 +147,10 @@ Stores tenant-level access and role information for a user.
 
 ### Suggested `role` values
 
-- `owner`
+- `tenant_owner`
+- `admin`
 - `manager`
+- `auditor`
 - `staff`
 
 ## 4. Tenant Restaurants
@@ -375,8 +378,16 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - `name`
 - `description`
 - `category`
+- `templateSource`
+- `ownerUserId`
+- `ownerDisplayNameSnapshot`
+- `tagIds`
+- `tagLabels`
+- `assignedRestaurantIds`
+- `assignedSiteIds`
 - `status`
 - `version`
+- `stableTemplateId`
 - `scoringConfig`
 - `gradeThresholds`
 - `criticalRules`
@@ -403,6 +414,7 @@ Stores tenant-usable checklist templates and versions for internal audits.
 
 - `title`
 - `description`
+- `stableSectionId`
 - `displayOrder`
 - `weight`
 - `isScored`
@@ -417,6 +429,7 @@ Stores tenant-usable checklist templates and versions for internal audits.
 
 ### Suggested fields
 
+- `stableQuestionId`
 - `prompt`
 - `helpText`
 - `answerType`
@@ -429,6 +442,15 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - `allowsNotes`
 - `allowsMedia`
 - `allowsDocuments`
+- `requiresSignature`
+- `allowsBarcodeScan`
+- `allowsQrScan`
+- `capturesLocation`
+- `measurementUnit`
+- `minValue`
+- `maxValue`
+- `defaultValue`
+- `predefinedNotes`
 - `allowsManualViolation`
 - `responseOptions`
 - `triggerRules`
@@ -439,6 +461,47 @@ Stores tenant-usable checklist templates and versions for internal audits.
 
 - embedding response options and trigger rules in the question document is often reasonable if they are not huge
 - if they become very large or frequently edited, they can move to subcollections later
+- `stableQuestionId` should remain consistent across checklist versions when the logical question is the same
+
+## 10A. Question Rules
+
+### Collection
+
+`tenants/{tenantId}/checklistTemplates/{checklistTemplateId}/sections/{sectionId}/questions/{questionId}/rules/{ruleId}`
+
+### Purpose
+
+Stores conditional logic, required evidence rules, and auto-follow-up behavior for a question.
+
+### Suggested fields
+
+- `ruleType`
+- `conditionOperator`
+- `conditionValue`
+- `conditionValues`
+- `targetQuestionId`
+- `targetStableQuestionId`
+- `effectType`
+- `effectPayload`
+- `displayOrder`
+- `isActive`
+- `createdAt`
+- `updatedAt`
+
+### Suggested `ruleType` values
+
+- `show_follow_up_question`
+- `hide_question`
+- `require_comment`
+- `require_photo`
+- `require_signature`
+- `create_action_on_submit`
+- `flag_critical_response`
+
+### Notes
+
+- this collection is optional if rule objects remain small enough to embed in the question document
+- use a dedicated collection if rules become numerous, reusable, or frequently edited
 
 ## 11. Audit Sessions
 
@@ -455,6 +518,9 @@ Represents a specific audit execution for a restaurant.
 - `tenantId`
 - `restaurantId`
 - `restaurantNameSnapshot`
+- `scheduleId`
+- `scheduleInstanceId`
+- `auditOrigin`
 - `checklistTemplateId`
 - `checklistTemplateNameSnapshot`
 - `checklistVersion`
@@ -487,6 +553,115 @@ Represents a specific audit execution for a restaurant.
 - `completed`
 - `archived`
 
+### Suggested `auditOrigin` values
+
+- `ad_hoc`
+- `scheduled`
+- `recurring_schedule_instance`
+
+## 11A. Audit Schedules
+
+### Collection
+
+`tenants/{tenantId}/auditSchedules/{scheduleId}`
+
+### Purpose
+
+Stores one-time and recurring audit schedule definitions for restaurants or sites.
+
+### Suggested fields
+
+- `tenantId`
+- `restaurantId`
+- `restaurantNameSnapshot`
+- `siteId`
+- `siteNameSnapshot`
+- `checklistTemplateId`
+- `checklistTemplateNameSnapshot`
+- `scheduleType`
+- `title`
+- `description`
+- `assignedTo`
+- `startsOn`
+- `endsOn`
+- `dueAt`
+- `timezone`
+- `recurrenceRule`
+- `graceWindowDays`
+- `status`
+- `lastGeneratedAt`
+- `lastCompletedAt`
+- `nextDueAt`
+- `createdBy`
+- `createdAt`
+- `updatedAt`
+
+### Suggested `scheduleType` values
+
+- `one_time`
+- `recurring`
+
+### Suggested `status` values
+
+- `active`
+- `paused`
+- `completed`
+- `cancelled`
+
+### Notes
+
+- one-time schedules can use `scheduleType = one_time` with `dueAt`
+- recurring schedules can store a recurrence definition and generate child instances
+- `siteId` can be optional if version 1 schedules are restaurant-level only
+
+## 11B. Audit Schedule Instances
+
+### Collection
+
+`tenants/{tenantId}/auditSchedules/{scheduleId}/instances/{instanceId}`
+
+### Purpose
+
+Stores generated scheduled audit occurrences and their operational state.
+
+### Suggested fields
+
+- `scheduleId`
+- `tenantId`
+- `restaurantId`
+- `restaurantNameSnapshot`
+- `siteId`
+- `siteNameSnapshot`
+- `checklistTemplateId`
+- `checklistTemplateNameSnapshot`
+- `scheduledFor`
+- `dueAt`
+- `status`
+- `auditId`
+- `startedAt`
+- `startedBy`
+- `completedAt`
+- `completedBy`
+- `missedAt`
+- `overdueAt`
+- `createdAt`
+- `updatedAt`
+
+### Suggested `status` values
+
+- `scheduled`
+- `in_progress`
+- `completed`
+- `overdue`
+- `missed`
+- `cancelled`
+
+### Notes
+
+- schedule instances give FiScore a durable record for expected versus completed audits
+- `auditId` links the scheduled occurrence to the actual audit execution record when started
+- overdue and missed should remain reportable even after later operational recovery
+
 ## 12. Audit Responses
 
 ### Collection
@@ -502,6 +677,7 @@ Stores per-question audit responses.
 - `sectionId`
 - `sectionTitleSnapshot`
 - `questionId`
+- `stableQuestionId`
 - `questionPromptSnapshot`
 - `questionDisplayOrder`
 - `responseType`
@@ -510,12 +686,29 @@ Stores per-question audit responses.
 - `numericValue`
 - `textValue`
 - `dateValue`
+- `timeValue`
+- `dateTimeValue`
 - `note`
+- `commentRequired`
+- `photoRequired`
+- `signatureValue`
+- `signatureCapturedAt`
+- `barcodeValue`
+- `qrValue`
+- `locationCapture`
+- `measurementValue`
+- `measurementUnit`
 - `scoreEarned`
 - `scorePossible`
 - `isNotApplicable`
 - `isPassing`
 - `isCriticalResponse`
+- `prefilledFromAuditId`
+- `prefilledFromResponseId`
+- `prefillSuggestedValue`
+- `previousAuditId`
+- `previousResponseId`
+- `previousResponseSummary`
 - `triggeredRuleIds`
 - `triggeredViolationIds`
 - `respondedAt`
@@ -528,6 +721,7 @@ Stores per-question audit responses.
 
 - snapshot question text for historical accuracy
 - avoid trying to reconstruct historical results from mutable templates later
+- `stableQuestionId` supports prior-response lookup and cross-version reporting when question wording changes but the logical question remains the same
 
 ## 13. Audit Attachments
 
@@ -848,6 +1042,8 @@ This duplication is normal and desirable for Firestore.
 The schema should support these common queries efficiently:
 
 - restaurants for a tenant
+- audit schedules for a tenant filtered by restaurant and status
+- upcoming or overdue audit schedule instances
 - audits for a tenant filtered by restaurant and status
 - violations for a tenant filtered by restaurant, status, assignee, severity, and due date
 - latest public inspections for a restaurant
@@ -859,6 +1055,9 @@ The schema should support these common queries efficiently:
 
 The exact index set will depend on app screens, but likely needs include:
 
+- `auditSchedules` by `restaurantId + status`
+- `auditSchedules` by `nextDueAt`
+- `auditSchedules/{scheduleId}/instances` by `status + dueAt`
 - `violations` by `restaurantId + status`
 - `violations` by `status + assignedTo`
 - `violations` by `status + dueDate`
@@ -899,6 +1098,8 @@ For version 1, the most important Firestore collections are:
 - `tenants`
 - `tenants/{tenantId}/members`
 - `tenants/{tenantId}/restaurants`
+- `tenants/{tenantId}/auditSchedules`
+- `tenants/{tenantId}/auditSchedules/{scheduleId}/instances`
 - `tenants/{tenantId}/audits`
 - `tenants/{tenantId}/audits/{auditId}/responses`
 - `tenants/{tenantId}/violations`

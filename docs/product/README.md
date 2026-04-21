@@ -50,6 +50,18 @@ Restaurants often struggle to keep inspection results, internal audits, follow-u
 - Analytics for internal audits
 - Admin tools for inviting team members
 
+## Product Design References
+
+The core product design documents in this folder include:
+
+- [FEATURES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FEATURES.md)
+- [WORKFLOWS.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\WORKFLOWS.md)
+- [USER_ROLES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\USER_ROLES.md)
+- [DATA_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DATA_MODEL.md)
+- [SCORING_RULES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SCORING_RULES.md)
+- [SYNC_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SYNC_STRATEGY.md)
+- [AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md)
+
 ## Offline-First Requirement
 
 FiScore must work reliably in low-connectivity and no-connectivity environments. Restaurant teams should be able to continue using the app during active shifts, in storage areas, or in buildings with poor signal without losing confidence in the system.
