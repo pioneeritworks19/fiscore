@@ -1,7 +1,20 @@
 create extension if not exists pgcrypto;
 
+create table if not exists ops.platform_registry (
+    platform_id uuid primary key default gen_random_uuid(),
+    platform_slug text not null unique,
+    platform_name text not null,
+    base_domain text,
+    status text not null default 'active',
+    default_parser_id text,
+    default_parser_version text,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
 create table if not exists ops.source_registry (
     source_id uuid primary key default gen_random_uuid(),
+    platform_id uuid references ops.platform_registry(platform_id),
     source_slug text not null unique,
     source_name text not null,
     platform_name text not null,
@@ -24,6 +37,8 @@ create table if not exists ops.scrape_run (
     trigger_type text not null,
     run_status text not null default 'queued',
     parser_version text not null,
+    request_context jsonb,
+    source_snapshot jsonb,
     started_at timestamptz not null default now(),
     completed_at timestamptz,
     discovery_count integer not null default 0,

@@ -65,6 +65,15 @@ class SwordSourceAdapter:
                 source_id=source.source_id,
                 request=request,
                 parser_version=source.parser_version,
+                request_context=run_plan.request_context,
+                source_snapshot={
+                    "source_slug": source.source_slug,
+                    "source_name": source.source_name,
+                    "platform_name": source.platform_name,
+                    "jurisdiction_name": source.jurisdiction_name,
+                    "base_url": source.base_url,
+                    "parser_version": source.parser_version,
+                },
             )
         except Exception as exc:  # pragma: no cover - environment-specific connectivity
             logger.exception("Unable to create scrape run")

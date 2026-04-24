@@ -47,6 +47,42 @@ The repository now includes an initial Python backend scaffold for:
 - SQL bootstrap files for the first `ops`, `ingestion`, and `master` schemas
 - initial Sword source seed data
 
+## Ingestion Control Panel
+
+The API now includes an internal operations console for ingestion management.
+
+Current capabilities:
+
+- Overview dashboard
+- Platform registry dashboard
+- Source list with manual run triggers
+- Run history and run detail
+- Artifact explorer
+- Parsed-record explorer
+- Health dashboard
+- Alert view
+- Rerun request workflow
+- Master lineage view
+- Source version view
+
+Current endpoints/pages:
+
+- `/ops/sources`
+- `/ops/runs`
+- `/ops/runs/{scrapeRunId}`
+- `/ops/artifacts`
+- `/ops/artifacts/{rawArtifactId}`
+- `/ops/parse-results`
+- `/ops/parse-results/{parseResultId}`
+- `/ops/health`
+- `/ops/alerts`
+- `/ops/reruns`
+- `/ops/lineage`
+- `/ops/versions`
+- `/ops/sources/{sourceSlug}/runs`
+- `/ops/control-panel`
+- `/ops/control-panel/platforms`
+
 ## Ingestion Code Layout
 
 Source ingestion code is organized under:
@@ -87,3 +123,17 @@ Once dependencies are installed and `.env` is configured with your Cloud SQL con
 ```bash
 python scripts/apply_sql_bootstrap.py
 ```
+
+If your local database was bootstrapped before platform grouping and richer ops run metadata were added, also apply:
+
+- `sql/migrations/004_add_scrape_run_context_columns.sql`
+- `sql/migrations/005_add_platform_registry.sql`
+
+## GCP Deployment
+
+For the current rollout order and deploy helpers, use:
+
+- `docs/backend/GCP_DEPLOYMENT_RUNBOOK.md`
+- `scripts/deploy_worker.ps1`
+- `scripts/deploy_api.ps1`
+- `scripts/create_scheduler_jobs.ps1`

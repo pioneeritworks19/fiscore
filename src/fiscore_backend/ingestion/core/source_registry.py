@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 
 from psycopg.rows import dict_row
 
@@ -9,6 +10,8 @@ from fiscore_backend.models import WorkerRunRequest
 @dataclass(frozen=True)
 class SourceRegistryRecord:
     source_id: str
+    platform_id: str | None
+    platform_slug: str | None
     source_slug: str
     source_name: str
     platform_name: str
@@ -24,13 +27,16 @@ def get_source_by_slug(source_slug: str) -> SourceRegistryRecord | None:
                 """
                 select
                     source_id::text as source_id,
+                    sr.platform_id::text as platform_id,
+                    pr.platform_slug,
                     source_slug,
                     source_name,
-                    platform_name,
+                    sr.platform_name,
                     jurisdiction_name,
                     base_url,
                     parser_version
-                from ops.source_registry
+                from ops.source_registry sr
+                left join ops.platform_registry pr on pr.platform_id = sr.platform_id
                 where source_slug = %s
                 """,
                 (source_slug,),
@@ -43,7 +49,14 @@ def get_source_by_slug(source_slug: str) -> SourceRegistryRecord | None:
     return SourceRegistryRecord(**row)
 
 
-def create_scrape_run(source_id: str, request: WorkerRunRequest, parser_version: str) -> str:
+def create_scrape_run(
+    source_id: str,
+    request: WorkerRunRequest,
+    parser_version: str,
+    *,
+    request_context: dict | None = None,
+    source_snapshot: dict | None = None,
+) -> str:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -53,9 +66,11 @@ def create_scrape_run(source_id: str, request: WorkerRunRequest, parser_version:
                     run_mode,
                     trigger_type,
                     run_status,
-                    parser_version
+                    parser_version,
+                    request_context,
+                    source_snapshot
                 )
-                values (%s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb)
                 returning scrape_run_id::text as scrape_run_id
                 """,
                 (
@@ -64,6 +79,8 @@ def create_scrape_run(source_id: str, request: WorkerRunRequest, parser_version:
                     request.trigger_type,
                     "queued",
                     parser_version,
+                    json.dumps(request_context or {}),
+                    json.dumps(source_snapshot or {}),
                 ),
             )
             scrape_run_id = cur.fetchone()[0]

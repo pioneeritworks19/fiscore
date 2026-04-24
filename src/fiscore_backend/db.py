@@ -8,7 +8,7 @@ from fiscore_backend.config import get_settings
 
 def connect() -> psycopg.Connection:
     settings = get_settings()
-    return psycopg.connect(settings.database_dsn)
+    return psycopg.connect(**settings.database_connection_kwargs)
 
 
 @contextmanager
@@ -26,4 +26,3 @@ def check_connection() -> bool:
             cur.execute("select 1")
             cur.fetchone()
     return True
-

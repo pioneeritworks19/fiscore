@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     gcp_project_id: str = Field(alias="GCP_PROJECT_ID")
     gcp_region: str = Field(alias="GCP_REGION")
     raw_artifact_bucket: str = Field(alias="RAW_ARTIFACT_BUCKET")
+    cloud_sql_connection_name: str | None = Field(default=None, alias="CLOUD_SQL_CONNECTION_NAME")
+    cloud_sql_socket_dir: str = Field(default="/cloudsql", alias="CLOUD_SQL_SOCKET_DIR")
 
     db_host: str = Field(alias="DB_HOST")
     db_port: int = Field(default=5432, alias="DB_PORT")
@@ -30,14 +32,22 @@ class Settings(BaseSettings):
     default_parser_version: str = Field(default="sword-v1", alias="DEFAULT_PARSER_VERSION")
 
     @property
-    def database_dsn(self) -> str:
-        return (
-            f"postgresql://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}"
-        )
+    def database_connection_kwargs(self) -> dict[str, str | int]:
+        kwargs: dict[str, str | int] = {
+            "dbname": self.db_name,
+            "user": self.db_user,
+            "password": self.db_password,
+            "port": self.db_port,
+        }
+
+        if self.cloud_sql_connection_name:
+            kwargs["host"] = f"{self.cloud_sql_socket_dir}/{self.cloud_sql_connection_name}"
+        else:
+            kwargs["host"] = self.db_host
+
+        return kwargs
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

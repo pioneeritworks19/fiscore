@@ -1,0 +1,1530 @@
+from __future__ import annotations
+
+from collections import defaultdict
+from datetime import datetime
+from html import escape
+import json
+from math import ceil
+from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
+
+from fiscore_backend.ingestion.core.dispatcher import dispatch_run
+from fiscore_backend.models import (
+    CreateRerunRequest,
+    MasterInspectionLineageSummary,
+    OpsAlertSummary,
+    OpsArtifactDetail,
+    OpsArtifactSummary,
+    OpsHealthSummary,
+    OpsParseResultSummary,
+    OpsPlatformSummary,
+    OpsRerunSummary,
+    OpsRunDetail,
+    OpsRunSummary,
+    OpsSourceSummary,
+    SourceVersionSummary,
+    TriggerRunRequest,
+    WorkerRunRequest,
+    WorkerRunResponse,
+)
+from fiscore_backend.ops.repository import (
+    create_rerun_request,
+    get_artifact_detail,
+    get_health_summary,
+    get_parse_result_detail,
+    get_run_detail,
+    list_alerts,
+    list_alerts_page,
+    list_artifacts,
+    list_artifacts_page,
+    list_lineage,
+    list_lineage_page,
+    list_parse_results,
+    list_parse_results_page,
+    list_platforms,
+    list_reruns,
+    list_reruns_page,
+    list_runs,
+    list_runs_page,
+    list_source_versions,
+    list_source_versions_page,
+    list_sources,
+    list_sources_page,
+)
+
+router = APIRouter(prefix="/ops", tags=["ops"])
+
+NavItem = tuple[str, str]
+NAV_ITEMS: list[NavItem] = [
+    ("Overview", "/ops/control-panel"),
+    ("Platforms", "/ops/control-panel/platforms"),
+    ("Sources", "/ops/control-panel/sources"),
+    ("Runs", "/ops/control-panel/runs"),
+    ("Artifacts", "/ops/control-panel/artifacts"),
+    ("Parsed", "/ops/control-panel/parse-results"),
+    ("Health", "/ops/control-panel/health"),
+    ("Alerts", "/ops/control-panel/alerts"),
+    ("Reruns", "/ops/control-panel/reruns"),
+    ("Lineage", "/ops/control-panel/lineage"),
+    ("Versions", "/ops/control-panel/versions"),
+]
+PAGE_SIZE_OPTIONS = (25, 50, 100, 250)
+DISPLAY_TIMEZONE = ZoneInfo("America/New_York")
+
+
+@router.get("/platforms", response_model=list[OpsPlatformSummary])
+def get_platforms() -> list[OpsPlatformSummary]:
+    return list_platforms()
+
+
+@router.get("/sources", response_model=list[OpsSourceSummary])
+def get_sources(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+    platform_slug: str | None = None,
+    never_run_only: bool = False,
+) -> list[OpsSourceSummary]:
+    return list_sources_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        platform_slug=platform_slug,
+        never_run_only=never_run_only,
+    )[0]
+
+
+@router.get("/runs", response_model=list[OpsRunSummary])
+def get_runs(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+    source_slug: str | None = None,
+) -> list[OpsRunSummary]:
+    return list_runs_page(page=page, page_size=page_size, query=q, source_slug=source_slug)[0]
+
+
+@router.get("/runs/{scrape_run_id}", response_model=OpsRunDetail)
+def get_run(scrape_run_id: str) -> OpsRunDetail:
+    detail = get_run_detail(scrape_run_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Run {scrape_run_id} was not found.")
+    return detail
+
+
+@router.get("/artifacts", response_model=list[OpsArtifactSummary])
+def get_artifacts(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+) -> list[OpsArtifactSummary]:
+    return list_artifacts_page(page=page, page_size=page_size, query=q)[0]
+
+
+@router.get("/artifacts/{raw_artifact_id}", response_model=OpsArtifactDetail)
+def get_artifact(raw_artifact_id: str) -> OpsArtifactDetail:
+    detail = get_artifact_detail(raw_artifact_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Artifact {raw_artifact_id} was not found.")
+    return detail
+
+
+@router.get("/parse-results", response_model=list[OpsParseResultSummary])
+def get_parse_results(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+    record_type: str | None = None,
+) -> list[OpsParseResultSummary]:
+    return list_parse_results_page(page=page, page_size=page_size, query=q, record_type=record_type)[0]
+
+
+@router.get("/parse-results/{parse_result_id}", response_model=OpsParseResultSummary)
+def get_parse_result(parse_result_id: str) -> OpsParseResultSummary:
+    detail = get_parse_result_detail(parse_result_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Parse result {parse_result_id} was not found.")
+    return detail
+
+
+@router.get("/alerts", response_model=list[OpsAlertSummary])
+def get_alerts(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+) -> list[OpsAlertSummary]:
+    return list_alerts_page(page=page, page_size=page_size, query=q)[0]
+
+
+@router.get("/health", response_model=OpsHealthSummary)
+def get_health() -> OpsHealthSummary:
+    return get_health_summary()
+
+
+@router.get("/reruns", response_model=list[OpsRerunSummary])
+def get_reruns(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+) -> list[OpsRerunSummary]:
+    return list_reruns_page(page=page, page_size=page_size, query=q)[0]
+
+
+@router.post("/reruns", response_model=OpsRerunSummary)
+def create_rerun(request: CreateRerunRequest) -> OpsRerunSummary:
+    try:
+        return create_rerun_request(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/lineage", response_model=list[MasterInspectionLineageSummary])
+def get_lineage(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+) -> list[MasterInspectionLineageSummary]:
+    return list_lineage_page(page=page, page_size=page_size, query=q)[0]
+
+
+@router.get("/versions", response_model=list[SourceVersionSummary])
+def get_versions(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+) -> list[SourceVersionSummary]:
+    return list_source_versions_page(page=page, page_size=page_size, query=q)[0]
+
+
+@router.post("/sources/{source_slug}/runs", response_model=WorkerRunResponse)
+def trigger_run(source_slug: str, request: TriggerRunRequest) -> WorkerRunResponse:
+    return dispatch_run(
+        WorkerRunRequest(
+            source_slug=source_slug,
+            run_mode=request.run_mode,
+            trigger_type="manual",
+        )
+    )
+
+
+def _build_url(path: str, **params: object) -> str:
+    cleaned = {}
+    for key, value in params.items():
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        cleaned[key] = value
+    if not cleaned:
+        return path
+    return f"{path}?{urlencode(cleaned)}"
+
+
+def _nav_html(active_path: str) -> str:
+    items = []
+    for label, href in NAV_ITEMS:
+        is_overview = href == "/ops/control-panel"
+        active = "active" if (
+            active_path == href
+            or (not is_overview and active_path.startswith(f"{href}/"))
+        ) else ""
+        items.append(f'<a class="nav-link {active}" href="{href}">{escape(label)}</a>')
+    return "".join(items)
+
+
+def _badge_class(status: str | None) -> str:
+    if status is None:
+        return "badge"
+    lowered = status.lower()
+    if "fail" in lowered or "error" in lowered or "stale" in lowered:
+        return "badge fail"
+    if "warn" in lowered or "queue" in lowered or "running" in lowered or "pending" in lowered:
+        return "badge warn"
+    if "healthy" in lowered or "complete" in lowered or "active" in lowered or "matched" in lowered or "available" in lowered:
+        return "badge ok"
+    return "badge"
+
+
+def _pretty(value: object) -> str:
+    return escape(json.dumps(value, indent=2, default=str))
+
+
+def _display(value: object | None) -> str:
+    if isinstance(value, datetime):
+        localized = value.astimezone(DISPLAY_TIMEZONE)
+        return escape(localized.strftime("%Y-%m-%d %I:%M:%S %p ET"))
+    return escape(str(value)) if value not in (None, "") else "&mdash;"
+
+
+def _truncate_middle(value: str, *, max_length: int = 72) -> str:
+    if len(value) <= max_length:
+        return value
+    keep = max((max_length - 3) // 2, 8)
+    return f"{value[:keep]}...{value[-keep:]}"
+
+
+def _latest_badge(index: int) -> str:
+    return " <span class='badge ok'>Latest</span>" if index == 0 else ""
+
+
+def _meta_text(value: str) -> str:
+    return f"<span class='meta-text'>{escape(value)}</span>"
+
+
+def _sorted_hint(label: str = "Newest first. Times shown in America/New_York.") -> str:
+    return f"<div class='muted sorted-hint'>{escape(label)}</div>"
+
+
+def _compact_link(value: str, *, href: str | None = None, max_length: int = 76) -> str:
+    display_value = _truncate_middle(value, max_length=max_length)
+    target = href or value
+    return (
+        f"<a class='compact-link' href='{escape(target)}' title='{escape(value)}'>"
+        f"{escape(display_value)}</a>"
+    )
+
+
+def _compact_text(value: str, *, max_length: int = 76) -> str:
+    display_value = _truncate_middle(value, max_length=max_length)
+    return f"<span class='compact-text' title='{escape(value)}'>{escape(display_value)}</span>"
+
+
+def _table(headers: list[str], rows: list[str], *, empty_message: str, colspan: int | None = None) -> str:
+    head_html = "".join(f"<th>{escape(header)}</th>" for header in headers)
+    if not rows:
+        cols = colspan or len(headers)
+        rows_html = f'<tr><td colspan="{cols}" class="muted">{escape(empty_message)}</td></tr>'
+    else:
+        rows_html = "".join(rows)
+    return f"<table><thead><tr>{head_html}</tr></thead><tbody>{rows_html}</tbody></table>"
+
+
+def _summary_line(*, page: int, page_size: int, total_count: int) -> str:
+    if total_count == 0:
+        return '<div class="muted">0 records</div>'
+    start = (page - 1) * page_size + 1
+    end = min(page * page_size, total_count)
+    return f'<div class="muted">Showing {start}-{end} of {total_count} records</div>'
+
+
+def _pagination_controls(path: str, *, page: int, page_size: int, total_count: int, **query_params: object) -> str:
+    total_pages = max(ceil(total_count / page_size), 1) if page_size else 1
+    prev_url = _build_url(path, page=page - 1, page_size=page_size, **query_params) if page > 1 else None
+    next_url = _build_url(path, page=page + 1, page_size=page_size, **query_params) if page < total_pages else None
+    prev_button = (
+        f'<a class="button secondary" href="{prev_url}">Previous</a>' if prev_url else '<span class="button secondary disabled">Previous</span>'
+    )
+    next_button = (
+        f'<a class="button secondary" href="{next_url}">Next</a>' if next_url else '<span class="button secondary disabled">Next</span>'
+    )
+    return f"""
+    <div class="pager">
+      {_summary_line(page=page, page_size=page_size, total_count=total_count)}
+      <div class="actions">
+        {prev_button}
+        <span class="badge">Page {page} of {total_pages}</span>
+        {next_button}
+      </div>
+    </div>
+    """
+
+
+def _search_form(
+    path: str,
+    *,
+    q: str | None,
+    page_size: int,
+    placeholder: str,
+    extra_fields: str = "",
+) -> str:
+    options = "".join(
+        f"<option value='{size}' {'selected' if size == page_size else ''}>{size} / page</option>"
+        for size in PAGE_SIZE_OPTIONS
+    )
+    return f"""
+    <form method="get" action="{path}" class="toolbar-form">
+      <input class="control-grow" type="search" name="q" value="{escape(q or '')}" placeholder="{escape(placeholder)}" />
+      <select class="control-compact" name="page_size">{options}</select>
+      {extra_fields}
+      <button type="submit">Apply</button>
+      <a class="button secondary" href="{path}">Clear</a>
+    </form>
+    """
+
+
+def _platform_filter_select(current: str | None) -> str:
+    options = ['<option value="">All platforms</option>']
+    for platform in list_platforms():
+        selected = "selected" if platform.platform_slug == current else ""
+        options.append(
+            f"<option value='{escape(platform.platform_slug)}' {selected}>{escape(platform.platform_name)}</option>"
+        )
+    return f"<select name='platform_slug'>{''.join(options)}</select>"
+
+
+def _checkbox_field(*, name: str, label: str, checked: bool) -> str:
+    return (
+        f"<label class='filter-toggle'>"
+        f"<input type='checkbox' name='{escape(name)}' value='true' {'checked' if checked else ''} />"
+        f"<span>{escape(label)}</span>"
+        f"</label>"
+    )
+
+
+def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str:
+    return f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{escape(title)}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {{
+        --bg: #eef5fb;
+        --surface: #ffffff;
+        --surface-2: #f6faff;
+        --surface-3: #edf4fb;
+        --ink: #112031;
+        --muted: #5d6f82;
+        --line: #d7e4f2;
+        --line-strong: #bed1e3;
+        --accent: #0d6efd;
+        --accent-2: #073b8a;
+        --accent-soft: #e7f1ff;
+        --shadow: rgba(21, 56, 99, 0.08);
+      }}
+      * {{ box-sizing: border-box; }}
+      body {{
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top right, rgba(0, 171, 228, 0.18), transparent 24%),
+          radial-gradient(circle at top left, rgba(13, 110, 253, 0.12), transparent 20%),
+          linear-gradient(180deg, #f7fbff 0%, #edf4fb 100%);
+      }}
+      a {{ color: var(--accent); text-decoration: none; }}
+      a:hover {{ text-decoration: underline; }}
+      .layout {{
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 100vh;
+      }}
+      .sidebar {{
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        padding: 32px 20px;
+        border-right: 1px solid var(--line);
+        background:
+          linear-gradient(180deg, rgba(10, 27, 47, 0.96) 0%, rgba(14, 41, 72, 0.94) 100%);
+        box-shadow: 14px 0 32px rgba(10, 31, 54, 0.08);
+      }}
+      .brand {{
+        margin-bottom: 28px;
+      }}
+      .brand h1 {{
+        margin: 0;
+        font-size: 1.95rem;
+        letter-spacing: -0.03em;
+        color: #f8fbff;
+      }}
+      .brand p {{
+        margin: 10px 0 0;
+        color: rgba(225, 236, 249, 0.78);
+        line-height: 1.6;
+        max-width: 210px;
+      }}
+      .nav {{
+        display: grid;
+        gap: 10px;
+        margin-top: 26px;
+      }}
+      .nav-link {{
+        display: block;
+        padding: 12px 14px;
+        border-radius: 14px;
+        color: rgba(232, 241, 250, 0.88);
+        background: transparent;
+        border: 1px solid transparent;
+        font-weight: 500;
+      }}
+      .nav-link.active {{
+        background: linear-gradient(135deg, rgba(231, 241, 255, 0.18) 0%, rgba(0, 171, 228, 0.16) 100%);
+        border-color: rgba(141, 192, 255, 0.42);
+        color: #ffffff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }}
+      .nav-link:hover {{
+        text-decoration: none;
+        background: rgba(255, 255, 255, 0.05);
+      }}
+      .main {{
+        padding: 32px 30px 64px;
+      }}
+      .hero {{
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 16px;
+        margin-bottom: 26px;
+      }}
+      .hero h1 {{
+        margin: 0;
+        font-size: 2.4rem;
+        letter-spacing: -0.045em;
+        color: #0d2038;
+      }}
+      .hero p {{
+        margin: 10px 0 0;
+        color: var(--muted);
+        max-width: 780px;
+        line-height: 1.65;
+      }}
+      .grid {{ display: grid; gap: 18px; }}
+      .grid.two {{ grid-template-columns: 1fr 1fr; }}
+      .grid.three {{ grid-template-columns: repeat(3, 1fr); }}
+      .panel {{
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 22px;
+        box-shadow: 0 18px 38px var(--shadow);
+      }}
+      .platform-card {{
+        display: grid;
+        gap: 14px;
+      }}
+      .platform-card h3 {{
+        margin: 0;
+      }}
+      .panel h2 {{
+        margin: 0 0 14px;
+        font-size: 1.08rem;
+        font-weight: 700;
+        color: #153556;
+      }}
+      .panel h3 {{
+        margin: 0 0 10px;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #153556;
+      }}
+      table {{
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.94rem;
+        table-layout: fixed;
+      }}
+      thead th {{
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(6px);
+      }}
+      th, td {{
+        padding: 12px 8px;
+        border-bottom: 1px solid #e7eef7;
+        text-align: left;
+        vertical-align: top;
+        overflow-wrap: anywhere;
+      }}
+      th {{
+        font-size: 0.8rem;
+        color: #59708c;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 700;
+      }}
+      .badge {{
+        display: inline-block;
+        padding: 5px 11px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #f8fbff;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }}
+      .badge.ok {{ color: #0f6a3c; border-color: #a6debf; background: #edf9f2; }}
+      .badge.warn {{ color: #8b5e1f; border-color: #e4c081; background: #fff7e8; }}
+      .badge.fail {{ color: #9a2d3f; border-color: #e2adbb; background: #fff1f4; }}
+      .button.disabled {{
+        cursor: default;
+        opacity: 0.45;
+        text-decoration: none;
+      }}
+      .muted {{ color: var(--muted); }}
+      .meta-text {{
+        display: inline-block;
+        margin-top: 4px;
+        color: #74879b;
+        font-size: 0.86rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+      }}
+      .stat {{
+        padding: 18px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+        border: 1px solid var(--line);
+      }}
+      .stat .value {{
+        display: block;
+        font-size: 1.9rem;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: #123c74;
+      }}
+      .actions {{
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }}
+      button, .button {{
+        border: 0;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--accent) 0%, #009fe3 100%);
+        color: white;
+        padding: 11px 17px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        box-shadow: 0 10px 22px rgba(0, 110, 253, 0.18);
+      }}
+      button.secondary, .button.secondary {{
+        background: linear-gradient(135deg, #51657d 0%, #6f849b 100%);
+        box-shadow: none;
+      }}
+      pre {{
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #f6faff;
+        border: 1px solid #dce9f6;
+        border-radius: 14px;
+        padding: 14px;
+        font-size: 0.88rem;
+      }}
+      .stack > * + * {{ margin-top: 12px; }}
+      form.inline {{
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }}
+      .run-form {{
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: nowrap;
+        width: 100%;
+      }}
+      .run-form select {{
+        min-width: 170px;
+        max-width: 190px;
+      }}
+      .run-form button {{
+        padding: 9px 14px;
+        min-width: 64px;
+        white-space: nowrap;
+      }}
+      .action-cell {{
+        white-space: nowrap;
+      }}
+      .toolbar {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+        gap: 10px;
+        flex-wrap: wrap;
+      }}
+      .toolbar-form {{
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        width: 100%;
+      }}
+      .toolbar-form .control-grow {{
+        flex: 1 1 280px;
+        min-width: 240px;
+      }}
+      .toolbar-form .control-compact {{
+        width: auto;
+        min-width: 138px;
+      }}
+      .filter-toggle {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 42px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        color: var(--muted);
+        font-size: 0.92rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }}
+      .filter-toggle input {{
+        width: auto;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+      }}
+      input, select, textarea {{
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        color: var(--ink);
+        padding: 9px 12px;
+        font: inherit;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      }}
+      input:focus, select:focus, textarea:focus {{
+        outline: none;
+        border-color: #8fc0ff;
+        box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.12);
+      }}
+      input[type="search"] {{
+        min-width: 260px;
+        flex: 1 1 280px;
+      }}
+      textarea {{ min-height: 96px; resize: vertical; }}
+      .pager {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin: 10px 0;
+        flex-wrap: wrap;
+      }}
+      .pager .actions {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }}
+      .pager .button,
+      .toolbar-form button,
+      .toolbar-form .button {{
+        padding: 9px 14px;
+      }}
+      .chip-row {{
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }}
+      .chip {{
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--muted);
+        font-size: 0.84rem;
+      }}
+      .sorted-hint {{
+        margin: 0 0 10px;
+        font-size: 0.9rem;
+      }}
+      .latest-row td {{
+        background: rgba(231, 241, 255, 0.72);
+      }}
+      .compact-link, .compact-text {{
+        display: inline-block;
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }}
+      .mono {{
+        font-family: "Cascadia Code", Consolas, monospace;
+        font-size: 0.88rem;
+      }}
+      .table-tight th:nth-child(1) {{ width: 13%; }}
+      .table-tight th:nth-child(2) {{ width: 10%; }}
+      .table-tight th:nth-child(3) {{ width: 10%; }}
+      .table-tight th:nth-child(4) {{ width: 15%; }}
+      .table-tight th:nth-child(5) {{ width: 8%; }}
+      .table-tight th:nth-child(6) {{ width: 8%; }}
+      .table-tight th:nth-child(7) {{ width: 10%; }}
+      .table-tight th:nth-child(8) {{ width: 8%; }}
+      .table-tight th:nth-child(9) {{ width: 8%; }}
+      .table-tight th:nth-child(10) {{ width: 18%; }}
+      .table-artifacts th:nth-child(1) {{ width: 10%; }}
+      .table-artifacts th:nth-child(2) {{ width: 8%; }}
+      .table-artifacts th:nth-child(3) {{ width: 36%; }}
+      .table-artifacts th:nth-child(4) {{ width: 28%; }}
+      .table-artifacts th:nth-child(5) {{ width: 18%; }}
+      @media (max-width: 1020px) {{
+        .layout {{ grid-template-columns: 1fr; }}
+        .sidebar {{
+          position: static;
+          height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }}
+        .grid.two, .grid.three {{ grid-template-columns: 1fr; }}
+      }}
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>FiScore Ops</h1>
+          <p>Control panel for core ingestion, source adapters, artifacts, normalization, and source lineage.</p>
+        </div>
+        <nav class="nav">
+          {_nav_html(active_path)}
+        </nav>
+      </aside>
+      <main class="main">
+        {body_html}
+      </main>
+    </div>
+  </body>
+</html>"""
+
+
+def _overview_page() -> str:
+    health = get_health_summary()
+    platforms = list_platforms()
+    sources = list_sources(limit=12)
+    runs = list_runs(limit=12)
+    body = f"""
+    <section class="hero">
+      <div>
+        <h1>Overview</h1>
+        <p>Command center for ingestion operations. Use the menu to drill into platforms, sources, run history, raw artifacts, parsed records, health, alerts, rerun workflows, and normalized lineage.</p>
+      </div>
+      <div class="actions">
+        <a class="button secondary" href="/ops/control-panel">Refresh</a>
+      </div>
+    </section>
+    <section class="grid three">
+      <div class="stat"><span class="value">{health.total_platforms}</span><span class="muted">Registered platforms</span></div>
+      <div class="stat"><span class="value">{health.total_sources}</span><span class="muted">Registered sources</span></div>
+      <div class="stat"><span class="value">{health.open_alert_count}</span><span class="muted">Open alerts</span></div>
+    </section>
+    <section class="grid two" style="margin-top:18px;">
+      <section class="panel">
+        <h2>Platform snapshot</h2>
+        {_table(
+            ["Platform", "Sources", "Healthy", "Warnings", "Stale", "Latest success"],
+            [
+                f"<tr><td><a href='/ops/control-panel/sources?platform_slug={escape(p.platform_slug)}'>{escape(p.platform_name)}</a></td><td>{p.source_count}</td><td>{p.healthy_source_count}</td><td>{p.warning_source_count}</td><td>{p.stale_source_count}</td><td>{_display(p.latest_success_at)}</td></tr>"
+                for p in platforms[:8]
+            ],
+            empty_message="No platforms registered yet."
+        )}
+      </section>
+      <section class="panel">
+        <h2>Sources needing attention</h2>
+        {_table(
+            ["Source", "Status", "Last success", "Freshness", "Action"],
+            [
+                f"<tr><td><strong>{escape(s.source_name)}</strong><br>{_meta_text(s.source_slug)}</td><td><span class='{_badge_class(s.last_run_status)}'>{escape(s.last_run_status or 'never run')}</span></td><td>{_display(s.latest_success_at)}</td><td>{_display(s.freshness_age_days)}</td><td><a href='/ops/control-panel/sources'>Open</a></td></tr>"
+                for s in sources
+                if s.freshness_age_days is None or s.freshness_age_days > s.target_freshness_days or (s.last_run_status and "warning" in s.last_run_status.lower())
+            ][:10],
+            empty_message="No sources currently need attention."
+        )}
+      </section>
+    </section>
+    <section class="panel" style="margin-top:18px;">
+      <h2>Recent runs</h2>
+      {_sorted_hint()}
+      {_table(
+          ["Run", "Mode", "Status", "Artifacts", "Parsed", "Normalized"],
+          [
+                f"<tr class='{'latest-row' if i == 0 else ''}'><td><a href='/ops/control-panel/runs/{r.scrape_run_id}'>{escape(r.scrape_run_id[:8])}</a>{_latest_badge(i)}<br>{_meta_text(r.source_slug)}</td><td>{escape(r.run_mode)}</td><td><span class='{_badge_class(r.run_status)}'>{escape(r.run_status)}</span></td><td>{r.artifact_count}</td><td>{r.parsed_record_count}</td><td>{r.normalized_record_count}</td></tr>"
+              for i, r in enumerate(runs)
+          ],
+          empty_message="No runs recorded yet."
+      )}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Overview", active_path="/ops/control-panel")
+
+
+def _platforms_page() -> str:
+    platforms = list_platforms()
+    cards = []
+    for platform in platforms:
+        cards.append(
+            f"""
+            <section class="panel platform-card">
+              <div>
+                <h3>{escape(platform.platform_name)}</h3>
+                <div class="muted">{escape(platform.platform_slug)}</div>
+              </div>
+              <div class="chip-row">
+                <span class="chip">{platform.source_count} sources</span>
+                <span class="chip">{platform.healthy_source_count} healthy</span>
+                <span class="chip">{platform.warning_source_count} warning</span>
+                <span class="chip">{platform.stale_source_count} stale</span>
+              </div>
+              <div class="muted">Base domain: {escape(platform.base_domain or 'n/a')}</div>
+              <div class="muted">Latest success: {_display(platform.latest_success_at)}</div>
+              <div class="actions"><a class="button secondary" href="/ops/control-panel/sources?platform_slug={escape(platform.platform_slug)}">View sources</a></div>
+            </section>
+            """
+        )
+    body = f"""
+    <section class="hero">
+      <div><h1>Platforms</h1><p>Platform registry groups related source ingestions so the console stays manageable as more websites come online.</p></div>
+    </section>
+    <section class="grid two">
+      {''.join(cards) if cards else "<section class='panel'><div class='muted'>No platforms registered yet.</div></section>"}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Platforms", active_path="/ops/control-panel/platforms")
+
+
+def _sources_page(
+    *,
+    q: str | None,
+    page: int,
+    page_size: int,
+    platform_slug: str | None,
+    never_run_only: bool,
+) -> str:
+    sources, total_count = list_sources_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        platform_slug=platform_slug,
+        never_run_only=never_run_only,
+    )
+    grouped: dict[tuple[str | None, str], list[OpsSourceSummary]] = defaultdict(list)
+    for source in sources:
+        grouped[(source.platform_slug, source.platform_name)].append(source)
+
+    group_sections = []
+    for (group_slug, group_name), group_sources in grouped.items():
+        rows = []
+        for source in group_sources:
+            run_form = (
+                f"<form class='run-form' method='post' action='/ops/control-panel/sources/{escape(source.source_slug)}/run'>"
+                "<select name='run_mode'>"
+                "<option value='incremental'>incremental</option>"
+                "<option value='reconciliation'>reconciliation</option>"
+                "<option value='backfill'>backfill</option>"
+                "</select>"
+                "<button type='submit'>Run</button>"
+                "</form>"
+            )
+            rows.append(
+                f"<tr><td><strong>{escape(source.source_name)}</strong><br>{_meta_text(source.source_slug)}</td>"
+                f"<td>{escape(source.jurisdiction_name)}</td>"
+                f"<td><span class='{_badge_class(source.status)}'>{escape(source.status)}</span></td>"
+                f"<td><span class='{_badge_class(source.last_run_status)}'>{escape(source.last_run_status or 'never run')}</span></td>"
+                f"<td>{_display(source.latest_success_at)}</td>"
+                f"<td>{_display(source.freshness_age_days)}</td>"
+                f"<td class='action-cell'>{run_form}</td></tr>"
+            )
+        section = f"""
+        <section class="panel">
+          <div class="toolbar">
+            <div>
+              <h2>{escape(group_name)}</h2>
+              <div class="muted">{escape(group_slug or 'unregistered-platform')}</div>
+            </div>
+            <div class="chip-row"><span class="chip">{len(group_sources)} sources on this page</span></div>
+          </div>
+          {_table(["Source", "Jurisdiction", "Config status", "Last run", "Last success", "Freshness (days)", "Action"], rows, empty_message="No sources found for this platform.")}
+        </section>
+        """
+        group_sections.append(section)
+
+    toolbar = _search_form(
+        "/ops/control-panel/sources",
+        q=q,
+        page_size=page_size,
+        placeholder="Search source slug, source name, platform, or jurisdiction",
+        extra_fields="".join(
+            [
+                _platform_filter_select(platform_slug),
+                _checkbox_field(name="never_run_only", label="Never run only", checked=never_run_only),
+            ]
+        ),
+    )
+    pager = _pagination_controls(
+        "/ops/control-panel/sources",
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        q=q,
+        platform_slug=platform_slug,
+        never_run_only="true" if never_run_only else None,
+    )
+    body = f"""
+    <section class="hero">
+      <div><h1>Sources</h1><p>All configured source ingestions across current and future platforms.</p></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+    </section>
+    <section class="grid">
+      {''.join(group_sections) if group_sections else "<section class='panel'><div class='muted'>No sources found.</div></section>"}
+    </section>
+    <section class="panel">{pager}</section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Sources", active_path="/ops/control-panel/sources")
+
+
+def _runs_page(*, q: str | None, page: int, page_size: int, source_slug: str | None) -> str:
+    runs, total_count = list_runs_page(page=page, page_size=page_size, query=q, source_slug=source_slug)
+    rows = [
+        f"<tr class='{'latest-row' if i == 0 else ''}'><td><a href='/ops/control-panel/runs/{escape(r.scrape_run_id)}'>{escape(r.scrape_run_id[:8])}</a>{_latest_badge(i)}<br>{_meta_text(r.source_slug)}</td>"
+        f"<td>{escape(r.run_mode)}</td>"
+        f"<td><span class='badge'>{escape(r.trigger_type)}</span></td>"
+        f"<td><span class='{_badge_class(r.run_status)}'>{escape(r.run_status)}</span></td>"
+        f"<td>{r.artifact_count}</td><td>{r.parsed_record_count}</td><td>{r.normalized_record_count}</td><td>{r.warning_count}</td><td>{r.error_count}</td><td>{_display(r.started_at)}</td></tr>"
+        for i, r in enumerate(runs)
+    ]
+    source_options = ["<option value=''>All sources</option>"]
+    for source in list_sources(limit=250):
+        selected = "selected" if source.source_slug == source_slug else ""
+        source_options.append(
+            f"<option value='{escape(source.source_slug)}' {selected}>{escape(source.source_name)}</option>"
+        )
+    toolbar = _search_form(
+        "/ops/control-panel/runs",
+        q=q,
+        page_size=page_size,
+        placeholder="Search source, run mode, status, or trigger",
+        extra_fields=f"<select name='source_slug'>{''.join(source_options)}</select>",
+    )
+    pager = _pagination_controls(
+        "/ops/control-panel/runs",
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        q=q,
+        source_slug=source_slug,
+    )
+    body = f"""
+    <section class="hero">
+      <div><h1>Runs</h1><p>Recent source execution history across all ingestion modes.</p></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_sorted_hint()}
+      <div class="table-tight">
+      {_table(["Run", "Mode", "Trigger", "Status", "Artifacts", "Parsed", "Normalized", "Warnings", "Errors", "Started"], rows, empty_message="No runs recorded yet.")}
+      </div>
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Runs", active_path="/ops/control-panel/runs")
+
+
+def _run_detail_page(scrape_run_id: str) -> str:
+    detail = get_run_detail(scrape_run_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Run {scrape_run_id} was not found.")
+    artifact_rows = [
+        f"<tr><td>{escape(a.artifact_type)}</td><td><a href='/ops/control-panel/artifacts/{escape(a.raw_artifact_id)}'>{escape(a.raw_artifact_id[:8])}</a></td><td class='mono'>{_compact_link(a.source_url)}</td><td class='mono'>{_compact_text(a.storage_path)}</td><td>{_display(a.fetched_at)}</td></tr>"
+        for a in detail.artifacts
+    ]
+    parse_rows = [
+        f"<tr><td>{escape(p.record_type)}</td><td><a href='/ops/control-panel/parse-results/{escape(p.parse_result_id)}'>{escape(p.parse_result_id[:8])}</a></td><td>{escape(p.parse_status)}</td><td>{escape(p.source_record_key or '—')}</td><td>{p.warning_count}</td></tr>"
+        for p in detail.parse_results[:100]
+    ]
+    warning_rows = [
+        f"<tr><td>{escape(w.warning_code)}</td><td>{escape(w.warning_message)}</td><td>{_display(w.created_at)}</td></tr>"
+        for w in detail.warnings
+    ]
+    body = f"""
+    <section class="hero">
+      <div>
+        <h1>Run {escape(detail.run.scrape_run_id[:8])}</h1>
+        <p>{escape(detail.run.source_name)} - {escape(detail.run.source_slug)} - {escape(detail.run.run_mode)}</p>
+      </div>
+      <div class="actions"><a class="button secondary" href="/ops/control-panel/runs">Back to runs</a></div>
+    </section>
+    <section class="grid two">
+      <section class="panel stack">
+        <h2>Summary</h2>
+        <div class="actions">
+          <span class="{_badge_class(detail.run.run_status)}">{escape(detail.run.run_status)}</span>
+          <span class="badge">Artifacts {detail.run.artifact_count}</span>
+          <span class="badge">Parsed {detail.run.parsed_record_count}</span>
+          <span class="badge">Normalized {detail.run.normalized_record_count}</span>
+        </div>
+        <div class="muted">Started: {_display(detail.run.started_at)}</div>
+        <div class="muted">Completed: {_display(detail.run.completed_at)}</div>
+        <div class="muted">Trigger: {escape(detail.run.trigger_type)}</div>
+        <div class="muted">Warning count: {detail.run.warning_count} | Error count: {detail.run.error_count}</div>
+        <div class="muted">Error summary: {escape(detail.run.error_summary or '-')}</div>
+      </section>
+      <section class="panel">
+        <h2>Request Context</h2>
+        <pre>{_pretty(detail.request_context)}</pre>
+      </section>
+      <section class="panel">
+        <h2>Source Snapshot</h2>
+        <pre>{_pretty(detail.source_snapshot)}</pre>
+      </section>
+      <section class="panel">
+        <h2>Artifacts</h2>
+        <div class="table-artifacts">
+        {_table(["Type", "Artifact", "Source URL", "Storage", "Fetched"], artifact_rows, empty_message="No artifacts recorded.")}
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Parse Results</h2>
+        {_table(["Type", "Parse Result", "Status", "Source key", "Warnings"], parse_rows, empty_message="No parse results recorded.")}
+      </section>
+      <section class="panel">
+        <h2>Warnings</h2>
+        {_table(["Code", "Message", "Created"], warning_rows, empty_message="No parser warnings recorded.")}
+      </section>
+    </section>
+    """
+    return _control_panel_shell(body, title=f"Run {detail.run.scrape_run_id}", active_path="/ops/control-panel/runs")
+
+
+def _artifacts_page(*, q: str | None, page: int, page_size: int) -> str:
+    artifacts, total_count = list_artifacts_page(page=page, page_size=page_size, query=q)
+    rows = [
+        f"<tr class='{'latest-row' if i == 0 else ''}'><td><a href='/ops/control-panel/artifacts/{escape(a.raw_artifact_id)}'>{escape(a.raw_artifact_id[:8])}</a>{_latest_badge(i)}</td><td>{escape(a.artifact_type)}</td><td class='mono'>{_compact_link(a.source_url)}</td><td class='mono'>{_compact_text(a.storage_path)}</td><td>{_display(a.fetched_at)}</td></tr>"
+        for i, a in enumerate(artifacts)
+    ]
+    toolbar = _search_form(
+        "/ops/control-panel/artifacts",
+        q=q,
+        page_size=page_size,
+        placeholder="Search artifact type, source URL, storage path, or source slug",
+    )
+    pager = _pagination_controls("/ops/control-panel/artifacts", page=page, page_size=page_size, total_count=total_count, q=q)
+    body = f"""
+    <section class="hero">
+      <div><h1>Artifacts</h1><p>Raw HTML, JSON, and future PDFs fetched during source ingestion.</p></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_sorted_hint()}
+      <div class="table-artifacts">
+      {_table(["Artifact", "Type", "Source URL", "Storage Path", "Fetched"], rows, empty_message="No artifacts recorded yet.")}
+      </div>
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Artifacts", active_path="/ops/control-panel/artifacts")
+
+
+def _artifact_detail_page(raw_artifact_id: str) -> str:
+    detail = get_artifact_detail(raw_artifact_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Artifact {raw_artifact_id} was not found.")
+    body = f"""
+    <section class="hero">
+      <div><h1>Artifact {escape(detail.raw_artifact_id[:8])}</h1><p>Raw artifact detail and storage reference.</p></div>
+      <div class="actions"><a class="button secondary" href="/ops/control-panel/artifacts">Back to artifacts</a></div>
+    </section>
+    <section class="grid two">
+      <section class="panel stack">
+        <h2>Artifact Summary</h2>
+        <div class="muted">Type: {escape(detail.artifact_type)}</div>
+        <div class="muted">Fetched: {_display(detail.fetched_at)}</div>
+        <div class="muted">Source URL: <a class="mono" href="{escape(detail.source_url)}">{escape(detail.source_url)}</a></div>
+        <div class="muted">Storage path: <span class="mono">{escape(detail.storage_path)}</span></div>
+        <div class="muted">Content hash: {escape(detail.content_hash)}</div>
+      </section>
+      <section class="panel">
+        <h2>Trace</h2>
+        <pre>{_pretty({"source_id": detail.source_id, "scrape_run_id": detail.scrape_run_id})}</pre>
+      </section>
+    </section>
+    """
+    return _control_panel_shell(body, title=f"Artifact {detail.raw_artifact_id}", active_path="/ops/control-panel/artifacts")
+
+
+def _parse_results_page(*, q: str | None, page: int, page_size: int, record_type: str | None) -> str:
+    parse_results, total_count = list_parse_results_page(page=page, page_size=page_size, query=q, record_type=record_type)
+    rows = [
+        f"<tr class='{'latest-row' if i == 0 else ''}'><td><a href='/ops/control-panel/parse-results/{escape(p.parse_result_id)}'>{escape(p.parse_result_id[:8])}</a>{_latest_badge(i)}</td><td>{escape(p.record_type)}</td><td>{escape(p.parse_status)}</td><td>{escape(p.source_record_key or '-')}</td><td>{p.warning_count}</td><td>{_display(p.created_at)}</td></tr>"
+        for i, p in enumerate(parse_results)
+    ]
+    record_options = ["<option value=''>All types</option>"]
+    for option in ("inspection", "finding"):
+        selected = "selected" if option == record_type else ""
+        record_options.append(f"<option value='{option}' {selected}>{option}</option>")
+    toolbar = _search_form(
+        "/ops/control-panel/parse-results",
+        q=q,
+        page_size=page_size,
+        placeholder="Search record type, source key, parse status, or payload",
+        extra_fields=f"<select name='record_type'>{''.join(record_options)}</select>",
+    )
+    pager = _pagination_controls(
+        "/ops/control-panel/parse-results",
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        q=q,
+        record_type=record_type,
+    )
+    body = f"""
+    <section class="hero">
+      <div><h1>Parsed Records</h1><p>Inspection, finding, and future source-shaped outputs created by parsers.</p></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_sorted_hint()}
+      {_table(["Parse Result", "Type", "Status", "Source Key", "Warnings", "Created"], rows, empty_message="No parse results recorded yet.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Parsed Records", active_path="/ops/control-panel/parse-results")
+
+
+def _parse_result_detail_page(parse_result_id: str) -> str:
+    detail = get_parse_result_detail(parse_result_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Parse result {parse_result_id} was not found.")
+    body = f"""
+    <section class="hero">
+      <div><h1>Parse Result {escape(detail.parse_result_id[:8])}</h1><p>{escape(detail.record_type)} - {escape(detail.parse_status)}</p></div>
+      <div class="actions"><a class="button secondary" href="/ops/control-panel/parse-results">Back to parsed records</a></div>
+    </section>
+    <section class="grid two">
+      <section class="panel stack">
+        <h2>Summary</h2>
+        <div class="muted">Type: {escape(detail.record_type)}</div>
+        <div class="muted">Status: {escape(detail.parse_status)}</div>
+        <div class="muted">Source key: {escape(detail.source_record_key or '—')}</div>
+        <div class="muted">Warnings: {detail.warning_count} | Errors: {detail.error_count}</div>
+        <div class="muted">Created: {_display(detail.created_at)}</div>
+      </section>
+      <section class="panel">
+        <h2>Payload</h2>
+        <pre>{_pretty(detail.payload)}</pre>
+      </section>
+    </section>
+    """
+    return _control_panel_shell(body, title=f"Parse Result {detail.parse_result_id}", active_path="/ops/control-panel/parse-results")
+
+
+def _health_page() -> str:
+    health = get_health_summary()
+    sources = list_sources(limit=250)
+    rows = [
+        f"<tr><td><strong>{escape(s.source_name)}</strong><br>{_meta_text(s.source_slug)}</td><td>{_display(s.latest_success_at)}</td><td>{_display(s.freshness_age_days)}</td><td><span class='{_badge_class(s.last_run_status or ('stale' if s.freshness_age_days is None else 'healthy'))}'>{escape(s.last_run_status or 'never run')}</span></td></tr>"
+        for s in sources
+    ]
+    body = f"""
+    <section class="hero">
+      <div><h1>Health</h1><p>Freshness, success cadence, and operational status across all sources.</p></div>
+    </section>
+    <section class="grid three">
+      <div class="stat"><span class="value">{health.total_platforms}</span><span class="muted">Platforms</span></div>
+      <div class="stat"><span class="value">{health.healthy_sources}</span><span class="muted">Healthy sources</span></div>
+      <div class="stat"><span class="value">{health.stale_sources}</span><span class="muted">Stale sources</span></div>
+    </section>
+    <section class="panel" style="margin-top:18px;">
+      <h2>Freshness by source</h2>
+      {_table(["Source", "Latest success", "Freshness days", "Last run status"], rows, empty_message="No source health data yet.")}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Health", active_path="/ops/control-panel/health")
+
+
+def _alerts_page(*, q: str | None, page: int, page_size: int) -> str:
+    alerts, total_count = list_alerts_page(page=page, page_size=page_size, query=q)
+    rows = [
+        f"<tr><td><span class='{_badge_class(a.severity)}'>{escape(a.severity)}</span></td><td>{escape(a.title)}</td><td>{escape(a.source_slug or '—')}</td><td>{escape(a.status)}</td><td>{escape(a.message)}</td><td>{_display(a.created_at)}</td></tr>"
+        for a in alerts
+    ]
+    toolbar = _search_form(
+        "/ops/control-panel/alerts",
+        q=q,
+        page_size=page_size,
+        placeholder="Search alert type, title, source, or message",
+    )
+    pager = _pagination_controls("/ops/control-panel/alerts", page=page, page_size=page_size, total_count=total_count, q=q)
+    body = f"""
+    <section class="hero">
+      <div><h1>Alerts</h1><p>Operational alerts tied to sources and runs.</p></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_table(["Severity", "Title", "Source", "Status", "Message", "Created"], rows, empty_message="No operational alerts recorded.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Alerts", active_path="/ops/control-panel/alerts")
+
+
+def _reruns_page(*, q: str | None, page: int, page_size: int) -> str:
+    reruns, total_count = list_reruns_page(page=page, page_size=page_size, query=q)
+    source_options = "".join(
+        f"<option value='{escape(s.source_slug)}'>{escape(s.source_name)} ({escape(s.source_slug)})</option>"
+        for s in list_sources(limit=250)
+    )
+    rows = [
+        f"<tr><td>{escape(r.source_name)}</td><td>{escape(r.requested_scope)}</td><td>{escape(r.requested_by or '—')}</td><td><span class='{_badge_class(r.status)}'>{escape(r.status)}</span></td><td>{_display(r.created_at)}</td></tr>"
+        for r in reruns
+    ]
+    toolbar = _search_form(
+        "/ops/control-panel/reruns",
+        q=q,
+        page_size=page_size,
+        placeholder="Search source, scope, requester, or status",
+    )
+    pager = _pagination_controls("/ops/control-panel/reruns", page=page, page_size=page_size, total_count=total_count, q=q)
+    body = f"""
+    <section class="hero">
+      <div><h1>Reruns</h1><p>Queue and inspect rerun requests without jumping into SQL.</p></div>
+    </section>
+    <section class="grid two">
+      <section class="panel">
+        <h2>Create rerun request</h2>
+        <form method="post" action="/ops/control-panel/reruns/create" class="stack">
+          <label>Source<select name="source_slug">{source_options}</select></label>
+          <label>Requested scope<select name="requested_scope"><option value="incremental">incremental</option><option value="reconciliation">reconciliation</option><option value="backfill">backfill</option><option value="targeted">targeted</option></select></label>
+          <label>Requested by<input type="text" name="requested_by" value="control-panel" /></label>
+          <label>Request payload (JSON)<textarea name="request_payload">{{}}</textarea></label>
+          <div class="actions"><button type="submit">Create rerun request</button></div>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Recent rerun requests</h2>
+        <div class="toolbar">{toolbar}</div>
+        {pager}
+        {_table(["Source", "Scope", "Requested by", "Status", "Created"], rows, empty_message="No rerun requests recorded.")}
+        {pager}
+      </section>
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Reruns", active_path="/ops/control-panel/reruns")
+
+
+def _lineage_page(*, q: str | None, page: int, page_size: int) -> str:
+    lineage, total_count = list_lineage_page(page=page, page_size=page_size, query=q)
+    rows = [
+        f"<tr><td><strong>{escape(item.display_name)}</strong><br><span class='muted'>{escape(item.city)}, {escape(item.state_code)}</span></td><td>{escape(item.source_slug)}</td><td>{escape(item.source_inspection_key)}</td><td>{_display(item.inspection_date)}</td><td>{escape(item.inspection_type or '—')}</td><td><span class='{_badge_class(item.report_availability_status)}'>{escape(item.report_availability_status or '—')}</span></td><td>{item.finding_count}</td></tr>"
+        for item in lineage
+    ]
+    toolbar = _search_form(
+        "/ops/control-panel/lineage",
+        q=q,
+        page_size=page_size,
+        placeholder="Search restaurant, city, source slug, source inspection key, or type",
+    )
+    pager = _pagination_controls("/ops/control-panel/lineage", page=page, page_size=page_size, total_count=total_count, q=q)
+    body = f"""
+    <section class="hero">
+      <div><h1>Master Lineage</h1><p>How normalized inspections connect back to sources, reports, and finding counts.</p></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_table(["Restaurant", "Source", "Source Inspection Key", "Inspection Date", "Type", "Report Status", "Findings"], rows, empty_message="No normalized lineage available yet.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Lineage", active_path="/ops/control-panel/lineage")
+
+
+def _versions_page(*, q: str | None, page: int, page_size: int) -> str:
+    versions, total_count = list_source_versions_page(page=page, page_size=page_size, query=q)
+    rows = [
+        f"<tr><td>{escape(v.source_slug)}</td><td>{escape(v.entity_type)}</td><td>{escape(v.source_entity_key or '—')}</td><td>{v.version_number}</td><td><span class='{_badge_class('current' if v.is_current else 'historical')}'>{'current' if v.is_current else 'historical'}</span></td><td>{escape(v.change_type)}</td><td>{_display(v.effective_at)}</td></tr>"
+        for v in versions
+    ]
+    toolbar = _search_form(
+        "/ops/control-panel/versions",
+        q=q,
+        page_size=page_size,
+        placeholder="Search source slug, entity type, source key, or change type",
+    )
+    pager = _pagination_controls("/ops/control-panel/versions", page=page, page_size=page_size, total_count=total_count, q=q)
+    body = f"""
+    <section class="hero">
+      <div><h1>Versions</h1><p>Version history and diff inspection hooks for source entities.</p></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_table(["Source", "Entity", "Source Key", "Version", "Current", "Change Type", "Effective"], rows, empty_message="No source versions recorded yet.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Versions", active_path="/ops/control-panel/versions")
+
+
+@router.get("/control-panel", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_root() -> str:
+    return _overview_page()
+
+
+@router.get("/control-panel/overview", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_overview() -> str:
+    return _overview_page()
+
+
+@router.get("/control-panel/platforms", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_platforms() -> str:
+    return _platforms_page()
+
+
+@router.get("/control-panel/sources", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_sources(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    platform_slug: str | None = None,
+    never_run_only: bool = False,
+) -> str:
+    return _sources_page(
+        q=q,
+        page=page,
+        page_size=page_size,
+        platform_slug=platform_slug,
+        never_run_only=never_run_only,
+    )
+
+
+@router.post("/control-panel/sources/{source_slug}/run", include_in_schema=False)
+def control_panel_trigger_run(source_slug: str, run_mode: str = "incremental") -> RedirectResponse:
+    dispatch_run(
+        WorkerRunRequest(
+            source_slug=source_slug,
+            run_mode=run_mode,  # type: ignore[arg-type]
+            trigger_type="manual",
+        )
+    )
+    return RedirectResponse(url="/ops/control-panel/runs", status_code=303)
+
+
+@router.get("/control-panel/runs", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_runs(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    source_slug: str | None = None,
+) -> str:
+    return _runs_page(q=q, page=page, page_size=page_size, source_slug=source_slug)
+
+
+@router.get("/control-panel/runs/{scrape_run_id}", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_run_detail(scrape_run_id: str) -> str:
+    return _run_detail_page(scrape_run_id)
+
+
+@router.get("/control-panel/artifacts", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_artifacts(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> str:
+    return _artifacts_page(q=q, page=page, page_size=page_size)
+
+
+@router.get("/control-panel/artifacts/{raw_artifact_id}", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_artifact_detail(raw_artifact_id: str) -> str:
+    return _artifact_detail_page(raw_artifact_id)
+
+
+@router.get("/control-panel/parse-results", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_parse_results(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    record_type: str | None = None,
+) -> str:
+    return _parse_results_page(q=q, page=page, page_size=page_size, record_type=record_type)
+
+
+@router.get("/control-panel/parse-results/{parse_result_id}", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_parse_result_detail(parse_result_id: str) -> str:
+    return _parse_result_detail_page(parse_result_id)
+
+
+@router.get("/control-panel/health", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_health() -> str:
+    return _health_page()
+
+
+@router.get("/control-panel/alerts", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_alerts(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> str:
+    return _alerts_page(q=q, page=page, page_size=page_size)
+
+
+@router.get("/control-panel/reruns", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_reruns(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> str:
+    return _reruns_page(q=q, page=page, page_size=page_size)
+
+
+@router.post("/control-panel/reruns/create", include_in_schema=False)
+def control_panel_create_rerun(
+    source_slug: str,
+    requested_scope: str,
+    requested_by: str = "control-panel",
+    request_payload: str = "{}",
+) -> RedirectResponse:
+    parsed_payload: dict = {}
+    try:
+        decoded = json.loads(request_payload)
+        if isinstance(decoded, dict):
+            parsed_payload = decoded
+    except json.JSONDecodeError:
+        parsed_payload = {"raw_input": request_payload}
+    create_rerun_request(
+        CreateRerunRequest(
+            source_slug=source_slug,
+            requested_scope=requested_scope,
+            requested_by=requested_by,
+            request_payload=parsed_payload,
+        )
+    )
+    return RedirectResponse(url="/ops/control-panel/reruns", status_code=303)
+
+
+@router.get("/control-panel/lineage", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_lineage(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> str:
+    return _lineage_page(q=q, page=page, page_size=page_size)
+
+
+@router.get("/control-panel/versions", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_versions(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> str:
+    return _versions_page(q=q, page=page, page_size=page_size)
