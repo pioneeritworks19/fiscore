@@ -1,0 +1,2 @@
+"""FiScore backend scaffold."""
+

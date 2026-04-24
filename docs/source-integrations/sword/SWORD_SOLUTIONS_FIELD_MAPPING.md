@@ -43,6 +43,10 @@ From the public search page, the search criteria visibly include:
 - to date
 - show partial
 
+For FiScore ingestion, the Sword date range inputs should be treated as retrieval aids that narrow fetch scope.
+
+They should not be treated as the source of truth for record identity or final change classification.
+
 The site also states that it is publishing food service inspection summaries for participating health departments.
 
 ## Mapping Philosophy

@@ -88,6 +88,24 @@ Because the plan calls for full historical backfill, the parser should support:
 - date-ranged queries if required by the platform
 - repeated paginated fetching if search results are split across pages
 
+### Incremental Request Strategy
+
+For recurring Sword refreshes, the request builder should support explicit run modes:
+
+- `incremental`
+- `reconciliation`
+
+Recommended query windows:
+
+- `incremental` = rolling overlapping `45-day` lookback
+- `reconciliation` = rolling `180-day` lookback
+
+Important rule:
+
+- use date filters to reduce fetch scope
+- do not treat the date filter itself as the final source of truth for determining what changed
+- continue to compare fetched records against stored FiScore records using derived keys and hashes
+
 ### Request Builder Rules
 
 - preserve the exact county parameter used
@@ -509,6 +527,26 @@ Maintain hashes for:
 
 This supports efficient comparison while preserving full source versions.
 
+### Date-Filtered Comparison Rule
+
+For Sword, a date-filtered run should still behave like a comparison run, not a blind overwrite.
+
+That means the pipeline should:
+
+1. fetch the current source slice for the requested date window
+2. parse the current source slice
+3. compare parsed inspections and findings to previously stored FiScore records
+4. write only the detected inserts, updates, removals, and source versions
+
+The date window helps limit how much source material is re-read.
+
+The date window does not replace:
+
+- derived inspection identity
+- derived finding identity
+- comparison hashing
+- source version tracking
+
 ## 12. Error Handling Rules
 
 The parser should distinguish between hard failures and partial extraction.
@@ -566,6 +604,15 @@ The parser pipeline should support reruns at multiple scopes.
 - targeted restaurant rerun
 - targeted license rerun
 - full platform rerun eventually
+
+### Recommended Sword Run Modes
+
+The Sword pipeline should support these operational run modes explicitly:
+
+- `backfill` for initial full historical load
+- `incremental` for weekly overlapping recent-history refresh
+- `reconciliation` for monthly wider lookback refresh
+- targeted reruns for restaurant or license-specific recovery
 
 ### Rerun Requirement
 

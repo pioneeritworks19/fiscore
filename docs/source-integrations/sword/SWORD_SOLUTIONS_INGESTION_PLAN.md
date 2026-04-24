@@ -135,12 +135,80 @@ There should be no artificial limit for the first execution.
 - historical depth improves product value from the beginning
 - it reduces the need for an immediate second ingestion phase
 
+### Backfill Mode
+
+The Sword pipeline should treat the initial historical load as an explicit run mode:
+
+- `backfill`
+
+Backfill mode should:
+
+- run county by county
+- use the broadest safe source scope available
+- avoid date restriction unless Sword requires batching to retrieve older records
+- establish the baseline set of restaurants, inspections, findings, and source versions for later comparison
+
 ## Ongoing Refresh
 
 After the initial backfill, the ongoing cadence should be:
 
 - weekly refresh per county
 - plus manual refresh when needed
+
+### Incremental Mode
+
+The routine weekly refresh should run as an explicit:
+
+- `incremental`
+
+mode.
+
+For Sword, incremental mode should use the source date filters to reduce fetch scope, but should not rely on the date filter as the source of truth for change detection.
+
+Recommended weekly incremental query window:
+
+- rolling overlapping lookback of `45 days`
+
+Why:
+
+- catches newly posted recent inspections
+- reduces the amount of source content that must be re-read on each weekly run
+- provides protection against delayed source publication and small scheduler gaps
+
+Within that window, FiScore should still detect change by comparing parsed records against stored records using:
+
+- source inspection keys
+- source finding keys
+- normalized comparison hashes
+- source version history
+
+### Reconciliation Mode
+
+Sword should also support a periodic wider refresh mode:
+
+- `reconciliation`
+
+Recommended cadence:
+
+- monthly per county
+
+Recommended reconciliation query window:
+
+- rolling lookback of `180 days`
+
+Why:
+
+- catches late postings and corrected inspections outside the normal weekly incremental window
+- validates that the narrower incremental process is not missing meaningful source changes
+- reduces the need for frequent full-county re-reads once the source is operating normally
+
+### Run Mode Summary
+
+Recommended Sword run modes:
+
+- `backfill` = full historical baseline load
+- `incremental` = weekly `45-day` overlapping refresh
+- `reconciliation` = monthly `180-day` lookback refresh
 
 ## Identity and Matching Rules
 
@@ -253,6 +321,10 @@ This should be done with:
 - source version tracking
 - change classification
 - current record markers
+
+For Sword specifically, date filters should only narrow the fetch scope.
+
+The decision about whether something is new, changed, or removed should still come from FiScore comparison logic rather than from the date filter alone.
 
 ## Versioning Rules
 
@@ -447,6 +519,7 @@ Although the source set includes all counties on the site, implementation should
 ### Phase 5: Ongoing Operations
 
 - move to weekly refresh cadence
+- run monthly reconciliation passes
 - enable manual reruns and monitoring
 
 ## Recommended Field Importance Priority
@@ -498,4 +571,3 @@ After this plan, the next most useful implementation docs would be:
 ## Summary
 
 FiScore should use Sword Solutions as the first practical ingestion platform, modeled as one platform with separate county sources. The first rollout should ingest relevant restaurant, inspection, and violation data for all Sword-listed Michigan counties through a full historical backfill, store raw and parsed artifacts alongside normalized records, detect source changes with version tracking, publish only linked restaurant data into tenants, and include the operational tooling needed to monitor and rerun county pipelines over time.
-
