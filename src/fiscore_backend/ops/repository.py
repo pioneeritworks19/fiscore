@@ -7,12 +7,23 @@ from psycopg.rows import dict_row
 
 from fiscore_backend.db import get_connection
 from fiscore_backend.models import (
+    AdminRestaurantDetail,
+    AdminRestaurantInspectionDetail,
     CreateRerunRequest,
     MasterInspectionLineageSummary,
     OpsAlertSummary,
     OpsArtifactDetail,
     OpsArtifactSummary,
     OpsHealthSummary,
+    OpsMasterDataQualitySummary,
+    OpsMasterFindingSummary,
+    OpsMasterInspectionDetail,
+    OpsMasterInspectionReportSummary,
+    OpsMasterInspectionSummary,
+    OpsMasterRestaurantDetail,
+    OpsMasterRestaurantIdentifierSummary,
+    OpsMasterRestaurantSourceLinkSummary,
+    OpsMasterRestaurantSummary,
     OpsParseResultSummary,
     OpsPlatformSummary,
     OpsRunIssueSummary,
@@ -968,6 +979,1303 @@ def list_lineage_page(
             cur.execute(data_sql, [*params, safe_size, offset])
             rows = cur.fetchall()
     return [MasterInspectionLineageSummary(**row) for row in rows], total_count
+
+
+def get_master_data_quality_summary() -> OpsMasterDataQualitySummary:
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                with duplicate_groups as (
+                    select location_fingerprint, count(*)::int as group_size
+                    from master.master_restaurant
+                    group by location_fingerprint
+                    having count(*) > 1
+                ),
+                current_reports as (
+                    select
+                        master_inspection_id,
+                        max(case when is_current then 1 else 0 end)::int as has_current_report,
+                        max(
+                            case
+                                when is_current and coalesce(availability_status, '') = 'available' then 1
+                                else 0
+                            end
+                        )::int as has_available_report,
+                        max(
+                            case
+                                when is_current and coalesce(storage_path, '') <> '' then 1
+                                else 0
+                            end
+                        )::int as has_storage_path
+                    from master.master_inspection_report
+                    group by master_inspection_id
+                )
+                select
+                    (select count(*) from master.master_restaurant)::int as total_restaurants,
+                    (select count(*) from master.master_inspection)::int as total_inspections,
+                    (select count(*) from master.master_inspection_report)::int as total_reports,
+                    (select count(*) from master.master_inspection_finding)::int as total_findings,
+                    (
+                        select count(*)::int
+                        from master.master_restaurant mr
+                        where not exists (
+                            select 1
+                            from master.master_restaurant_source_link mrl
+                            where mrl.master_restaurant_id = mr.master_restaurant_id
+                        )
+                    ) as restaurants_without_source_links,
+                    (
+                        select count(*)::int
+                        from master.master_restaurant mr
+                        where not exists (
+                            select 1
+                            from master.master_restaurant_identifier mri
+                            where mri.master_restaurant_id = mr.master_restaurant_id
+                        )
+                    ) as restaurants_without_identifiers,
+                    (
+                        select coalesce(sum(group_size), 0)::int
+                        from duplicate_groups
+                    ) as duplicate_risk_restaurants,
+                    (
+                        select count(*)::int
+                        from master.master_inspection mi
+                        left join current_reports cr on cr.master_inspection_id = mi.master_inspection_id
+                        where coalesce(cr.has_current_report, 0) = 0 or coalesce(cr.has_available_report, 0) = 0
+                    ) as inspections_missing_reports,
+                    (
+                        select count(*)::int
+                        from master.master_inspection_report mir
+                        where mir.is_current = true
+                          and coalesce(mir.availability_status, '') = 'available'
+                          and coalesce(mir.storage_path, '') = ''
+                    ) as reports_missing_storage,
+                    (
+                        select count(*)::int
+                        from master.master_inspection_finding mif
+                        where coalesce(mif.official_detail_text, '') = ''
+                          and (
+                              mif.official_detail_json is null
+                              or mif.official_detail_json = '{}'::jsonb
+                              or mif.official_detail_json = 'null'::jsonb
+                          )
+                    ) as findings_missing_detail
+                """
+            )
+            row = cur.fetchone()
+    return OpsMasterDataQualitySummary(**row)
+
+
+def list_master_restaurants_page(
+    *,
+    page: int = 1,
+    page_size: int = 100,
+    query: str | None = None,
+    source_slug: str | None = None,
+    quality_filter: str | None = None,
+) -> tuple[list[OpsMasterRestaurantSummary], int]:
+    safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=250)
+    search = _like_pattern(query)
+    offset = (safe_page - 1) * safe_size
+
+    where_parts = []
+    params: list[Any] = []
+    if search is not None:
+        where_parts.append(
+            """
+            (
+                mr.display_name ilike %s
+                or coalesce(mr.normalized_name, '') ilike %s
+                or mr.address_line1 ilike %s
+                or mr.city ilike %s
+                or coalesce(mr.zip_code, '') ilike %s
+                or mr.location_fingerprint ilike %s
+                or exists (
+                    select 1
+                    from master.master_restaurant_identifier mri
+                    where mri.master_restaurant_id = mr.master_restaurant_id
+                      and (
+                          mri.identifier_type ilike %s
+                          or mri.identifier_value ilike %s
+                      )
+                )
+                or exists (
+                    select 1
+                    from master.master_restaurant_source_link mrl
+                    join ops.source_registry sr on sr.source_id = mrl.source_id
+                    where mrl.master_restaurant_id = mr.master_restaurant_id
+                      and (
+                          sr.source_slug ilike %s
+                          or sr.source_name ilike %s
+                          or mrl.source_restaurant_key ilike %s
+                      )
+                )
+            )
+            """
+        )
+        params.extend([search] * 11)
+    if source_slug:
+        where_parts.append(
+            """
+            exists (
+                select 1
+                from master.master_restaurant_source_link mrl
+                join ops.source_registry sr on sr.source_id = mrl.source_id
+                where mrl.master_restaurant_id = mr.master_restaurant_id
+                  and sr.source_slug = %s
+            )
+            """
+        )
+        params.append(source_slug)
+    if quality_filter == "duplicates":
+        where_parts.append(
+            """
+            exists (
+                select 1
+                from master.master_restaurant other_mr
+                where other_mr.location_fingerprint = mr.location_fingerprint
+                  and other_mr.master_restaurant_id <> mr.master_restaurant_id
+            )
+            """
+        )
+    elif quality_filter == "missing_reports":
+        where_parts.append(
+            """
+            exists (
+                select 1
+                from master.master_inspection mi
+                left join master.master_inspection_report mir
+                    on mir.master_inspection_id = mi.master_inspection_id
+                    and mir.is_current = true
+                where mi.master_restaurant_id = mr.master_restaurant_id
+                group by mi.master_inspection_id
+                having count(mir.master_inspection_report_id) = 0
+                   or bool_or(coalesce(mir.availability_status, '') = 'available') = false
+            )
+            """
+        )
+    elif quality_filter == "weak_linkage":
+        where_parts.append(
+            """
+            (
+                not exists (
+                    select 1
+                    from master.master_restaurant_identifier mri
+                    where mri.master_restaurant_id = mr.master_restaurant_id
+                )
+                or not exists (
+                    select 1
+                    from master.master_restaurant_source_link mrl
+                    where mrl.master_restaurant_id = mr.master_restaurant_id
+                )
+                or exists (
+                    select 1
+                    from master.master_restaurant_source_link mrl
+                    where mrl.master_restaurant_id = mr.master_restaurant_id
+                      and (
+                          mrl.match_status <> 'matched'
+                          or coalesce(mrl.match_confidence, 0) < 0.95
+                      )
+                )
+            )
+            """
+        )
+    where_sql = f"where {' and '.join(where_parts)}" if where_parts else ""
+
+    count_sql = f"""
+        select count(*)::int as total_count
+        from master.master_restaurant mr
+        {where_sql}
+    """
+    data_sql = f"""
+        with inspection_stats as (
+            select
+                mi.master_restaurant_id,
+                count(*)::int as inspection_count,
+                max(mi.inspection_date) as latest_inspection_date,
+                count(*) filter (
+                    where not exists (
+                        select 1
+                        from master.master_inspection_report mir
+                        where mir.master_inspection_id = mi.master_inspection_id
+                          and mir.is_current = true
+                          and mir.availability_status = 'available'
+                    )
+                )::int as report_gap_count
+            from master.master_inspection mi
+            group by mi.master_restaurant_id
+        ),
+        link_stats as (
+            select
+                mrl.master_restaurant_id,
+                count(*)::int as source_link_count
+            from master.master_restaurant_source_link mrl
+            group by mrl.master_restaurant_id
+        ),
+        identifier_stats as (
+            select
+                mri.master_restaurant_id,
+                count(*)::int as identifier_count
+            from master.master_restaurant_identifier mri
+            group by mri.master_restaurant_id
+        ),
+        duplicate_stats as (
+            select
+                location_fingerprint,
+                count(*)::int as duplicate_group_size
+            from master.master_restaurant
+            group by location_fingerprint
+        )
+        select
+            mr.master_restaurant_id::text as master_restaurant_id,
+            mr.display_name,
+            mr.normalized_name,
+            mr.address_line1,
+            mr.city,
+            mr.state_code,
+            mr.zip_code,
+            mr.status,
+            mr.location_fingerprint,
+            coalesce(ins.inspection_count, 0) as inspection_count,
+            coalesce(ls.source_link_count, 0) as source_link_count,
+            coalesce(ids.identifier_count, 0) as identifier_count,
+            ins.latest_inspection_date,
+            coalesce(ins.report_gap_count, 0) as report_gap_count,
+            coalesce(ds.duplicate_group_size, 1) as duplicate_group_size,
+            mr.created_at,
+            mr.updated_at
+        from master.master_restaurant mr
+        left join inspection_stats ins on ins.master_restaurant_id = mr.master_restaurant_id
+        left join link_stats ls on ls.master_restaurant_id = mr.master_restaurant_id
+        left join identifier_stats ids on ids.master_restaurant_id = mr.master_restaurant_id
+        left join duplicate_stats ds on ds.location_fingerprint = mr.location_fingerprint
+        {where_sql}
+        order by
+            coalesce(ins.latest_inspection_date, date '1900-01-01') desc,
+            mr.updated_at desc,
+            mr.display_name
+        limit %s offset %s
+    """
+
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(count_sql, params)
+            total_count = cur.fetchone()["total_count"]
+            cur.execute(data_sql, [*params, safe_size, offset])
+            rows = cur.fetchall()
+    return [OpsMasterRestaurantSummary(**row) for row in rows], total_count
+
+
+def get_master_restaurant_detail(master_restaurant_id: str) -> OpsMasterRestaurantDetail | None:
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                with inspection_stats as (
+                    select
+                        mi.master_restaurant_id,
+                        count(*)::int as inspection_count,
+                        max(mi.inspection_date) as latest_inspection_date,
+                        count(*) filter (
+                            where not exists (
+                                select 1
+                                from master.master_inspection_report mir
+                                where mir.master_inspection_id = mi.master_inspection_id
+                                  and mir.is_current = true
+                                  and mir.availability_status = 'available'
+                            )
+                        )::int as report_gap_count
+                    from master.master_inspection mi
+                    group by mi.master_restaurant_id
+                ),
+                link_stats as (
+                    select
+                        mrl.master_restaurant_id,
+                        count(*)::int as source_link_count
+                    from master.master_restaurant_source_link mrl
+                    group by mrl.master_restaurant_id
+                ),
+                identifier_stats as (
+                    select
+                        mri.master_restaurant_id,
+                        count(*)::int as identifier_count
+                    from master.master_restaurant_identifier mri
+                    group by mri.master_restaurant_id
+                ),
+                duplicate_stats as (
+                    select
+                        location_fingerprint,
+                        count(*)::int as duplicate_group_size
+                    from master.master_restaurant
+                    group by location_fingerprint
+                )
+                select
+                    mr.master_restaurant_id::text as master_restaurant_id,
+                    mr.display_name,
+                    mr.normalized_name,
+                    mr.address_line1,
+                    mr.city,
+                    mr.state_code,
+                    mr.zip_code,
+                    mr.status,
+                    mr.location_fingerprint,
+                    coalesce(ins.inspection_count, 0) as inspection_count,
+                    coalesce(ls.source_link_count, 0) as source_link_count,
+                    coalesce(ids.identifier_count, 0) as identifier_count,
+                    ins.latest_inspection_date,
+                    coalesce(ins.report_gap_count, 0) as report_gap_count,
+                    coalesce(ds.duplicate_group_size, 1) as duplicate_group_size,
+                    mr.created_at,
+                    mr.updated_at
+                from master.master_restaurant mr
+                left join inspection_stats ins on ins.master_restaurant_id = mr.master_restaurant_id
+                left join link_stats ls on ls.master_restaurant_id = mr.master_restaurant_id
+                left join identifier_stats ids on ids.master_restaurant_id = mr.master_restaurant_id
+                left join duplicate_stats ds on ds.location_fingerprint = mr.location_fingerprint
+                where mr.master_restaurant_id = %s::uuid
+                limit 1
+                """,
+                (master_restaurant_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            restaurant = OpsMasterRestaurantSummary(**row)
+
+            cur.execute(
+                """
+                select
+                    mri.master_restaurant_identifier_id::text as master_restaurant_identifier_id,
+                    sr.source_slug,
+                    mri.identifier_type,
+                    mri.identifier_value,
+                    mri.is_primary,
+                    mri.confidence::float8 as confidence,
+                    mri.updated_at
+                from master.master_restaurant_identifier mri
+                left join ops.source_registry sr on sr.source_id = mri.source_id
+                where mri.master_restaurant_id = %s::uuid
+                order by mri.is_primary desc, mri.updated_at desc, mri.identifier_type, mri.identifier_value
+                """,
+                (master_restaurant_id,),
+            )
+            identifiers = [OpsMasterRestaurantIdentifierSummary(**item) for item in cur.fetchall()]
+
+            cur.execute(
+                """
+                select
+                    mrl.master_restaurant_source_link_id::text as master_restaurant_source_link_id,
+                    sr.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mrl.source_restaurant_key,
+                    mrl.match_method,
+                    mrl.match_confidence::float8 as match_confidence,
+                    mrl.match_status,
+                    mrl.matched_at,
+                    count(mi.master_inspection_id)::int as inspection_count,
+                    max(mi.inspection_date) as latest_inspection_date
+                from master.master_restaurant_source_link mrl
+                join ops.source_registry sr on sr.source_id = mrl.source_id
+                left join master.master_inspection mi
+                    on mi.master_restaurant_id = mrl.master_restaurant_id
+                    and mi.source_id = mrl.source_id
+                where mrl.master_restaurant_id = %s::uuid
+                group by
+                    mrl.master_restaurant_source_link_id,
+                    sr.source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mrl.source_restaurant_key,
+                    mrl.match_method,
+                    mrl.match_confidence,
+                    mrl.match_status,
+                    mrl.matched_at
+                order by latest_inspection_date desc nulls last, sr.source_name, mrl.source_restaurant_key
+                """,
+                (master_restaurant_id,),
+            )
+            source_links = [OpsMasterRestaurantSourceLinkSummary(**item) for item in cur.fetchall()]
+
+            cur.execute(
+                """
+                select
+                    mi.master_inspection_id::text as master_inspection_id,
+                    mi.master_restaurant_id::text as master_restaurant_id,
+                    mr.display_name,
+                    mr.city,
+                    mr.state_code,
+                    sr.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mi.source_inspection_key,
+                    mi.inspection_date,
+                    mi.inspection_type,
+                    mi.score::float8 as score,
+                    mi.grade,
+                    mi.official_status,
+                    mi.report_url,
+                    mir.availability_status as report_availability_status,
+                    mir.report_format,
+                    mir.storage_path as report_storage_path,
+                    count(mif.master_inspection_finding_id)::int as finding_count,
+                    mi.created_at,
+                    mi.updated_at
+                from master.master_inspection mi
+                join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+                join ops.source_registry sr on sr.source_id = mi.source_id
+                left join master.master_inspection_report mir
+                    on mir.master_inspection_id = mi.master_inspection_id
+                    and mir.is_current = true
+                    and mir.report_role in ('official_source_report', 'official_audit_report')
+                left join master.master_inspection_finding mif
+                    on mif.master_inspection_id = mi.master_inspection_id
+                    and mif.is_current = true
+                where mi.master_restaurant_id = %s::uuid
+                group by
+                    mi.master_inspection_id,
+                    mr.display_name,
+                    mr.city,
+                    mr.state_code,
+                    sr.source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mir.availability_status,
+                    mir.report_format,
+                    mir.storage_path
+                order by mi.inspection_date desc, mi.created_at desc
+                limit 100
+                """,
+                (master_restaurant_id,),
+            )
+            inspections = [OpsMasterInspectionSummary(**item) for item in cur.fetchall()]
+
+    return OpsMasterRestaurantDetail(
+        restaurant=restaurant,
+        identifiers=identifiers,
+        source_links=source_links,
+        inspections=inspections,
+    )
+
+
+def list_master_inspections_page(
+    *,
+    page: int = 1,
+    page_size: int = 100,
+    query: str | None = None,
+    source_slug: str | None = None,
+    report_status: str | None = None,
+    scrape_run_id: str | None = None,
+) -> tuple[list[OpsMasterInspectionSummary], int]:
+    safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=250)
+    search = _like_pattern(query)
+    offset = (safe_page - 1) * safe_size
+
+    where_parts = []
+    params: list[Any] = []
+    if search is not None:
+        where_parts.append(
+            """
+            (
+                mr.display_name ilike %s
+                or sr.source_slug ilike %s
+                or sr.source_name ilike %s
+                or mi.source_inspection_key ilike %s
+                or coalesce(mi.inspection_type, '') ilike %s
+                or coalesce(mi.grade, '') ilike %s
+                or coalesce(mi.official_status, '') ilike %s
+            )
+            """
+        )
+        params.extend([search] * 7)
+    if source_slug:
+        where_parts.append("sr.source_slug = %s")
+        params.append(source_slug)
+    if report_status:
+        if report_status == "missing":
+            where_parts.append("coalesce(mir.availability_status, 'missing') = 'missing'")
+        else:
+            where_parts.append("coalesce(mir.availability_status, 'missing') = %s")
+            params.append(report_status)
+    if scrape_run_id:
+        where_parts.append(
+            """
+            exists (
+                select 1
+                from ingestion.parse_result pr
+                where pr.scrape_run_id = %s::uuid
+                  and pr.source_id = mi.source_id
+                  and pr.record_type = 'inspection'
+                  and (
+                      pr.source_record_key = mi.source_inspection_key
+                      or ('sword-header:' || coalesce(pr.payload ->> 'header_id', '')) = mi.source_inspection_key
+                      or ('ga-report:' || coalesce(pr.payload ->> 'report_url', '')) = mi.source_inspection_key
+                      or ('ga-detail:' || coalesce(pr.payload ->> 'detail_url', '')) = mi.source_inspection_key
+                  )
+            )
+            """
+        )
+        params.append(scrape_run_id)
+    where_sql = f"where {' and '.join(where_parts)}" if where_parts else ""
+
+    count_sql = f"""
+        select count(*)::int as total_count
+        from master.master_inspection mi
+        join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+        join ops.source_registry sr on sr.source_id = mi.source_id
+        left join lateral (
+            select mir.availability_status
+            from master.master_inspection_report mir
+            where mir.master_inspection_id = mi.master_inspection_id
+              and mir.is_current = true
+              and mir.report_role in ('official_source_report', 'official_audit_report')
+            order by mir.updated_at desc
+            limit 1
+        ) mir on true
+        {where_sql}
+    """
+    data_sql = f"""
+        select
+            mi.master_inspection_id::text as master_inspection_id,
+            mi.master_restaurant_id::text as master_restaurant_id,
+            mr.display_name,
+            mr.city,
+            mr.state_code,
+            sr.source_id::text as source_id,
+            sr.source_slug,
+            sr.source_name,
+            mi.source_inspection_key,
+            mi.inspection_date,
+            mi.inspection_type,
+            mi.score::float8 as score,
+            mi.grade,
+            mi.official_status,
+            mi.report_url,
+            mir.availability_status as report_availability_status,
+            mir.report_format,
+            mir.storage_path as report_storage_path,
+            count(mif.master_inspection_finding_id)::int as finding_count,
+            mi.created_at,
+            mi.updated_at
+        from master.master_inspection mi
+        join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+        join ops.source_registry sr on sr.source_id = mi.source_id
+        left join lateral (
+            select
+                mir.availability_status,
+                mir.report_format,
+                mir.storage_path
+            from master.master_inspection_report mir
+            where mir.master_inspection_id = mi.master_inspection_id
+              and mir.is_current = true
+              and mir.report_role in ('official_source_report', 'official_audit_report')
+            order by mir.updated_at desc
+            limit 1
+        ) mir on true
+        left join master.master_inspection_finding mif
+            on mif.master_inspection_id = mi.master_inspection_id
+            and mif.is_current = true
+        {where_sql}
+        group by
+            mi.master_inspection_id,
+            mr.display_name,
+            mr.city,
+            mr.state_code,
+            sr.source_id,
+            sr.source_slug,
+            sr.source_name,
+            mir.availability_status,
+            mir.report_format,
+            mir.storage_path
+        order by mi.inspection_date desc, mi.created_at desc
+        limit %s offset %s
+    """
+
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(count_sql, params)
+            total_count = cur.fetchone()["total_count"]
+            cur.execute(data_sql, [*params, safe_size, offset])
+            rows = cur.fetchall()
+    return [OpsMasterInspectionSummary(**row) for row in rows], total_count
+
+
+def get_master_inspection_detail(master_inspection_id: str) -> OpsMasterInspectionDetail | None:
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                select
+                    mi.master_inspection_id::text as master_inspection_id,
+                    mi.master_restaurant_id::text as master_restaurant_id,
+                    mr.display_name,
+                    mr.city,
+                    mr.state_code,
+                    sr.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mi.source_inspection_key,
+                    mi.inspection_date,
+                    mi.inspection_type,
+                    mi.score::float8 as score,
+                    mi.grade,
+                    mi.official_status,
+                    mi.report_url,
+                    mir.availability_status as report_availability_status,
+                    mir.report_format,
+                    mir.storage_path as report_storage_path,
+                    count(mif.master_inspection_finding_id)::int as finding_count,
+                    mi.created_at,
+                    mi.updated_at
+                from master.master_inspection mi
+                join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+                join ops.source_registry sr on sr.source_id = mi.source_id
+                left join lateral (
+                    select
+                        mir.availability_status,
+                        mir.report_format,
+                        mir.storage_path
+                    from master.master_inspection_report mir
+                    where mir.master_inspection_id = mi.master_inspection_id
+                      and mir.is_current = true
+                      and mir.report_role in ('official_source_report', 'official_audit_report')
+                    order by mir.updated_at desc
+                    limit 1
+                ) mir on true
+                left join master.master_inspection_finding mif
+                    on mif.master_inspection_id = mi.master_inspection_id
+                    and mif.is_current = true
+                where mi.master_inspection_id = %s::uuid
+                group by
+                    mi.master_inspection_id,
+                    mr.display_name,
+                    mr.city,
+                    mr.state_code,
+                    sr.source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mir.availability_status,
+                    mir.report_format,
+                    mir.storage_path
+                limit 1
+                """,
+                (master_inspection_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            inspection = OpsMasterInspectionSummary(**row)
+
+            cur.execute(
+                """
+                select
+                    mir.master_inspection_report_id::text as master_inspection_report_id,
+                    mir.master_inspection_id::text as master_inspection_id,
+                    sr.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mr.display_name,
+                    mi.inspection_date,
+                    mir.report_role,
+                    mir.report_format,
+                    mir.availability_status,
+                    mir.source_page_url,
+                    mir.source_file_url,
+                    mir.storage_path,
+                    mir.is_current,
+                    mir.created_at,
+                    mir.updated_at
+                from master.master_inspection_report mir
+                join master.master_inspection mi on mi.master_inspection_id = mir.master_inspection_id
+                join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+                join ops.source_registry sr on sr.source_id = mir.source_id
+                where mir.master_inspection_id = %s::uuid
+                order by mir.is_current desc, mir.updated_at desc
+                """,
+                (master_inspection_id,),
+            )
+            reports = [OpsMasterInspectionReportSummary(**item) for item in cur.fetchall()]
+
+            cur.execute(
+                """
+                select
+                    mif.master_inspection_finding_id::text as master_inspection_finding_id,
+                    mif.master_inspection_id::text as master_inspection_id,
+                    mi.master_restaurant_id::text as master_restaurant_id,
+                    mr.display_name,
+                    sr.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mi.inspection_date,
+                    mif.source_finding_key,
+                    mif.finding_order,
+                    mif.official_code,
+                    mif.official_clause_reference,
+                    mif.official_text,
+                    mif.official_detail_text,
+                    mif.normalized_title,
+                    mif.normalized_category,
+                    mif.severity,
+                    mif.corrected_during_inspection,
+                    mif.is_repeat_violation,
+                    mif.created_at,
+                    mif.updated_at
+                from master.master_inspection_finding mif
+                join master.master_inspection mi on mi.master_inspection_id = mif.master_inspection_id
+                join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+                join ops.source_registry sr on sr.source_id = mif.source_id
+                where mif.master_inspection_id = %s::uuid
+                order by coalesce(mif.finding_order, 999999), mif.created_at
+                """,
+                (master_inspection_id,),
+            )
+            findings = [OpsMasterFindingSummary(**item) for item in cur.fetchall()]
+
+            cur.execute(
+                """
+                select distinct
+                    r.scrape_run_id::text as scrape_run_id,
+                    r.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    r.run_mode,
+                    r.trigger_type,
+                    r.run_status,
+                    r.parser_version,
+                    r.started_at,
+                    r.completed_at,
+                    r.artifact_count,
+                    r.parsed_record_count,
+                    r.normalized_record_count,
+                    r.warning_count,
+                    r.error_count,
+                    r.error_summary
+                from ops.scrape_run r
+                join ops.source_registry sr on sr.source_id = r.source_id
+                join ingestion.parse_result pr
+                    on pr.scrape_run_id = r.scrape_run_id
+                   and pr.source_id = r.source_id
+                   and pr.record_type = 'inspection'
+                join master.master_inspection mi
+                    on mi.master_inspection_id = %s::uuid
+                   and mi.source_id = pr.source_id
+                   and (
+                       pr.source_record_key = mi.source_inspection_key
+                       or ('sword-header:' || coalesce(pr.payload ->> 'header_id', '')) = mi.source_inspection_key
+                       or ('ga-report:' || coalesce(pr.payload ->> 'report_url', '')) = mi.source_inspection_key
+                       or ('ga-detail:' || coalesce(pr.payload ->> 'detail_url', '')) = mi.source_inspection_key
+                   )
+                order by r.started_at desc
+                limit 20
+                """,
+                (master_inspection_id,),
+            )
+            related_runs = [OpsRunSummary(**item) for item in cur.fetchall()]
+
+    return OpsMasterInspectionDetail(
+        inspection=inspection,
+        reports=reports,
+        findings=findings,
+        related_runs=related_runs,
+    )
+
+
+def list_admin_restaurants_page(
+    *,
+    page: int = 1,
+    page_size: int = 100,
+    query: str | None = None,
+    state_code: str | None = None,
+    city: str | None = None,
+    status: str | None = None,
+    source_slug: str | None = None,
+    has_inspections: bool | None = None,
+) -> tuple[list[OpsMasterRestaurantSummary], int]:
+    safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=250)
+    search = _like_pattern(query)
+    offset = (safe_page - 1) * safe_size
+
+    where_parts = []
+    params: list[Any] = []
+    if search is not None:
+        where_parts.append(
+            """
+            (
+                mr.display_name ilike %s
+                or coalesce(mr.normalized_name, '') ilike %s
+                or mr.address_line1 ilike %s
+                or mr.city ilike %s
+                or coalesce(mr.zip_code, '') ilike %s
+                or exists (
+                    select 1
+                    from master.master_restaurant_identifier mri
+                    where mri.master_restaurant_id = mr.master_restaurant_id
+                      and mri.identifier_value ilike %s
+                )
+            )
+            """
+        )
+        params.extend([search] * 6)
+    if state_code:
+        where_parts.append("mr.state_code = %s")
+        params.append(state_code)
+    if city:
+        where_parts.append("mr.city ilike %s")
+        params.append(_like_pattern(city))
+    if status:
+        where_parts.append("mr.status = %s")
+        params.append(status)
+    if source_slug:
+        where_parts.append(
+            """
+            exists (
+                select 1
+                from master.master_restaurant_source_link mrl
+                join ops.source_registry sr on sr.source_id = mrl.source_id
+                where mrl.master_restaurant_id = mr.master_restaurant_id
+                  and sr.source_slug = %s
+            )
+            """
+        )
+        params.append(source_slug)
+    if has_inspections is True:
+        where_parts.append(
+            """
+            exists (
+                select 1 from master.master_inspection mi
+                where mi.master_restaurant_id = mr.master_restaurant_id
+            )
+            """
+        )
+    elif has_inspections is False:
+        where_parts.append(
+            """
+            not exists (
+                select 1 from master.master_inspection mi
+                where mi.master_restaurant_id = mr.master_restaurant_id
+            )
+            """
+        )
+    where_sql = f"where {' and '.join(where_parts)}" if where_parts else ""
+
+    count_sql = f"""
+        select count(*)::int as total_count
+        from master.master_restaurant mr
+        {where_sql}
+    """
+    data_sql = f"""
+        with inspection_stats as (
+            select
+                mi.master_restaurant_id,
+                count(*)::int as inspection_count,
+                max(mi.inspection_date) as latest_inspection_date,
+                count(*) filter (
+                    where not exists (
+                        select 1
+                        from master.master_inspection_report mir
+                        where mir.master_inspection_id = mi.master_inspection_id
+                          and mir.is_current = true
+                          and mir.availability_status = 'available'
+                    )
+                )::int as report_gap_count
+            from master.master_inspection mi
+            group by mi.master_restaurant_id
+        ),
+        link_stats as (
+            select mrl.master_restaurant_id, count(*)::int as source_link_count
+            from master.master_restaurant_source_link mrl
+            group by mrl.master_restaurant_id
+        ),
+        identifier_stats as (
+            select mri.master_restaurant_id, count(*)::int as identifier_count
+            from master.master_restaurant_identifier mri
+            group by mri.master_restaurant_id
+        ),
+        duplicate_stats as (
+            select location_fingerprint, count(*)::int as duplicate_group_size
+            from master.master_restaurant
+            group by location_fingerprint
+        )
+        select
+            mr.master_restaurant_id::text as master_restaurant_id,
+            mr.display_name,
+            mr.normalized_name,
+            mr.address_line1,
+            mr.city,
+            mr.state_code,
+            mr.zip_code,
+            mr.status,
+            mr.location_fingerprint,
+            coalesce(ins.inspection_count, 0) as inspection_count,
+            coalesce(ls.source_link_count, 0) as source_link_count,
+            coalesce(ids.identifier_count, 0) as identifier_count,
+            ins.latest_inspection_date,
+            coalesce(ins.report_gap_count, 0) as report_gap_count,
+            coalesce(ds.duplicate_group_size, 1) as duplicate_group_size,
+            mr.created_at,
+            mr.updated_at
+        from master.master_restaurant mr
+        left join inspection_stats ins on ins.master_restaurant_id = mr.master_restaurant_id
+        left join link_stats ls on ls.master_restaurant_id = mr.master_restaurant_id
+        left join identifier_stats ids on ids.master_restaurant_id = mr.master_restaurant_id
+        left join duplicate_stats ds on ds.location_fingerprint = mr.location_fingerprint
+        {where_sql}
+        order by
+            coalesce(ins.latest_inspection_date, date '1900-01-01') desc,
+            mr.display_name
+        limit %s offset %s
+    """
+
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(count_sql, params)
+            total_count = cur.fetchone()["total_count"]
+            cur.execute(data_sql, [*params, safe_size, offset])
+            rows = cur.fetchall()
+    return [OpsMasterRestaurantSummary(**row) for row in rows], total_count
+
+
+def get_admin_restaurant_detail(master_restaurant_id: str) -> AdminRestaurantDetail | None:
+    base_detail = get_master_restaurant_detail(master_restaurant_id)
+    if base_detail is None:
+        return None
+
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                select
+                    mi.master_inspection_id::text as master_inspection_id,
+                    mi.master_restaurant_id::text as master_restaurant_id,
+                    mr.display_name,
+                    mr.city,
+                    mr.state_code,
+                    sr.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mi.source_inspection_key,
+                    mi.inspection_date,
+                    mi.inspection_type,
+                    mi.score::float8 as score,
+                    mi.grade,
+                    mi.official_status,
+                    mi.report_url,
+                    mir.availability_status as report_availability_status,
+                    mir.report_format,
+                    mir.storage_path as report_storage_path,
+                    count(mif.master_inspection_finding_id)::int as finding_count,
+                    mi.created_at,
+                    mi.updated_at
+                from master.master_inspection mi
+                join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+                join ops.source_registry sr on sr.source_id = mi.source_id
+                left join lateral (
+                    select
+                        mir.availability_status,
+                        mir.report_format,
+                        mir.storage_path
+                    from master.master_inspection_report mir
+                    where mir.master_inspection_id = mi.master_inspection_id
+                      and mir.is_current = true
+                      and mir.report_role in ('official_source_report', 'official_audit_report')
+                    order by mir.updated_at desc
+                    limit 1
+                ) mir on true
+                left join master.master_inspection_finding mif
+                    on mif.master_inspection_id = mi.master_inspection_id
+                    and mif.is_current = true
+                where mi.master_restaurant_id = %s::uuid
+                group by
+                    mi.master_inspection_id,
+                    mr.display_name,
+                    mr.city,
+                    mr.state_code,
+                    sr.source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mir.availability_status,
+                    mir.report_format,
+                    mir.storage_path
+                order by mi.inspection_date desc, mi.created_at desc
+                """,
+                (master_restaurant_id,),
+            )
+            inspection_rows = cur.fetchall()
+            inspections = [OpsMasterInspectionSummary(**item) for item in inspection_rows]
+
+            cur.execute(
+                """
+                select
+                    mir.master_inspection_report_id::text as master_inspection_report_id,
+                    mir.master_inspection_id::text as master_inspection_id,
+                    sr.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mr.display_name,
+                    mi.inspection_date,
+                    mir.report_role,
+                    mir.report_format,
+                    mir.availability_status,
+                    mir.source_page_url,
+                    mir.source_file_url,
+                    mir.storage_path,
+                    mir.is_current,
+                    mir.created_at,
+                    mir.updated_at
+                from master.master_inspection_report mir
+                join master.master_inspection mi on mi.master_inspection_id = mir.master_inspection_id
+                join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+                join ops.source_registry sr on sr.source_id = mir.source_id
+                where mi.master_restaurant_id = %s::uuid
+                order by mi.inspection_date desc, mir.updated_at desc
+                """,
+                (master_restaurant_id,),
+            )
+            report_rows = [OpsMasterInspectionReportSummary(**item) for item in cur.fetchall()]
+
+            cur.execute(
+                """
+                select
+                    mif.master_inspection_finding_id::text as master_inspection_finding_id,
+                    mif.master_inspection_id::text as master_inspection_id,
+                    mi.master_restaurant_id::text as master_restaurant_id,
+                    mr.display_name,
+                    sr.source_id::text as source_id,
+                    sr.source_slug,
+                    sr.source_name,
+                    mi.inspection_date,
+                    mif.source_finding_key,
+                    mif.finding_order,
+                    mif.official_code,
+                    mif.official_clause_reference,
+                    mif.official_text,
+                    mif.official_detail_text,
+                    mif.normalized_title,
+                    mif.normalized_category,
+                    mif.severity,
+                    mif.corrected_during_inspection,
+                    mif.is_repeat_violation,
+                    mif.created_at,
+                    mif.updated_at
+                from master.master_inspection_finding mif
+                join master.master_inspection mi on mi.master_inspection_id = mif.master_inspection_id
+                join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+                join ops.source_registry sr on sr.source_id = mif.source_id
+                where mi.master_restaurant_id = %s::uuid
+                order by mi.inspection_date desc, coalesce(mif.finding_order, 999999), mif.created_at
+                """,
+                (master_restaurant_id,),
+            )
+            finding_rows = [OpsMasterFindingSummary(**item) for item in cur.fetchall()]
+
+    reports_by_inspection: dict[str, list[OpsMasterInspectionReportSummary]] = {}
+    for report in report_rows:
+        reports_by_inspection.setdefault(report.master_inspection_id, []).append(report)
+
+    findings_by_inspection: dict[str, list[OpsMasterFindingSummary]] = {}
+    for finding in finding_rows:
+        findings_by_inspection.setdefault(finding.master_inspection_id, []).append(finding)
+
+    inspection_details = [
+        AdminRestaurantInspectionDetail(
+            inspection=inspection,
+            reports=reports_by_inspection.get(inspection.master_inspection_id, []),
+            findings=findings_by_inspection.get(inspection.master_inspection_id, []),
+        )
+        for inspection in inspections
+    ]
+
+    return AdminRestaurantDetail(
+        restaurant=base_detail.restaurant,
+        identifiers=base_detail.identifiers,
+        source_links=base_detail.source_links,
+        inspections=inspection_details,
+    )
+
+
+def list_master_reports_page(
+    *,
+    page: int = 1,
+    page_size: int = 100,
+    query: str | None = None,
+    source_slug: str | None = None,
+    availability_status: str | None = None,
+    missing_storage_only: bool = False,
+) -> tuple[list[OpsMasterInspectionReportSummary], int]:
+    safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=250)
+    search = _like_pattern(query)
+    offset = (safe_page - 1) * safe_size
+
+    where_parts = []
+    params: list[Any] = []
+    if search is not None:
+        where_parts.append(
+            """
+            (
+                mr.display_name ilike %s
+                or sr.source_slug ilike %s
+                or sr.source_name ilike %s
+                or mir.report_role ilike %s
+                or coalesce(mir.source_page_url, '') ilike %s
+                or coalesce(mir.source_file_url, '') ilike %s
+                or coalesce(mir.storage_path, '') ilike %s
+            )
+            """
+        )
+        params.extend([search] * 7)
+    if source_slug:
+        where_parts.append("sr.source_slug = %s")
+        params.append(source_slug)
+    if availability_status:
+        where_parts.append("mir.availability_status = %s")
+        params.append(availability_status)
+    if missing_storage_only:
+        where_parts.append(
+            """
+            coalesce(mir.storage_path, '') = ''
+            and coalesce(mir.availability_status, '') = 'available'
+            """
+        )
+    where_sql = f"where {' and '.join(where_parts)}" if where_parts else ""
+
+    count_sql = f"""
+        select count(*)::int as total_count
+        from master.master_inspection_report mir
+        join master.master_inspection mi on mi.master_inspection_id = mir.master_inspection_id
+        join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+        join ops.source_registry sr on sr.source_id = mir.source_id
+        {where_sql}
+    """
+    data_sql = f"""
+        select
+            mir.master_inspection_report_id::text as master_inspection_report_id,
+            mir.master_inspection_id::text as master_inspection_id,
+            sr.source_id::text as source_id,
+            sr.source_slug,
+            sr.source_name,
+            mr.display_name,
+            mi.inspection_date,
+            mir.report_role,
+            mir.report_format,
+            mir.availability_status,
+            mir.source_page_url,
+            mir.source_file_url,
+            mir.storage_path,
+            mir.is_current,
+            mir.created_at,
+            mir.updated_at
+        from master.master_inspection_report mir
+        join master.master_inspection mi on mi.master_inspection_id = mir.master_inspection_id
+        join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+        join ops.source_registry sr on sr.source_id = mir.source_id
+        {where_sql}
+        order by mi.inspection_date desc, mir.updated_at desc
+        limit %s offset %s
+    """
+
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(count_sql, params)
+            total_count = cur.fetchone()["total_count"]
+            cur.execute(data_sql, [*params, safe_size, offset])
+            rows = cur.fetchall()
+    return [OpsMasterInspectionReportSummary(**row) for row in rows], total_count
+
+
+def list_master_findings_page(
+    *,
+    page: int = 1,
+    page_size: int = 100,
+    query: str | None = None,
+    source_slug: str | None = None,
+    missing_detail_only: bool = False,
+) -> tuple[list[OpsMasterFindingSummary], int]:
+    safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=250)
+    search = _like_pattern(query)
+    offset = (safe_page - 1) * safe_size
+
+    where_parts = []
+    params: list[Any] = []
+    if search is not None:
+        where_parts.append(
+            """
+            (
+                mr.display_name ilike %s
+                or sr.source_slug ilike %s
+                or sr.source_name ilike %s
+                or coalesce(mif.official_code, '') ilike %s
+                or coalesce(mif.official_clause_reference, '') ilike %s
+                or mif.official_text ilike %s
+                or coalesce(mif.official_detail_text, '') ilike %s
+                or coalesce(mif.normalized_category, '') ilike %s
+            )
+            """
+        )
+        params.extend([search] * 8)
+    if source_slug:
+        where_parts.append("sr.source_slug = %s")
+        params.append(source_slug)
+    if missing_detail_only:
+        where_parts.append(
+            """
+            coalesce(mif.official_detail_text, '') = ''
+            and (
+                mif.official_detail_json is null
+                or mif.official_detail_json = '{}'::jsonb
+                or mif.official_detail_json = 'null'::jsonb
+            )
+            """
+        )
+    where_sql = f"where {' and '.join(where_parts)}" if where_parts else ""
+
+    count_sql = f"""
+        select count(*)::int as total_count
+        from master.master_inspection_finding mif
+        join master.master_inspection mi on mi.master_inspection_id = mif.master_inspection_id
+        join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+        join ops.source_registry sr on sr.source_id = mif.source_id
+        {where_sql}
+    """
+    data_sql = f"""
+        select
+            mif.master_inspection_finding_id::text as master_inspection_finding_id,
+            mif.master_inspection_id::text as master_inspection_id,
+            mi.master_restaurant_id::text as master_restaurant_id,
+            mr.display_name,
+            sr.source_id::text as source_id,
+            sr.source_slug,
+            sr.source_name,
+            mi.inspection_date,
+            mif.source_finding_key,
+            mif.finding_order,
+            mif.official_code,
+            mif.official_clause_reference,
+            mif.official_text,
+            mif.official_detail_text,
+            mif.normalized_title,
+            mif.normalized_category,
+            mif.severity,
+            mif.corrected_during_inspection,
+            mif.is_repeat_violation,
+            mif.created_at,
+            mif.updated_at
+        from master.master_inspection_finding mif
+        join master.master_inspection mi on mi.master_inspection_id = mif.master_inspection_id
+        join master.master_restaurant mr on mr.master_restaurant_id = mi.master_restaurant_id
+        join ops.source_registry sr on sr.source_id = mif.source_id
+        {where_sql}
+        order by mi.inspection_date desc, mif.updated_at desc
+        limit %s offset %s
+    """
+
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(count_sql, params)
+            total_count = cur.fetchone()["total_count"]
+            cur.execute(data_sql, [*params, safe_size, offset])
+            rows = cur.fetchall()
+    return [OpsMasterFindingSummary(**row) for row in rows], total_count
 
 
 def list_source_versions(*, limit: int = 200) -> list[SourceVersionSummary]:

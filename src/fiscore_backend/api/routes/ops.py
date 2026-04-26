@@ -13,12 +13,20 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from fiscore_backend.ingestion.core.dispatcher import dispatch_run
 from fiscore_backend.models import (
+    AdminRestaurantDetail,
     CreateRerunRequest,
     MasterInspectionLineageSummary,
     OpsAlertSummary,
     OpsArtifactDetail,
     OpsArtifactSummary,
     OpsHealthSummary,
+    OpsMasterDataQualitySummary,
+    OpsMasterFindingSummary,
+    OpsMasterInspectionDetail,
+    OpsMasterInspectionReportSummary,
+    OpsMasterInspectionSummary,
+    OpsMasterRestaurantDetail,
+    OpsMasterRestaurantSummary,
     OpsParseResultSummary,
     OpsPlatformSummary,
     OpsRerunSummary,
@@ -32,8 +40,12 @@ from fiscore_backend.models import (
 )
 from fiscore_backend.ops.repository import (
     create_rerun_request,
+    get_admin_restaurant_detail,
     get_artifact_detail,
     get_health_summary,
+    get_master_data_quality_summary,
+    get_master_inspection_detail,
+    get_master_restaurant_detail,
     get_parse_result_detail,
     get_run_detail,
     list_alerts,
@@ -42,6 +54,11 @@ from fiscore_backend.ops.repository import (
     list_artifacts_page,
     list_lineage,
     list_lineage_page,
+    list_admin_restaurants_page,
+    list_master_findings_page,
+    list_master_inspections_page,
+    list_master_reports_page,
+    list_master_restaurants_page,
     list_parse_results,
     list_parse_results_page,
     list_platforms,
@@ -58,18 +75,31 @@ from fiscore_backend.ops.repository import (
 router = APIRouter(prefix="/ops", tags=["ops"])
 
 NavItem = tuple[str, str]
-NAV_ITEMS: list[NavItem] = [
-    ("Overview", "/ops/control-panel"),
-    ("Platforms", "/ops/control-panel/platforms"),
-    ("Sources", "/ops/control-panel/sources"),
-    ("Runs", "/ops/control-panel/runs"),
-    ("Artifacts", "/ops/control-panel/artifacts"),
-    ("Parsed", "/ops/control-panel/parse-results"),
-    ("Health", "/ops/control-panel/health"),
-    ("Alerts", "/ops/control-panel/alerts"),
-    ("Reruns", "/ops/control-panel/reruns"),
-    ("Lineage", "/ops/control-panel/lineage"),
-    ("Versions", "/ops/control-panel/versions"),
+NavSection = tuple[str | None, list[NavItem]]
+OPS_NAV_SECTIONS: list[NavSection] = [
+    (
+        "Ingestion",
+        [
+            ("Platforms", "/ops/control-panel/platforms"),
+            ("Sources", "/ops/control-panel/sources"),
+            ("Runs", "/ops/control-panel/runs"),
+            ("Reruns", "/ops/control-panel/reruns"),
+        ],
+    ),
+    (
+        "Data Flow",
+        [
+            ("Master Data", "/ops/control-panel/master-data"),
+            ("Lineage", "/ops/control-panel/lineage"),
+            ("Artifacts", "/ops/control-panel/artifacts"),
+            ("Parsed", "/ops/control-panel/parse-results"),
+            ("Versions", "/ops/control-panel/versions"),
+        ],
+    ),
+    ("Monitoring", [("Health", "/ops/control-panel/health"), ("Alerts", "/ops/control-panel/alerts")]),
+]
+ADMIN_NAV_SECTIONS: list[NavSection] = [
+    (None, [("Restaurants", "/ops/control-panel/admin/restaurants")]),
 ]
 PAGE_SIZE_OPTIONS = (25, 50, 100, 250)
 DISPLAY_TIMEZONE = ZoneInfo("America/New_York")
@@ -190,6 +220,130 @@ def get_lineage(
     return list_lineage_page(page=page, page_size=page_size, query=q)[0]
 
 
+@router.get("/master-data/summary", response_model=OpsMasterDataQualitySummary)
+def get_master_data_summary() -> OpsMasterDataQualitySummary:
+    return get_master_data_quality_summary()
+
+
+@router.get("/master-data/restaurants", response_model=list[OpsMasterRestaurantSummary])
+def get_master_restaurants(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+    source_slug: str | None = None,
+    quality_filter: str | None = None,
+) -> list[OpsMasterRestaurantSummary]:
+    return list_master_restaurants_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        source_slug=source_slug,
+        quality_filter=quality_filter,
+    )[0]
+
+
+@router.get("/master-data/restaurants/{master_restaurant_id}", response_model=OpsMasterRestaurantDetail)
+def get_master_restaurant(master_restaurant_id: str) -> OpsMasterRestaurantDetail:
+    detail = get_master_restaurant_detail(master_restaurant_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Master restaurant {master_restaurant_id} was not found.")
+    return detail
+
+
+@router.get("/master-data/inspections", response_model=list[OpsMasterInspectionSummary])
+def get_master_inspections(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+    source_slug: str | None = None,
+    report_status: str | None = None,
+    scrape_run_id: str | None = None,
+) -> list[OpsMasterInspectionSummary]:
+    return list_master_inspections_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        source_slug=source_slug,
+        report_status=report_status,
+        scrape_run_id=scrape_run_id,
+    )[0]
+
+
+@router.get("/master-data/inspections/{master_inspection_id}", response_model=OpsMasterInspectionDetail)
+def get_master_inspection(master_inspection_id: str) -> OpsMasterInspectionDetail:
+    detail = get_master_inspection_detail(master_inspection_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Master inspection {master_inspection_id} was not found.")
+    return detail
+
+
+@router.get("/master-data/reports", response_model=list[OpsMasterInspectionReportSummary])
+def get_master_reports(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+    source_slug: str | None = None,
+    availability_status: str | None = None,
+    missing_storage_only: bool = False,
+) -> list[OpsMasterInspectionReportSummary]:
+    return list_master_reports_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        source_slug=source_slug,
+        availability_status=availability_status,
+        missing_storage_only=missing_storage_only,
+    )[0]
+
+
+@router.get("/master-data/findings", response_model=list[OpsMasterFindingSummary])
+def get_master_findings(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+    source_slug: str | None = None,
+    missing_detail_only: bool = False,
+) -> list[OpsMasterFindingSummary]:
+    return list_master_findings_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        source_slug=source_slug,
+        missing_detail_only=missing_detail_only,
+    )[0]
+
+
+@router.get("/admin/restaurants", response_model=list[OpsMasterRestaurantSummary])
+def get_admin_restaurants(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 100,
+    state_code: str | None = None,
+    city: str | None = None,
+    status: str | None = None,
+    source_slug: str | None = None,
+    has_inspections: bool | None = None,
+) -> list[OpsMasterRestaurantSummary]:
+    return list_admin_restaurants_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        state_code=state_code,
+        city=city,
+        status=status,
+        source_slug=source_slug,
+        has_inspections=has_inspections,
+    )[0]
+
+
+@router.get("/admin/restaurants/{master_restaurant_id}", response_model=AdminRestaurantDetail)
+def get_admin_restaurant(master_restaurant_id: str) -> AdminRestaurantDetail:
+    detail = get_admin_restaurant_detail(master_restaurant_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Admin restaurant {master_restaurant_id} was not found.")
+    return detail
+
+
 @router.get("/versions", response_model=list[SourceVersionSummary])
 def get_versions(
     q: str | None = None,
@@ -223,16 +377,46 @@ def _build_url(path: str, **params: object) -> str:
     return f"{path}?{urlencode(cleaned)}"
 
 
-def _nav_html(active_path: str) -> str:
-    items = []
-    for label, href in NAV_ITEMS:
-        is_overview = href == "/ops/control-panel"
-        active = "active" if (
-            active_path == href
-            or (not is_overview and active_path.startswith(f"{href}/"))
-        ) else ""
-        items.append(f'<a class="nav-link {active}" href="{href}">{escape(label)}</a>')
-    return "".join(items)
+def _nav_html(active_path: str, *, workspace: str) -> str:
+    overview_active = active_path == "/ops/control-panel"
+    ops_expanded = workspace == "ops"
+    admin_expanded = workspace == "admin"
+
+    ops_children: list[str] = []
+    for _, items in OPS_NAV_SECTIONS:
+        for label, href in items:
+            active = "active" if (active_path == href or active_path.startswith(f"{href}/")) else ""
+            ops_children.append(f'<a class="tree-child {active}" href="{href}">{escape(label)}</a>')
+
+    admin_children: list[str] = []
+    for _, items in ADMIN_NAV_SECTIONS:
+        for label, href in items:
+            active = "active" if (active_path == href or active_path.startswith(f"{href}/")) else ""
+            admin_children.append(f'<a class="tree-child {active}" href="{href}">{escape(label)}</a>')
+
+    ops_parent_class = "tree-parent active" if ops_expanded else "tree-parent"
+    admin_parent_class = "tree-parent active" if admin_expanded else "tree-parent"
+    overview_class = "tree-root active" if overview_active else "tree-root"
+    ops_children_html = f"<div class='tree-children'>{''.join(ops_children)}</div>" if ops_expanded else ""
+    admin_children_html = (
+        f"<div class='tree-children tree-children-admin'>{''.join(admin_children)}</div>" if admin_expanded else ""
+    )
+
+    return (
+        f"<a class='{overview_class}' href='/ops/control-panel'>Overview</a>"
+        f"<div class='tree-group'>"
+        f"<a class='{ops_parent_class}' href='/ops/control-panel/platforms'>Ops</a>"
+        f"{ops_children_html}"
+        f"</div>"
+        f"<div class='tree-group'>"
+        f"<a class='{admin_parent_class}' href='/ops/control-panel/admin/restaurants'>Admin</a>"
+        f"{admin_children_html}"
+        f"</div>"
+    )
+
+
+def _workspace_copy(workspace: str) -> tuple[str, str]:
+    return ("FiScore", "Internal console for operations, master data diagnostics, and restaurant administration.")
 
 
 def _badge_class(status: str | None) -> str:
@@ -392,6 +576,16 @@ def _platform_filter_select(current: str | None) -> str:
     return f"<select name='platform_slug'>{''.join(options)}</select>"
 
 
+def _source_filter_select(current: str | None) -> str:
+    options = ['<option value="">All sources</option>']
+    for source in list_sources(limit=250):
+        selected = "selected" if source.source_slug == current else ""
+        options.append(
+            f"<option value='{escape(source.source_slug)}' {selected}>{escape(source.source_name)} ({escape(source.source_slug)})</option>"
+        )
+    return f"<select name='source_slug'>{''.join(options)}</select>"
+
+
 def _checkbox_field(*, name: str, label: str, checked: bool) -> str:
     return (
         f"<label class='filter-toggle'>"
@@ -401,7 +595,8 @@ def _checkbox_field(*, name: str, label: str, checked: bool) -> str:
     )
 
 
-def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str:
+def _control_panel_shell(body_html: str, *, title: str, active_path: str, workspace: str = "ops") -> str:
+    brand_title, brand_copy = _workspace_copy(workspace)
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -455,7 +650,7 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str
         box-shadow: 14px 0 32px rgba(10, 31, 54, 0.08);
       }}
       .brand {{
-        margin-bottom: 28px;
+        margin-bottom: 22px;
       }}
       .brand h1 {{
         margin: 0;
@@ -471,25 +666,53 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str
       }}
       .nav {{
         display: grid;
-        gap: 10px;
-        margin-top: 26px;
+        gap: 12px;
+        margin-top: 18px;
       }}
-      .nav-link {{
+      .tree-root,
+      .tree-parent {{
         display: block;
-        padding: 12px 14px;
-        border-radius: 14px;
-        color: rgba(232, 241, 250, 0.88);
-        background: transparent;
-        border: 1px solid transparent;
-        font-weight: 500;
+        padding: 10px 14px;
+        border-radius: 12px;
+        color: rgba(232, 241, 250, 0.9);
+        font-weight: 700;
+        text-decoration: none;
       }}
-      .nav-link.active {{
+      .tree-root.active,
+      .tree-parent.active {{
+        background: linear-gradient(135deg, rgba(231, 241, 255, 0.14) 0%, rgba(0, 171, 228, 0.12) 100%);
+        border: 1px solid rgba(141, 192, 255, 0.32);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }}
+      .tree-group {{
+        display: grid;
+        gap: 8px;
+      }}
+      .tree-children {{
+        display: grid;
+        gap: 6px;
+        margin-left: 12px;
+        padding: 4px 0 0 10px;
+      }}
+      .tree-children-admin {{
+        padding-top: 2px;
+      }}
+      .tree-child {{
+        display: block;
+        padding: 8px 12px;
+        border-radius: 10px;
+        color: rgba(220, 233, 246, 0.84);
+        font-weight: 500;
+        text-decoration: none;
+      }}
+      .tree-child.active {{
         background: linear-gradient(135deg, rgba(231, 241, 255, 0.18) 0%, rgba(0, 171, 228, 0.16) 100%);
         border-color: rgba(141, 192, 255, 0.42);
         color: #ffffff;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
       }}
-      .nav-link:hover {{
+      .tree-root:hover,
+      .tree-child:hover {{
         text-decoration: none;
         background: rgba(255, 255, 255, 0.05);
       }}
@@ -878,6 +1101,33 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str
       .subtab:hover {{
         text-decoration: none;
       }}
+      .inspection-stack {{
+        display: grid;
+        gap: 14px;
+      }}
+      .inspection-expander {{
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fbfdff;
+        overflow: hidden;
+      }}
+      .inspection-expander summary {{
+        cursor: pointer;
+        list-style: none;
+        padding: 16px 18px;
+        font-weight: 700;
+        color: #153556;
+      }}
+      .inspection-expander summary::-webkit-details-marker {{
+        display: none;
+      }}
+      .inspection-expander[open] summary {{
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-2);
+      }}
+      .inspection-expander-body {{
+        padding: 16px 18px 18px;
+      }}
       .issue-summary-grid {{
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -947,11 +1197,11 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str
     <div class="layout">
       <aside class="sidebar">
         <div class="brand">
-          <h1>FiScore Ops</h1>
-          <p>Control panel for core ingestion, source adapters, artifacts, normalization, and source lineage.</p>
+          <h1>{escape(brand_title)}</h1>
+          <p>{escape(brand_copy)}</p>
         </div>
         <nav class="nav">
-          {_nav_html(active_path)}
+          {_nav_html(active_path, workspace=workspace)}
         </nav>
       </aside>
       <main class="main">
@@ -964,6 +1214,7 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str
 
 def _overview_page() -> str:
     health = get_health_summary()
+    master_summary = get_master_data_quality_summary()
     platforms = list_platforms()
     sources = list_sources(limit=12)
     runs = list_runs(limit=12)
@@ -971,9 +1222,11 @@ def _overview_page() -> str:
     <section class="hero">
       <div>
         <h1>Overview</h1>
-        <p>Command center for ingestion operations. Use the menu to drill into platforms, sources, run history, raw artifacts, parsed records, health, alerts, rerun workflows, and normalized lineage.</p>
+        <p>Shared landing page for operations and administration. Jump into the Ops workspace to manage ingestion, or into Admin to browse restaurants across the database.</p>
       </div>
       <div class="actions">
+        <a class="button secondary" href="/ops/control-panel/platforms">Open Ops</a>
+        <a class="button secondary" href="/ops/control-panel/admin/restaurants">Open Admin</a>
         <a class="button secondary" href="/ops/control-panel">Refresh</a>
       </div>
     </section>
@@ -981,10 +1234,13 @@ def _overview_page() -> str:
       <div class="stat"><span class="value">{health.total_platforms}</span><span class="muted">Registered platforms</span></div>
       <div class="stat"><span class="value">{health.total_sources}</span><span class="muted">Registered sources</span></div>
       <div class="stat"><span class="value">{health.open_alert_count}</span><span class="muted">Open alerts</span></div>
+      <div class="stat"><span class="value">{master_summary.total_restaurants}</span><span class="muted">Master restaurants</span></div>
+      <div class="stat"><span class="value">{master_summary.total_inspections}</span><span class="muted">Normalized inspections</span></div>
+      <div class="stat"><span class="value">{master_summary.duplicate_risk_restaurants}</span><span class="muted">Duplicate-risk restaurants</span></div>
     </section>
     <section class="grid two" style="margin-top:18px;">
       <section class="panel">
-        <h2>Platform snapshot</h2>
+        <h2>Ops Snapshot</h2>
         {_table(
             ["Platform", "Sources", "Healthy", "Warnings", "Stale", "Latest success"],
             [
@@ -995,16 +1251,21 @@ def _overview_page() -> str:
         )}
       </section>
       <section class="panel">
-        <h2>Sources needing attention</h2>
+        <h2>Admin Snapshot</h2>
         {_table(
-            ["Source", "Status", "Last success", "Freshness", "Action"],
+            ["Metric", "Value"],
             [
-                f"<tr><td><strong>{_source_runs_link(s.source_slug, s.source_name)}</strong><br>{_meta_text(s.source_slug)}</td><td><span class='{_badge_class(s.last_run_status)}'>{escape(s.last_run_status or 'never run')}</span></td><td>{_display(s.latest_success_at)}</td><td>{_display(s.freshness_age_days)}</td><td><a href='/ops/control-panel/runs?source_slug={escape(s.source_slug)}'>View runs</a></td></tr>"
-                for s in sources
-                if s.freshness_age_days is None or s.freshness_age_days > s.target_freshness_days or (s.last_run_status and "warning" in s.last_run_status.lower())
-            ][:10],
-            empty_message="No sources currently need attention."
+                f"<tr><td>Total restaurants</td><td>{master_summary.total_restaurants}</td></tr>",
+                f"<tr><td>Restaurants without identifiers</td><td>{master_summary.restaurants_without_identifiers}</td></tr>",
+                f"<tr><td>Restaurants without source links</td><td>{master_summary.restaurants_without_source_links}</td></tr>",
+                f"<tr><td>Inspections missing reports</td><td>{master_summary.inspections_missing_reports}</td></tr>",
+            ],
+            empty_message="No admin metrics available."
         )}
+        <div class="actions" style="margin-top:14px;">
+          <a class="button secondary" href="/ops/control-panel/admin/restaurants">Browse restaurants</a>
+          <a class="button secondary" href="/ops/control-panel/master-data">Open master data diagnostics</a>
+        </div>
       </section>
     </section>
     <section class="panel" style="margin-top:18px;">
@@ -1020,7 +1281,7 @@ def _overview_page() -> str:
       )}
     </section>
     """
-    return _control_panel_shell(body, title="FiScore Ops Overview", active_path="/ops/control-panel")
+    return _control_panel_shell(body, title="FiScore Console Overview", active_path="/ops/control-panel", workspace="overview")
 
 
 def _platforms_page() -> str:
@@ -1367,7 +1628,10 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
         <h1>Run {escape(detail.run.scrape_run_id[:8])}</h1>
         <p>{escape(detail.run.source_name)} - {escape(detail.run.source_slug)} - {escape(detail.run.run_mode)}</p>
       </div>
-      <div class="actions"><a class="button secondary" href="/ops/control-panel/runs">Back to runs</a></div>
+      <div class="actions">
+        <a class="button secondary" href="{_build_url('/ops/control-panel/master-data/inspections', scrape_run_id=detail.run.scrape_run_id)}">Resulting master records</a>
+        <a class="button secondary" href="/ops/control-panel/runs">Back to runs</a>
+      </div>
     </section>
     <section class="summary-strip">
       <section class="summary-card">
@@ -1410,6 +1674,783 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
     {tab_body}
     """
     return _control_panel_shell(body, title=f"Run {detail.run.scrape_run_id}", active_path="/ops/control-panel/runs")
+
+
+def _master_data_tab_link(tab: str, label: str, *, active_tab: str, **params: object) -> str:
+    active = "active" if tab == active_tab else ""
+    path = "/ops/control-panel/master-data" if not tab else f"/ops/control-panel/master-data/{tab}"
+    href = _build_url(path, **params)
+    return f"<a class='subtab {active}' href='{href}'>{escape(label)}</a>"
+
+
+def _master_data_tabs(*, active_tab: str, scrape_run_id: str | None = None) -> str:
+    params = {"scrape_run_id": scrape_run_id}
+    return "".join(
+        [
+            _master_data_tab_link("", "Overview", active_tab=active_tab, **params),
+            _master_data_tab_link("restaurants", "Restaurants", active_tab=active_tab, **params),
+            _master_data_tab_link("inspections", "Inspections", active_tab=active_tab, **params),
+            _master_data_tab_link("reports", "Reports", active_tab=active_tab, **params),
+            _master_data_tab_link("findings", "Findings", active_tab=active_tab, **params),
+        ]
+    )
+
+
+def _master_data_overview_page(*, scrape_run_id: str | None = None) -> str:
+    summary = get_master_data_quality_summary()
+    inspections, inspection_total = list_master_inspections_page(
+        page=1,
+        page_size=8,
+        scrape_run_id=scrape_run_id,
+    )
+    restaurants, restaurant_total = list_master_restaurants_page(page=1, page_size=8, quality_filter="duplicates")
+    tabs = _master_data_tabs(active_tab="", scrape_run_id=scrape_run_id)
+    inspection_rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.master_inspection_id[:8])}</a></td>"
+            f"<td><a href='/ops/control-panel/master-data/restaurants/{escape(item.master_restaurant_id)}'>{escape(item.display_name)}</a><br>{_meta_text(f'{item.city}, {item.state_code}')}</td>"
+            f"<td>{escape(item.source_slug)}</td><td>{_display(item.inspection_date)}</td>"
+            f"<td><span class='{_badge_class(item.report_availability_status or 'missing')}'>{escape(item.report_availability_status or 'missing')}</span></td>"
+            f"<td>{item.finding_count}</td></tr>"
+        )
+        for item in inspections
+    ]
+    restaurant_rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/master-data/restaurants/{escape(item.master_restaurant_id)}'>{escape(item.display_name)}</a></td>"
+            f"<td>{escape(item.address_line1)}<br>{_meta_text(f'{item.city}, {item.state_code} {item.zip_code or ''}'.strip())}</td>"
+            f"<td>{item.duplicate_group_size}</td><td>{item.source_link_count}</td><td>{item.report_gap_count}</td></tr>"
+        )
+        for item in restaurants
+    ]
+    run_banner = (
+        f"<div class='badge warn'>Scoped to run {escape(scrape_run_id[:8])}</div>"
+        if scrape_run_id
+        else "<div class='badge'>All master data</div>"
+    )
+    body = f"""
+    <section class="hero">
+      <div>
+        <h1>Master Data Explorer</h1>
+        <p>Inspect canonical restaurants, inspections, reports, and findings with the source trace you need to debug parsing, linkage, duplicates, and report coverage.</p>
+      </div>
+      <div class="actions">{run_banner}</div>
+    </section>
+    <section class="summary-strip">
+      <section class="summary-card"><h3>Restaurants</h3><span class="big">{summary.total_restaurants}</span><div class="small">Canonical restaurant records</div></section>
+      <section class="summary-card"><h3>Inspections</h3><span class="big">{summary.total_inspections}</span><div class="small">Normalized inspections</div></section>
+      <section class="summary-card"><h3>Reports</h3><span class="big">{summary.inspections_missing_reports}</span><div class="small">Inspections missing a usable report</div></section>
+      <section class="summary-card"><h3>Duplicates</h3><span class="big">{summary.duplicate_risk_restaurants}</span><div class="small">Restaurants in duplicate-risk groups</div></section>
+      <section class="summary-card"><h3>Weak Linkage</h3><span class="big">{summary.restaurants_without_source_links + summary.restaurants_without_identifiers}</span><div class="small">Restaurants lacking core source linkage</div></section>
+    </section>
+    <section class="panel" style="margin-bottom:18px;">
+      <div class="actions" style="justify-content:space-between; align-items:flex-start;">
+        <div class="stack">
+          <h2 style="margin-bottom:0;">Quality Lenses</h2>
+          <div class="muted">Use these shortcuts to jump directly into the records most likely to need operational review.</div>
+        </div>
+        <div class="run-tabs">{tabs}</div>
+      </div>
+      <div class="actions" style="margin-top:14px; flex-wrap:wrap;">
+        <a class="button secondary" href="/ops/control-panel/master-data/restaurants?quality_filter=duplicates">Duplicate-risk restaurants</a>
+        <a class="button secondary" href="/ops/control-panel/master-data/restaurants?quality_filter=weak_linkage">Weak source linkage</a>
+        <a class="button secondary" href="/ops/control-panel/master-data/inspections?report_status=missing">Missing reports</a>
+        <a class="button secondary" href="/ops/control-panel/master-data/reports?missing_storage_only=true">Reports missing storage</a>
+        <a class="button secondary" href="/ops/control-panel/master-data/findings?missing_detail_only=true">Thin finding detail</a>
+      </div>
+    </section>
+    <section class="grid two">
+      <section class="panel">
+        <h2>Recent Inspections {f"<span class='badge'>Run scope: {escape(scrape_run_id[:8])}</span>" if scrape_run_id else ""}</h2>
+        <div class="muted">{inspection_total} matching inspections</div>
+        {_table(["Inspection", "Restaurant", "Source", "Date", "Report", "Findings"], inspection_rows, empty_message="No master inspections found.")}
+      </section>
+      <section class="panel">
+        <h2>Duplicate-Risk Restaurants</h2>
+        <div class="muted">{restaurant_total} restaurants in duplicate-risk groups</div>
+        {_table(["Restaurant", "Address", "Group", "Source Links", "Report Gaps"], restaurant_rows, empty_message="No duplicate-risk restaurants found.")}
+      </section>
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Master Data", active_path="/ops/control-panel/master-data")
+
+
+def _master_restaurants_page(
+    *,
+    q: str | None,
+    page: int,
+    page_size: int,
+    source_slug: str | None,
+    quality_filter: str | None,
+    scrape_run_id: str | None = None,
+) -> str:
+    restaurants, total_count = list_master_restaurants_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        source_slug=source_slug,
+        quality_filter=quality_filter,
+    )
+    rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/master-data/restaurants/{escape(item.master_restaurant_id)}'>{escape(item.display_name)}</a><br>{_meta_text(item.master_restaurant_id[:8])}</td>"
+            f"<td>{escape(item.address_line1)}<br>{_meta_text(f'{item.city}, {item.state_code} {item.zip_code or ''}'.strip())}</td>"
+            f"<td><span class='{_badge_class(item.status)}'>{escape(item.status)}</span></td>"
+            f"<td>{item.source_link_count}</td><td>{item.identifier_count}</td><td>{item.inspection_count}</td><td>{item.report_gap_count}</td>"
+            f"<td>{item.duplicate_group_size}</td><td>{_display(item.latest_inspection_date)}</td></tr>"
+        )
+        for item in restaurants
+    ]
+    quality_options = ["<option value=''>All quality states</option>"]
+    for option, label in (
+        ("duplicates", "Duplicate risk"),
+        ("missing_reports", "Missing reports"),
+        ("weak_linkage", "Weak linkage"),
+    ):
+        selected = "selected" if option == quality_filter else ""
+        quality_options.append(f"<option value='{option}' {selected}>{label}</option>")
+    toolbar = _search_form(
+        "/ops/control-panel/master-data/restaurants",
+        q=q,
+        page_size=page_size,
+        placeholder="Search restaurant, address, identifier, source slug, or source key",
+        extra_fields=f"{_source_filter_select(source_slug)}<select name='quality_filter'>{''.join(quality_options)}</select>",
+    )
+    pager = _pagination_controls(
+        "/ops/control-panel/master-data/restaurants",
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        q=q,
+        source_slug=source_slug,
+        quality_filter=quality_filter,
+    )
+    body = f"""
+    <section class="hero">
+      <div><h1>Master Restaurants</h1><p>Browse canonical restaurant identities, source linkage coverage, duplicate-risk groups, and report gaps.</p></div>
+      <div class="actions"><a class="button secondary" href="/ops/control-panel/master-data">Overview</a></div>
+    </section>
+    <section class="panel" style="margin-bottom:18px;">
+      <div class="actions" style="justify-content:space-between; align-items:flex-start;">
+        <div class="stack">
+          <h2 style="margin-bottom:0;">Explorer</h2>
+          <div class="muted">Best starting point for duplicate restaurant review and weak linkage detection.</div>
+        </div>
+        <div class="run-tabs">{_master_data_tabs(active_tab='restaurants', scrape_run_id=scrape_run_id)}</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_sorted_hint("Newest inspection first, then recently touched master records.")}
+      {_table(["Restaurant", "Address", "Status", "Source Links", "Identifiers", "Inspections", "Report Gaps", "Dup Group", "Latest Inspection"], rows, empty_message="No master restaurants found.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Master Restaurants", active_path="/ops/control-panel/master-data")
+
+
+def _master_restaurant_detail_page(master_restaurant_id: str) -> str:
+    detail = get_master_restaurant_detail(master_restaurant_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Master restaurant {master_restaurant_id} was not found.")
+    restaurant = detail.restaurant
+    identifier_rows = [
+        f"<tr><td>{escape(item.identifier_type)}</td><td class='mono'>{escape(item.identifier_value)}</td><td>{escape(item.source_slug or '—')}</td><td>{'yes' if item.is_primary else 'no'}</td><td>{_display(item.confidence)}</td></tr>"
+        for item in detail.identifiers
+    ]
+    source_link_rows = [
+        (
+            f"<tr><td>{escape(item.source_name)}<br>{_meta_text(item.source_slug)}</td><td class='mono'>{escape(item.source_restaurant_key)}</td>"
+            f"<td>{escape(item.match_method)}</td><td><span class='{_badge_class(item.match_status)}'>{escape(item.match_status)}</span></td>"
+            f"<td>{_display(item.match_confidence)}</td><td>{item.inspection_count}</td><td>{_display(item.latest_inspection_date)}</td></tr>"
+        )
+        for item in detail.source_links
+    ]
+    inspection_rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.master_inspection_id[:8])}</a></td>"
+            f"<td>{escape(item.source_slug)}</td><td class='mono'>{escape(item.source_inspection_key)}</td><td>{_display(item.inspection_date)}</td>"
+            f"<td>{escape(item.inspection_type or '—')}</td><td>{_display(item.score)}</td><td>{escape(item.grade or '—')}</td>"
+            f"<td><span class='{_badge_class(item.report_availability_status or 'missing')}'>{escape(item.report_availability_status or 'missing')}</span></td><td>{item.finding_count}</td></tr>"
+        )
+        for item in detail.inspections
+    ]
+    body = f"""
+    <section class="hero">
+      <div>
+        <h1>{escape(restaurant.display_name)}</h1>
+        <p>{escape(restaurant.address_line1)} • {escape(restaurant.city)}, {escape(restaurant.state_code)} {escape(restaurant.zip_code or '')}</p>
+      </div>
+      <div class="actions">
+        <a class="button secondary" href="{_build_url('/ops/control-panel/lineage', q=restaurant.display_name)}">View lineage</a>
+        <a class="button secondary" href="/ops/control-panel/master-data/restaurants">Back to restaurants</a>
+      </div>
+    </section>
+    <section class="summary-strip">
+      <section class="summary-card"><h3>Source Links</h3><span class="big">{restaurant.source_link_count}</span><div class="small">Source restaurant mappings</div></section>
+      <section class="summary-card"><h3>Identifiers</h3><span class="big">{restaurant.identifier_count}</span><div class="small">External identifiers</div></section>
+      <section class="summary-card"><h3>Inspections</h3><span class="big">{restaurant.inspection_count}</span><div class="small">Normalized inspections</div></section>
+      <section class="summary-card"><h3>Report Gaps</h3><span class="big">{restaurant.report_gap_count}</span><div class="small">Inspections without usable reports</div></section>
+      <section class="summary-card"><h3>Dup Group</h3><span class="big">{restaurant.duplicate_group_size}</span><div class="small">Shared location fingerprint group size</div></section>
+    </section>
+    <section class="grid two">
+      <section class="panel stack">
+        <h2>Identity</h2>
+        <div class="muted">Master restaurant ID: <span class="mono">{escape(restaurant.master_restaurant_id)}</span></div>
+        <div class="muted">Location fingerprint: <span class="mono">{escape(restaurant.location_fingerprint)}</span></div>
+        <div class="muted">Normalized name: {escape(restaurant.normalized_name or '—')}</div>
+        <div class="muted">Status: <span class="{_badge_class(restaurant.status)}">{escape(restaurant.status)}</span></div>
+        <div class="muted">Latest inspection: {_display(restaurant.latest_inspection_date)}</div>
+      </section>
+      <section class="panel">
+        <h2>Identifiers</h2>
+        {_table(["Type", "Value", "Source", "Primary", "Confidence"], identifier_rows, empty_message="No identifiers recorded.")}
+      </section>
+      <section class="panel">
+        <h2>Source Links</h2>
+        {_table(["Source", "Source Key", "Method", "Status", "Confidence", "Inspections", "Latest"], source_link_rows, empty_message="No source links recorded.")}
+      </section>
+      <section class="panel">
+        <h2>Inspections</h2>
+        {_table(["Inspection", "Source", "Source Key", "Date", "Type", "Score", "Grade", "Report", "Findings"], inspection_rows, empty_message="No inspections recorded.")}
+      </section>
+    </section>
+    """
+    return _control_panel_shell(body, title=restaurant.display_name, active_path="/ops/control-panel/master-data")
+
+
+def _master_inspections_page(
+    *,
+    q: str | None,
+    page: int,
+    page_size: int,
+    source_slug: str | None,
+    report_status: str | None,
+    scrape_run_id: str | None = None,
+) -> str:
+    inspections, total_count = list_master_inspections_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        source_slug=source_slug,
+        report_status=report_status,
+        scrape_run_id=scrape_run_id,
+    )
+    rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.master_inspection_id[:8])}</a></td>"
+            f"<td><a href='/ops/control-panel/master-data/restaurants/{escape(item.master_restaurant_id)}'>{escape(item.display_name)}</a><br>{_meta_text(f'{item.city}, {item.state_code}')}</td>"
+            f"<td>{escape(item.source_slug)}</td><td class='mono'>{escape(item.source_inspection_key)}</td><td>{_display(item.inspection_date)}</td>"
+            f"<td>{escape(item.inspection_type or '—')}</td><td>{_display(item.score)}</td><td>{escape(item.grade or '—')}</td>"
+            f"<td><span class='{_badge_class(item.report_availability_status or 'missing')}'>{escape(item.report_availability_status or 'missing')}</span></td><td>{item.finding_count}</td></tr>"
+        )
+        for item in inspections
+    ]
+    report_options = ["<option value=''>All report states</option>"]
+    for option in ("available", "not_provided_by_source", "missing"):
+        selected = "selected" if option == report_status else ""
+        report_options.append(f"<option value='{option}' {selected}>{option}</option>")
+    run_scope_field = (
+        f"<input type='hidden' name='scrape_run_id' value='{escape(scrape_run_id)}' />"
+        if scrape_run_id
+        else ""
+    )
+    toolbar = _search_form(
+        "/ops/control-panel/master-data/inspections",
+        q=q,
+        page_size=page_size,
+        placeholder="Search restaurant, source, inspection key, type, grade, or status",
+        extra_fields=(
+            f"{_source_filter_select(source_slug)}"
+            f"<select name='report_status'>{''.join(report_options)}</select>"
+            f"{run_scope_field}"
+        ),
+    )
+    pager = _pagination_controls(
+        "/ops/control-panel/master-data/inspections",
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        q=q,
+        source_slug=source_slug,
+        report_status=report_status,
+        scrape_run_id=scrape_run_id,
+    )
+    body = f"""
+    <section class="hero">
+      <div><h1>Master Inspections</h1><p>Trace normalized inspections back to source keys and quickly spot missing reports, weak parsing, and suspicious counts.</p></div>
+      <div class="actions">
+        {f"<span class='badge warn'>Run {escape(scrape_run_id[:8])}</span>" if scrape_run_id else ""}
+        <a class="button secondary" href="/ops/control-panel/master-data">Overview</a>
+      </div>
+    </section>
+    <section class="panel" style="margin-bottom:18px;">
+      <div class="actions" style="justify-content:space-between; align-items:flex-start;">
+        <div class="stack">
+          <h2 style="margin-bottom:0;">Explorer</h2>
+          <div class="muted">This is the fastest path from a run or lineage entry into the master inspection records it produced.</div>
+        </div>
+        <div class="run-tabs">{_master_data_tabs(active_tab='inspections', scrape_run_id=scrape_run_id)}</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_sorted_hint("Newest inspection first. Use run scope to inspect the records created from a specific source run.")}
+      {_table(["Inspection", "Restaurant", "Source", "Source Key", "Date", "Type", "Score", "Grade", "Report", "Findings"], rows, empty_message="No master inspections found.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Master Inspections", active_path="/ops/control-panel/master-data")
+
+
+def _master_inspection_detail_page(master_inspection_id: str) -> str:
+    detail = get_master_inspection_detail(master_inspection_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Master inspection {master_inspection_id} was not found.")
+    inspection = detail.inspection
+    report_rows = [
+        (
+            f"<tr><td>{escape(item.report_role)}</td><td>{escape(item.report_format or '—')}</td>"
+            f"<td><span class='{_badge_class(item.availability_status)}'>{escape(item.availability_status)}</span></td>"
+            f"<td class='mono'>{_compact_text(item.storage_path or '—')}</td>"
+            f"<td class='mono'>{_compact_link(item.source_file_url) if item.source_file_url else '—'}</td>"
+            f"<td>{_display(item.updated_at)}</td></tr>"
+        )
+        for item in detail.reports
+    ]
+    finding_rows = [
+        (
+            f"<tr><td>{escape(item.official_code or '—')}</td><td>{escape(item.normalized_category or '—')}</td>"
+            f"<td>{escape(item.severity or '—')}</td><td>{_compact_message(item.official_text, max_length=120)}</td>"
+            f"<td>{'yes' if item.corrected_during_inspection else 'no' if item.corrected_during_inspection is not None else '—'}</td>"
+            f"<td>{'yes' if item.is_repeat_violation else 'no' if item.is_repeat_violation is not None else '—'}</td></tr>"
+        )
+        for item in detail.findings
+    ]
+    run_rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/runs/{escape(item.scrape_run_id)}'>{escape(item.scrape_run_id[:8])}</a></td>"
+            f"<td>{escape(item.run_status)}</td><td>{escape(item.run_mode)}</td><td>{escape(item.parser_version)}</td>"
+            f"<td>{item.parsed_record_count}</td><td>{item.normalized_record_count}</td><td>{_display(item.started_at)}</td></tr>"
+        )
+        for item in detail.related_runs
+    ]
+    body = f"""
+    <section class="hero">
+      <div>
+        <h1>Inspection {escape(inspection.master_inspection_id[:8])}</h1>
+        <p><a href='/ops/control-panel/master-data/restaurants/{escape(inspection.master_restaurant_id)}'>{escape(inspection.display_name)}</a> • {escape(inspection.source_name)} • {escape(inspection.source_inspection_key)}</p>
+      </div>
+      <div class="actions">
+        <a class="button secondary" href="{_build_url('/ops/control-panel/lineage', q=inspection.source_inspection_key)}">View lineage</a>
+        <a class="button secondary" href="/ops/control-panel/master-data/inspections">Back to inspections</a>
+      </div>
+    </section>
+    <section class="summary-strip">
+      <section class="summary-card"><h3>Date</h3><span class="big">{escape(str(inspection.inspection_date))}</span><div class="small">Inspection date</div></section>
+      <section class="summary-card"><h3>Score</h3><span class="big">{escape(str(inspection.score)) if inspection.score is not None else '—'}</span><div class="small">Normalized score</div></section>
+      <section class="summary-card"><h3>Grade</h3><span class="big">{escape(inspection.grade or '—')}</span><div class="small">Grade from source</div></section>
+      <section class="summary-card"><h3>Report</h3><span class="big">{escape(inspection.report_availability_status or 'missing')}</span><div class="small">Current report availability</div></section>
+      <section class="summary-card"><h3>Findings</h3><span class="big">{inspection.finding_count}</span><div class="small">Current findings linked</div></section>
+    </section>
+    <section class="grid two">
+      <section class="panel stack">
+        <h2>Inspection Summary</h2>
+        <div class="muted">Source: {escape(inspection.source_name)} ({escape(inspection.source_slug)})</div>
+        <div class="muted">Restaurant: <a href='/ops/control-panel/master-data/restaurants/{escape(inspection.master_restaurant_id)}'>{escape(inspection.display_name)}</a></div>
+        <div class="muted">Type: {escape(inspection.inspection_type or '—')}</div>
+        <div class="muted">Official status: {escape(inspection.official_status or '—')}</div>
+        <div class="muted">Report URL: {escape(inspection.report_url or '—')}</div>
+        <div class="muted">Stored report: <span class="mono">{escape(inspection.report_storage_path or '—')}</span></div>
+      </section>
+      <section class="panel">
+        <h2>Reports</h2>
+        {_table(["Role", "Format", "Availability", "Storage", "Source File", "Updated"], report_rows, empty_message="No report records linked.")}
+      </section>
+      <section class="panel">
+        <h2>Findings</h2>
+        {_table(["Code", "Category", "Severity", "Official Text", "Corrected", "Repeat"], finding_rows, empty_message="No findings linked.")}
+      </section>
+      <section class="panel">
+        <h2>Related Runs</h2>
+        {_table(["Run", "Status", "Mode", "Parser", "Parsed", "Normalized", "Started"], run_rows, empty_message="No source runs resolved for this inspection.")}
+      </section>
+    </section>
+    """
+    return _control_panel_shell(body, title=f"Inspection {inspection.master_inspection_id}", active_path="/ops/control-panel/master-data")
+
+
+def _master_reports_page(
+    *,
+    q: str | None,
+    page: int,
+    page_size: int,
+    source_slug: str | None,
+    availability_status: str | None,
+    missing_storage_only: bool,
+    scrape_run_id: str | None = None,
+) -> str:
+    reports, total_count = list_master_reports_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        source_slug=source_slug,
+        availability_status=availability_status,
+        missing_storage_only=missing_storage_only,
+    )
+    rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.display_name)}</a></td>"
+            f"<td>{escape(item.source_slug)}</td><td>{_display(item.inspection_date)}</td><td>{escape(item.report_role)}</td>"
+            f"<td>{escape(item.report_format or '—')}</td><td><span class='{_badge_class(item.availability_status)}'>{escape(item.availability_status)}</span></td>"
+            f"<td class='mono'>{_compact_text(item.storage_path or '—')}</td><td>{'yes' if item.is_current else 'no'}</td></tr>"
+        )
+        for item in reports
+    ]
+    availability_options = ["<option value=''>All availability</option>"]
+    for option in ("available", "not_provided_by_source"):
+        selected = "selected" if option == availability_status else ""
+        availability_options.append(f"<option value='{option}' {selected}>{option}</option>")
+    toolbar = _search_form(
+        "/ops/control-panel/master-data/reports",
+        q=q,
+        page_size=page_size,
+        placeholder="Search restaurant, source, report role, URLs, or storage path",
+        extra_fields=(
+            f"{_source_filter_select(source_slug)}"
+            f"<select name='availability_status'>{''.join(availability_options)}</select>"
+            f"{_checkbox_field(name='missing_storage_only', label='Available but not stored', checked=missing_storage_only)}"
+        ),
+    )
+    pager = _pagination_controls(
+        "/ops/control-panel/master-data/reports",
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        q=q,
+        source_slug=source_slug,
+        availability_status=availability_status,
+        missing_storage_only=missing_storage_only,
+    )
+    body = f"""
+    <section class="hero">
+      <div><h1>Master Reports</h1><p>Inspect report availability and storage linkage to catch missing PDFs, broken attachments, and weak report metadata.</p></div>
+      <div class="actions"><a class="button secondary" href="/ops/control-panel/master-data">Overview</a></div>
+    </section>
+    <section class="panel" style="margin-bottom:18px;">
+      <div class="actions" style="justify-content:space-between; align-items:flex-start;">
+        <div class="stack">
+          <h2 style="margin-bottom:0;">Explorer</h2>
+          <div class="muted">Use this page when an inspection exists but the report trail looks incomplete or inconsistent.</div>
+        </div>
+        <div class="run-tabs">{_master_data_tabs(active_tab='reports', scrape_run_id=scrape_run_id)}</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_table(["Inspection", "Source", "Date", "Role", "Format", "Availability", "Storage", "Current"], rows, empty_message="No report records found.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Master Reports", active_path="/ops/control-panel/master-data")
+
+
+def _master_findings_page(
+    *,
+    q: str | None,
+    page: int,
+    page_size: int,
+    source_slug: str | None,
+    missing_detail_only: bool,
+    scrape_run_id: str | None = None,
+) -> str:
+    findings, total_count = list_master_findings_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        source_slug=source_slug,
+        missing_detail_only=missing_detail_only,
+    )
+    rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.display_name)}</a></td>"
+            f"<td>{escape(item.source_slug)}</td><td>{_display(item.inspection_date)}</td><td>{escape(item.official_code or '—')}</td>"
+            f"<td>{escape(item.normalized_category or '—')}</td><td>{escape(item.severity or '—')}</td>"
+            f"<td>{_compact_message(item.official_text, max_length=120)}</td><td>{_compact_message(item.official_detail_text or '—', max_length=100)}</td></tr>"
+        )
+        for item in findings
+    ]
+    toolbar = _search_form(
+        "/ops/control-panel/master-data/findings",
+        q=q,
+        page_size=page_size,
+        placeholder="Search restaurant, source, violation code, clause, text, or category",
+        extra_fields=f"{_source_filter_select(source_slug)}{_checkbox_field(name='missing_detail_only', label='Missing detail text', checked=missing_detail_only)}",
+    )
+    pager = _pagination_controls(
+        "/ops/control-panel/master-data/findings",
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        q=q,
+        source_slug=source_slug,
+        missing_detail_only=missing_detail_only,
+    )
+    body = f"""
+    <section class="hero">
+      <div><h1>Master Findings</h1><p>Review normalized findings and spot weak parsing where codes, detail text, or categories did not come through cleanly.</p></div>
+      <div class="actions"><a class="button secondary" href="/ops/control-panel/master-data">Overview</a></div>
+    </section>
+    <section class="panel" style="margin-bottom:18px;">
+      <div class="actions" style="justify-content:space-between; align-items:flex-start;">
+        <div class="stack">
+          <h2 style="margin-bottom:0;">Explorer</h2>
+          <div class="muted">This page is optimized for parser QA, especially when finding text feels too thin or duplicated.</div>
+        </div>
+        <div class="run-tabs">{_master_data_tabs(active_tab='findings', scrape_run_id=scrape_run_id)}</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_table(["Inspection", "Source", "Date", "Code", "Category", "Severity", "Official Text", "Detail"], rows, empty_message="No findings found.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Ops Master Findings", active_path="/ops/control-panel/master-data")
+
+
+def _admin_restaurant_tab_link(master_restaurant_id: str, tab: str, label: str, *, active_tab: str) -> str:
+    active = "active" if tab == active_tab else ""
+    href = _build_url(f"/ops/control-panel/admin/restaurants/{master_restaurant_id}", tab=tab)
+    return f"<a class='subtab {active}' href='{href}'>{escape(label)}</a>"
+
+
+def _admin_restaurants_page(
+    *,
+    q: str | None,
+    page: int,
+    page_size: int,
+    state_code: str | None,
+    city: str | None,
+    status: str | None,
+    source_slug: str | None,
+    has_inspections: bool | None,
+) -> str:
+    restaurants, total_count = list_admin_restaurants_page(
+        page=page,
+        page_size=page_size,
+        query=q,
+        state_code=state_code,
+        city=city,
+        status=status,
+        source_slug=source_slug,
+        has_inspections=has_inspections,
+    )
+    rows = [
+        (
+            f"<tr><td><a href='/ops/control-panel/admin/restaurants/{escape(item.master_restaurant_id)}'>{escape(item.display_name)}</a></td>"
+            f"<td>{escape(item.address_line1)}<br>{_meta_text(f'{item.city}, {item.state_code} {item.zip_code or ''}'.strip())}</td>"
+            f"<td>{item.source_link_count}</td><td>{item.inspection_count}</td><td>{_display(item.latest_inspection_date)}</td>"
+            f"<td><span class='{_badge_class(item.status)}'>{escape(item.status)}</span></td></tr>"
+        )
+        for item in restaurants
+    ]
+    status_options = ["<option value=''>All statuses</option>"]
+    for option in ("active", "inactive"):
+        selected = "selected" if option == status else ""
+        status_options.append(f"<option value='{option}' {selected}>{option}</option>")
+    inspection_options = ["<option value=''>All restaurants</option>"]
+    for option, label in (("true", "Has inspections"), ("false", "No inspections")):
+        selected = "selected" if ((option == "true" and has_inspections is True) or (option == "false" and has_inspections is False)) else ""
+        inspection_options.append(f"<option value='{option}' {selected}>{label}</option>")
+    toolbar = _search_form(
+        "/ops/control-panel/admin/restaurants",
+        q=q,
+        page_size=page_size,
+        placeholder="Search restaurant name, address, city, zip, or identifier",
+        extra_fields=(
+            f"<input class='control-compact' type='text' name='city' value='{escape(city or '')}' placeholder='City' />"
+            f"<input class='control-compact' type='text' name='state_code' value='{escape(state_code or '')}' placeholder='State' />"
+            f"{_source_filter_select(source_slug)}"
+            f"<select name='status'>{''.join(status_options)}</select>"
+            f"<select name='has_inspections'>{''.join(inspection_options)}</select>"
+        ),
+    )
+    pager = _pagination_controls(
+        "/ops/control-panel/admin/restaurants",
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        q=q,
+        state_code=state_code,
+        city=city,
+        status=status,
+        source_slug=source_slug,
+        has_inspections=("true" if has_inspections is True else "false" if has_inspections is False else None),
+    )
+    body = f"""
+    <section class="hero">
+      <div>
+        <h1>Restaurants</h1>
+        <p>Search the full restaurant directory and drill from the canonical restaurant record into its inspections and findings.</p>
+      </div>
+      <div class="actions">
+        <a class="button secondary" href="/ops/control-panel">Overview</a>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">{toolbar}</div>
+      {pager}
+      {_sorted_hint("Most recently inspected restaurants first.")}
+      {_table(["Restaurant", "Address", "Sources", "Inspections", "Latest Inspection", "Status"], rows, empty_message="No restaurants found.")}
+      {pager}
+    </section>
+    """
+    return _control_panel_shell(body, title="FiScore Admin Restaurants", active_path="/ops/control-panel/admin/restaurants", workspace="admin")
+
+
+def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None = None) -> str:
+    detail = get_admin_restaurant_detail(master_restaurant_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Admin restaurant {master_restaurant_id} was not found.")
+    active_tab = tab if tab in {"info", "inspections"} else "info"
+    restaurant = detail.restaurant
+    tabs = "".join(
+        [
+            _admin_restaurant_tab_link(master_restaurant_id, "info", "Restaurant Info", active_tab=active_tab),
+            _admin_restaurant_tab_link(master_restaurant_id, "inspections", "Inspections", active_tab=active_tab),
+        ]
+    )
+    identifier_rows = [
+        f"<tr><td>{escape(item.identifier_type)}</td><td class='mono'>{escape(item.identifier_value)}</td><td>{escape(item.source_slug or '—')}</td><td>{'yes' if item.is_primary else 'no'}</td></tr>"
+        for item in detail.identifiers
+    ]
+    source_link_rows = [
+        (
+            f"<tr><td>{escape(item.source_name)}<br>{_meta_text(item.source_slug)}</td>"
+            f"<td class='mono'>{escape(item.source_restaurant_key)}</td><td>{escape(item.match_method)}</td>"
+            f"<td><span class='{_badge_class(item.match_status)}'>{escape(item.match_status)}</span></td>"
+            f"<td>{_display(item.latest_inspection_date)}</td></tr>"
+        )
+        for item in detail.source_links
+    ]
+    inspection_blocks = []
+    for entry in detail.inspections:
+        inspection = entry.inspection
+        report_rows = [
+            f"<tr><td>{escape(report.report_role)}</td><td>{escape(report.report_format or '—')}</td><td><span class='{_badge_class(report.availability_status)}'>{escape(report.availability_status)}</span></td><td class='mono'>{_compact_text(report.storage_path or '—')}</td></tr>"
+            for report in entry.reports
+        ]
+        finding_rows = [
+            (
+                f"<tr><td>{escape(finding.official_code or '—')}</td><td>{escape(finding.normalized_category or '—')}</td>"
+                f"<td>{escape(finding.severity or '—')}</td><td>{_compact_message(finding.official_text, max_length=120)}</td>"
+                f"<td>{'yes' if finding.is_repeat_violation else 'no' if finding.is_repeat_violation is not None else '—'}</td></tr>"
+            )
+            for finding in entry.findings
+        ]
+        inspection_blocks.append(
+            f"""
+            <details class="inspection-expander">
+              <summary>
+                {escape(str(inspection.inspection_date))} • {escape(inspection.source_name)} • {escape(inspection.inspection_type or 'Inspection')} •
+                Score {escape(str(inspection.score)) if inspection.score is not None else '—'} •
+                {inspection.finding_count} findings
+              </summary>
+              <div class="inspection-expander-body">
+                <div class="grid two">
+                  <section class="panel stack">
+                    <h2>Inspection Summary</h2>
+                    <div class="muted">Source key: <span class="mono">{escape(inspection.source_inspection_key)}</span></div>
+                    <div class="muted">Grade: {escape(inspection.grade or '—')}</div>
+                    <div class="muted">Status: {escape(inspection.official_status or '—')}</div>
+                    <div class="muted">Report status: <span class="{_badge_class(inspection.report_availability_status or 'missing')}">{escape(inspection.report_availability_status or 'missing')}</span></div>
+                    <div class="actions">
+                      <a class="button secondary" href="/ops/control-panel/master-data/inspections/{escape(inspection.master_inspection_id)}">Ops diagnostics</a>
+                    </div>
+                  </section>
+                  <section class="panel">
+                    <h2>Reports</h2>
+                    {_table(["Role", "Format", "Availability", "Storage"], report_rows, empty_message="No report records linked.")}
+                  </section>
+                </div>
+                <section class="panel" style="margin-top:14px;">
+                  <h2>Findings</h2>
+                  {_table(["Code", "Category", "Severity", "Official Text", "Repeat"], finding_rows, empty_message="No findings linked.")}
+                </section>
+              </div>
+            </details>
+            """
+        )
+    if active_tab == "info":
+        tab_body = f"""
+        <section class="grid two">
+          <section class="panel stack">
+            <h2>Restaurant Info</h2>
+            <div class="muted">Master restaurant ID: <span class="mono">{escape(restaurant.master_restaurant_id)}</span></div>
+            <div class="muted">Display name: {escape(restaurant.display_name)}</div>
+            <div class="muted">Normalized name: {escape(restaurant.normalized_name or '—')}</div>
+            <div class="muted">Address: {escape(restaurant.address_line1)}, {escape(restaurant.city)}, {escape(restaurant.state_code)} {escape(restaurant.zip_code or '')}</div>
+            <div class="muted">Status: <span class="{_badge_class(restaurant.status)}">{escape(restaurant.status)}</span></div>
+            <div class="muted">Location fingerprint: <span class="mono">{escape(restaurant.location_fingerprint)}</span></div>
+          </section>
+          <section class="panel">
+            <h2>Identifiers</h2>
+            {_table(["Type", "Value", "Source", "Primary"], identifier_rows, empty_message="No identifiers recorded.")}
+          </section>
+          <section class="panel">
+            <h2>Linked Sources</h2>
+            {_table(["Source", "Source Key", "Method", "Status", "Latest Inspection"], source_link_rows, empty_message="No source links recorded.")}
+          </section>
+          <section class="panel stack">
+            <h2>Summary</h2>
+            <div class="muted">Inspections: {restaurant.inspection_count}</div>
+            <div class="muted">Linked sources: {restaurant.source_link_count}</div>
+            <div class="muted">Latest inspection: {_display(restaurant.latest_inspection_date)}</div>
+            <div class="actions">
+              <a class="button secondary" href="/ops/control-panel/master-data/restaurants/{escape(restaurant.master_restaurant_id)}">View master data diagnostics</a>
+              <a class="button secondary" href="{_build_url('/ops/control-panel/lineage', q=restaurant.display_name)}">View lineage</a>
+            </div>
+          </section>
+        </section>
+        """
+    else:
+        tab_body = f"""
+        <section class="panel stack">
+          <h2>Inspections</h2>
+          <div class="muted">Expand an inspection to review its reports and findings in context.</div>
+          <div class="inspection-stack">
+            {''.join(inspection_blocks) if inspection_blocks else "<div class='muted'>No inspections recorded for this restaurant.</div>"}
+          </div>
+        </section>
+        """
+    body = f"""
+    <section class="hero">
+      <div>
+        <h1>{escape(restaurant.display_name)}</h1>
+        <p>{escape(restaurant.address_line1)} • {escape(restaurant.city)}, {escape(restaurant.state_code)} {escape(restaurant.zip_code or '')}</p>
+      </div>
+      <div class="actions">
+        <a class="button secondary" href="/ops/control-panel/admin/restaurants">Back to restaurants</a>
+      </div>
+    </section>
+    <section class="summary-strip">
+      <section class="summary-card"><h3>Sources</h3><span class="big">{restaurant.source_link_count}</span><div class="small">Linked source records</div></section>
+      <section class="summary-card"><h3>Inspections</h3><span class="big">{restaurant.inspection_count}</span><div class="small">Inspection history</div></section>
+      <section class="summary-card"><h3>Latest</h3><span class="big">{escape(str(restaurant.latest_inspection_date)) if restaurant.latest_inspection_date else '—'}</span><div class="small">Latest inspection date</div></section>
+      <section class="summary-card"><h3>Status</h3><span class="big">{escape(restaurant.status)}</span><div class="small">Restaurant record status</div></section>
+      <section class="summary-card"><h3>Identifiers</h3><span class="big">{restaurant.identifier_count}</span><div class="small">Known external identifiers</div></section>
+    </section>
+    <section class="panel" style="margin-bottom:18px;">
+      <div class="run-tabs">{tabs}</div>
+    </section>
+    {tab_body}
+    """
+    return _control_panel_shell(body, title=restaurant.display_name, active_path="/ops/control-panel/admin/restaurants", workspace="admin")
 
 
 def _artifacts_page(*, q: str | None, page: int, page_size: int) -> str:
@@ -1742,6 +2783,128 @@ def control_panel_runs(
 @router.get("/control-panel/runs/{scrape_run_id}", response_class=HTMLResponse, include_in_schema=False)
 def control_panel_run_detail(scrape_run_id: str, tab: str | None = None) -> str:
     return _run_detail_page(scrape_run_id, tab=tab)
+
+
+@router.get("/control-panel/master-data", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_master_data(scrape_run_id: str | None = None) -> str:
+    return _master_data_overview_page(scrape_run_id=scrape_run_id)
+
+
+@router.get("/control-panel/master-data/restaurants", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_master_restaurants(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    source_slug: str | None = None,
+    quality_filter: str | None = None,
+    scrape_run_id: str | None = None,
+) -> str:
+    return _master_restaurants_page(
+        q=q,
+        page=page,
+        page_size=page_size,
+        source_slug=source_slug,
+        quality_filter=quality_filter,
+        scrape_run_id=scrape_run_id,
+    )
+
+
+@router.get("/control-panel/master-data/restaurants/{master_restaurant_id}", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_master_restaurant_detail(master_restaurant_id: str) -> str:
+    return _master_restaurant_detail_page(master_restaurant_id)
+
+
+@router.get("/control-panel/master-data/inspections", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_master_inspections(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    source_slug: str | None = None,
+    report_status: str | None = None,
+    scrape_run_id: str | None = None,
+) -> str:
+    return _master_inspections_page(
+        q=q,
+        page=page,
+        page_size=page_size,
+        source_slug=source_slug,
+        report_status=report_status,
+        scrape_run_id=scrape_run_id,
+    )
+
+
+@router.get("/control-panel/master-data/inspections/{master_inspection_id}", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_master_inspection_detail(master_inspection_id: str) -> str:
+    return _master_inspection_detail_page(master_inspection_id)
+
+
+@router.get("/control-panel/master-data/reports", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_master_reports(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    source_slug: str | None = None,
+    availability_status: str | None = None,
+    missing_storage_only: bool = False,
+    scrape_run_id: str | None = None,
+) -> str:
+    return _master_reports_page(
+        q=q,
+        page=page,
+        page_size=page_size,
+        source_slug=source_slug,
+        availability_status=availability_status,
+        missing_storage_only=missing_storage_only,
+        scrape_run_id=scrape_run_id,
+    )
+
+
+@router.get("/control-panel/master-data/findings", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_master_findings(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    source_slug: str | None = None,
+    missing_detail_only: bool = False,
+    scrape_run_id: str | None = None,
+) -> str:
+    return _master_findings_page(
+        q=q,
+        page=page,
+        page_size=page_size,
+        source_slug=source_slug,
+        missing_detail_only=missing_detail_only,
+        scrape_run_id=scrape_run_id,
+    )
+
+
+@router.get("/control-panel/admin/restaurants", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_admin_restaurants(
+    q: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    state_code: str | None = None,
+    city: str | None = None,
+    status: str | None = None,
+    source_slug: str | None = None,
+    has_inspections: str | None = None,
+) -> str:
+    has_inspections_value = True if has_inspections == "true" else False if has_inspections == "false" else None
+    return _admin_restaurants_page(
+        q=q,
+        page=page,
+        page_size=page_size,
+        state_code=state_code,
+        city=city,
+        status=status,
+        source_slug=source_slug,
+        has_inspections=has_inspections_value,
+    )
+
+
+@router.get("/control-panel/admin/restaurants/{master_restaurant_id}", response_class=HTMLResponse, include_in_schema=False)
+def control_panel_admin_restaurant_detail(master_restaurant_id: str, tab: str | None = None) -> str:
+    return _admin_restaurant_detail_page(master_restaurant_id, tab=tab)
 
 
 @router.get("/control-panel/artifacts", response_class=HTMLResponse, include_in_schema=False)
