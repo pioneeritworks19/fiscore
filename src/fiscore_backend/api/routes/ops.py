@@ -274,6 +274,19 @@ def _meta_text(value: str) -> str:
     return f"<span class='meta-text'>{escape(value)}</span>"
 
 
+def _source_runs_link(source_slug: str, source_name: str) -> str:
+    return (
+        f"<a href='/ops/control-panel/runs?source_slug={escape(source_slug)}'>"
+        f"{escape(source_name)}</a>"
+    )
+
+
+def _run_tab_link(scrape_run_id: str, tab: str, label: str, *, active_tab: str) -> str:
+    active = "active" if tab == active_tab else ""
+    href = _build_url(f"/ops/control-panel/runs/{scrape_run_id}", tab=tab)
+    return f"<a class='subtab {active}' href='{href}'>{escape(label)}</a>"
+
+
 def _sorted_hint(label: str = "Newest first. Times shown in America/New_York.") -> str:
     return f"<div class='muted sorted-hint'>{escape(label)}</div>"
 
@@ -290,6 +303,20 @@ def _compact_link(value: str, *, href: str | None = None, max_length: int = 76) 
 def _compact_text(value: str, *, max_length: int = 76) -> str:
     display_value = _truncate_middle(value, max_length=max_length)
     return f"<span class='compact-text' title='{escape(value)}'>{escape(display_value)}</span>"
+
+
+def _compact_message(value: str, *, max_length: int = 140) -> str:
+    cleaned = " ".join(value.split())
+    if len(cleaned) <= max_length:
+        return escape(cleaned)
+    preview = escape(cleaned[:max_length].rstrip() + "...")
+    full = escape(cleaned)
+    return (
+        "<details class='cell-disclosure'>"
+        f"<summary>{preview}</summary>"
+        f"<div class='cell-disclosure-body'>{full}</div>"
+        "</details>"
+    )
 
 
 def _table(headers: list[str], rows: list[str], *, empty_message: str, colspan: int | None = None) -> str:
@@ -770,6 +797,139 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str
       .table-artifacts th:nth-child(3) {{ width: 36%; }}
       .table-artifacts th:nth-child(4) {{ width: 28%; }}
       .table-artifacts th:nth-child(5) {{ width: 18%; }}
+      .table-issues th:nth-child(1) {{ width: 8%; }}
+      .table-issues th:nth-child(2) {{ width: 10%; }}
+      .table-issues th:nth-child(3) {{ width: 13%; }}
+      .table-issues th:nth-child(4) {{ width: 37%; }}
+      .table-issues th:nth-child(5) {{ width: 10%; }}
+      .table-issues th:nth-child(6) {{ width: 10%; }}
+      .table-issues th:nth-child(7) {{ width: 12%; }}
+      .cell-disclosure {{
+        display: block;
+      }}
+      .cell-disclosure summary {{
+        cursor: pointer;
+        list-style: none;
+        color: #2a4765;
+      }}
+      .cell-disclosure summary::-webkit-details-marker {{
+        display: none;
+      }}
+      .cell-disclosure-body {{
+        margin-top: 8px;
+        color: var(--muted);
+        line-height: 1.55;
+      }}
+      .summary-strip {{
+        display: grid;
+        grid-template-columns: 1.2fr repeat(4, minmax(120px, 0.7fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }}
+      .summary-card {{
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+        border-radius: 18px;
+        padding: 16px 18px;
+      }}
+      .summary-card h3 {{
+        margin: 0 0 8px;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #68809a;
+      }}
+      .summary-card .big {{
+        display: block;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #123c74;
+      }}
+      .summary-card .small {{
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }}
+      .run-tabs {{
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 0 0 18px;
+      }}
+      .subtab {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 16px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.92);
+        color: #36526e;
+        font-weight: 600;
+        text-decoration: none;
+      }}
+      .subtab.active {{
+        color: #ffffff;
+        border-color: rgba(9, 91, 201, 0.25);
+        background: linear-gradient(135deg, var(--accent) 0%, #009fe3 100%);
+        box-shadow: 0 10px 22px rgba(0, 110, 253, 0.18);
+      }}
+      .subtab:hover {{
+        text-decoration: none;
+      }}
+      .issue-summary-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }}
+      .issue-summary-card {{
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px 16px;
+        background: #fbfdff;
+      }}
+      .issue-summary-card .label {{
+        display: block;
+        color: #68809a;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 6px;
+      }}
+      .issue-summary-card .count {{
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #123c74;
+      }}
+      .context-accordion {{
+        display: grid;
+        gap: 12px;
+      }}
+      details.disclosure {{
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.98);
+        overflow: hidden;
+      }}
+      details.disclosure summary {{
+        cursor: pointer;
+        list-style: none;
+        padding: 16px 18px;
+        font-weight: 700;
+        color: #153556;
+      }}
+      details.disclosure summary::-webkit-details-marker {{
+        display: none;
+      }}
+      details.disclosure[open] summary {{
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-2);
+      }}
+      details.disclosure .disclosure-body {{
+        padding: 16px 18px 18px;
+      }}
       @media (max-width: 1020px) {{
         .layout {{ grid-template-columns: 1fr; }}
         .sidebar {{
@@ -779,6 +939,7 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str) -> str
           border-bottom: 1px solid var(--line);
         }}
         .grid.two, .grid.three {{ grid-template-columns: 1fr; }}
+        .summary-strip {{ grid-template-columns: 1fr; }}
       }}
     </style>
   </head>
@@ -838,7 +999,7 @@ def _overview_page() -> str:
         {_table(
             ["Source", "Status", "Last success", "Freshness", "Action"],
             [
-                f"<tr><td><strong>{escape(s.source_name)}</strong><br>{_meta_text(s.source_slug)}</td><td><span class='{_badge_class(s.last_run_status)}'>{escape(s.last_run_status or 'never run')}</span></td><td>{_display(s.latest_success_at)}</td><td>{_display(s.freshness_age_days)}</td><td><a href='/ops/control-panel/sources'>Open</a></td></tr>"
+                f"<tr><td><strong>{_source_runs_link(s.source_slug, s.source_name)}</strong><br>{_meta_text(s.source_slug)}</td><td><span class='{_badge_class(s.last_run_status)}'>{escape(s.last_run_status or 'never run')}</span></td><td>{_display(s.latest_success_at)}</td><td>{_display(s.freshness_age_days)}</td><td><a href='/ops/control-panel/runs?source_slug={escape(s.source_slug)}'>View runs</a></td></tr>"
                 for s in sources
                 if s.freshness_age_days is None or s.freshness_age_days > s.target_freshness_days or (s.last_run_status and "warning" in s.last_run_status.lower())
             ][:10],
@@ -930,7 +1091,7 @@ def _sources_page(
                 "</form>"
             )
             rows.append(
-                f"<tr><td><strong>{escape(source.source_name)}</strong><br>{_meta_text(source.source_slug)}</td>"
+                f"<tr><td><strong>{_source_runs_link(source.source_slug, source.source_name)}</strong><br>{_meta_text(source.source_slug)}</td>"
                 f"<td>{escape(source.jurisdiction_name)}</td>"
                 f"<td><span class='{_badge_class(source.status)}'>{escape(source.status)}</span></td>"
                 f"<td><span class='{_badge_class(source.last_run_status)}'>{escape(source.last_run_status or 'never run')}</span></td>"
@@ -1037,10 +1198,13 @@ def _runs_page(*, q: str | None, page: int, page_size: int, source_slug: str | N
     return _control_panel_shell(body, title="FiScore Ops Runs", active_path="/ops/control-panel/runs")
 
 
-def _run_detail_page(scrape_run_id: str) -> str:
+def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
     detail = get_run_detail(scrape_run_id)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"Run {scrape_run_id} was not found.")
+    active_tab = tab if tab in {"overview", "issues", "data"} else (
+        "issues" if detail.run.warning_count > 0 or detail.run.error_count > 0 else "overview"
+    )
     artifact_rows = [
         f"<tr><td>{escape(a.artifact_type)}</td><td><a href='/ops/control-panel/artifacts/{escape(a.raw_artifact_id)}'>{escape(a.raw_artifact_id[:8])}</a></td><td class='mono'>{_compact_link(a.source_url)}</td><td class='mono'>{_compact_text(a.storage_path)}</td><td>{_display(a.fetched_at)}</td></tr>"
         for a in detail.artifacts
@@ -1053,6 +1217,150 @@ def _run_detail_page(scrape_run_id: str) -> str:
         f"<tr><td>{escape(w.warning_code)}</td><td>{escape(w.warning_message)}</td><td>{_display(w.created_at)}</td></tr>"
         for w in detail.warnings
     ]
+    issue_rows = [
+        (
+            f"<tr><td>{escape(i.severity)}</td><td>{escape(i.category)}</td><td>{escape(i.issue_code)}</td>"
+            f"<td>{_compact_message(i.issue_message)}</td><td>{escape(i.component or '—')}</td>"
+            f"<td>{escape(i.stage or '—')}</td><td>{_display(i.created_at)}</td></tr>"
+        )
+        for i in detail.issues
+    ]
+    issue_counts: dict[str, int] = defaultdict(int)
+    issue_patterns: dict[tuple[str, str, str, str | None, str | None], dict[str, object]] = {}
+    for issue in detail.issues:
+        issue_counts[f"{issue.severity}:{issue.category}"] += 1
+        pattern_key = (
+            issue.severity,
+            issue.category,
+            issue.issue_code,
+            issue.component,
+            issue.stage,
+        )
+        current = issue_patterns.get(pattern_key)
+        if current is None:
+            issue_patterns[pattern_key] = {
+                "severity": issue.severity,
+                "category": issue.category,
+                "issue_code": issue.issue_code,
+                "component": issue.component,
+                "stage": issue.stage,
+                "count": 1,
+                "latest_created_at": issue.created_at,
+            }
+        else:
+            current["count"] = int(current["count"]) + 1
+            if issue.created_at > current["latest_created_at"]:
+                current["latest_created_at"] = issue.created_at
+    top_issue_cards = [
+        (
+            f"<div class='issue-summary-card'><span class='label'>{escape(key.replace(':', ' / '))}</span>"
+            f"<span class='count'>{count}</span></div>"
+        )
+        for key, count in sorted(issue_counts.items(), key=lambda item: (-item[1], item[0]))[:6]
+    ]
+    issue_pattern_rows = [
+        (
+            f"<tr><td>{escape(str(pattern['severity']))}</td>"
+            f"<td>{escape(str(pattern['category']))}</td>"
+            f"<td>{escape(str(pattern['issue_code']))}</td>"
+            f"<td>{pattern['count']}</td>"
+            f"<td>{escape(str(pattern['component'] or '—'))}</td>"
+            f"<td>{escape(str(pattern['stage'] or '—'))}</td>"
+            f"<td>{_display(pattern['latest_created_at'])}</td></tr>"
+        )
+        for pattern in sorted(
+            issue_patterns.values(),
+            key=lambda item: (-int(item["count"]), str(item["issue_code"])),
+        )[:8]
+    ]
+    artifact_preview_rows = artifact_rows[:8]
+    parse_preview_rows = parse_rows[:10]
+    top_issue_codes = ", ".join(sorted({i.issue_code for i in detail.issues})[:3]) or "No issues recorded"
+    context_block = f"""
+    <div class="context-accordion">
+      <details class="disclosure">
+        <summary>Request Context</summary>
+        <div class="disclosure-body"><pre>{_pretty(detail.request_context)}</pre></div>
+      </details>
+      <details class="disclosure">
+        <summary>Source Snapshot</summary>
+        <div class="disclosure-body"><pre>{_pretty(detail.source_snapshot)}</pre></div>
+      </details>
+    </div>
+    """
+    tabs = "".join(
+        [
+            _run_tab_link(scrape_run_id, "overview", "Overview", active_tab=active_tab),
+            _run_tab_link(scrape_run_id, "issues", "Issues", active_tab=active_tab),
+            _run_tab_link(scrape_run_id, "data", "Data", active_tab=active_tab),
+        ]
+    )
+    if active_tab == "overview":
+        tab_body = f"""
+        <section class="grid two">
+          <section class="panel stack">
+            <h2>Issue Summary</h2>
+            <div class="issue-summary-grid">
+              {''.join(top_issue_cards) if top_issue_cards else "<div class='issue-summary-card'><span class='label'>Run</span><span class='count'>Clean</span></div>"}
+            </div>
+            <div class="muted">Top issue codes: {escape(top_issue_codes)}</div>
+          </section>
+          <section class="panel stack">
+            <h2>Context</h2>
+            {context_block}
+          </section>
+          <section class="panel">
+            <h2>Issue Patterns</h2>
+            {_table(["Severity", "Category", "Code", "Count", "Component", "Stage", "Latest"], issue_pattern_rows, empty_message="No run issues recorded.")}
+          </section>
+          <section class="panel">
+            <h2>Artifact Preview</h2>
+            <div class="table-artifacts">
+            {_table(["Type", "Artifact", "Source URL", "Storage", "Fetched"], artifact_preview_rows, empty_message="No artifacts recorded.")}
+            </div>
+          </section>
+        </section>
+        """
+    elif active_tab == "issues":
+        tab_body = f"""
+        <section class="grid">
+          <section class="panel stack">
+            <h2>Issue Summary</h2>
+            <div class="issue-summary-grid">
+              {''.join(top_issue_cards) if top_issue_cards else "<div class='issue-summary-card'><span class='label'>Run</span><span class='count'>Clean</span></div>"}
+            </div>
+          </section>
+          <section class="panel">
+            <h2>Run Issues</h2>
+            <div class="table-issues">
+            {_table(["Severity", "Category", "Code", "Message", "Component", "Stage", "Created"], issue_rows, empty_message="No run issues recorded.")}
+            </div>
+          </section>
+          <section class="panel">
+            <h2>Parser Warnings</h2>
+            {_table(["Code", "Message", "Created"], warning_rows, empty_message="No parser warnings recorded.")}
+          </section>
+        </section>
+        """
+    else:
+        tab_body = f"""
+        <section class="grid two">
+          <section class="panel">
+            <h2>Artifacts</h2>
+            <div class="table-artifacts">
+            {_table(["Type", "Artifact", "Source URL", "Storage", "Fetched"], artifact_rows, empty_message="No artifacts recorded.")}
+            </div>
+          </section>
+          <section class="panel">
+            <h2>Parse Results</h2>
+            {_table(["Type", "Parse Result", "Status", "Source key", "Warnings"], parse_preview_rows, empty_message="No parse results recorded.")}
+          </section>
+          <section class="panel stack">
+            <h2>Context</h2>
+            {context_block}
+          </section>
+        </section>
+        """
     body = f"""
     <section class="hero">
       <div>
@@ -1061,44 +1369,45 @@ def _run_detail_page(scrape_run_id: str) -> str:
       </div>
       <div class="actions"><a class="button secondary" href="/ops/control-panel/runs">Back to runs</a></div>
     </section>
-    <section class="grid two">
-      <section class="panel stack">
-        <h2>Summary</h2>
+    <section class="summary-strip">
+      <section class="summary-card">
+        <h3>Status</h3>
         <div class="actions">
           <span class="{_badge_class(detail.run.run_status)}">{escape(detail.run.run_status)}</span>
-          <span class="badge">Artifacts {detail.run.artifact_count}</span>
-          <span class="badge">Parsed {detail.run.parsed_record_count}</span>
-          <span class="badge">Normalized {detail.run.normalized_record_count}</span>
         </div>
-        <div class="muted">Started: {_display(detail.run.started_at)}</div>
-        <div class="muted">Completed: {_display(detail.run.completed_at)}</div>
-        <div class="muted">Trigger: {escape(detail.run.trigger_type)}</div>
-        <div class="muted">Warning count: {detail.run.warning_count} | Error count: {detail.run.error_count}</div>
-        <div class="muted">Error summary: {escape(detail.run.error_summary or '-')}</div>
+        <div class="small">Started {_display(detail.run.started_at)}<br>Completed {_display(detail.run.completed_at)}</div>
       </section>
-      <section class="panel">
-        <h2>Request Context</h2>
-        <pre>{_pretty(detail.request_context)}</pre>
+      <section class="summary-card">
+        <h3>Artifacts</h3>
+        <span class="big">{detail.run.artifact_count}</span>
+        <div class="small">Fetched and stored during this run</div>
       </section>
-      <section class="panel">
-        <h2>Source Snapshot</h2>
-        <pre>{_pretty(detail.source_snapshot)}</pre>
+      <section class="summary-card">
+        <h3>Parsed</h3>
+        <span class="big">{detail.run.parsed_record_count}</span>
+        <div class="small">Inspection and finding parse results</div>
       </section>
-      <section class="panel">
-        <h2>Artifacts</h2>
-        <div class="table-artifacts">
-        {_table(["Type", "Artifact", "Source URL", "Storage", "Fetched"], artifact_rows, empty_message="No artifacts recorded.")}
-        </div>
+      <section class="summary-card">
+        <h3>Normalized</h3>
+        <span class="big">{detail.run.normalized_record_count}</span>
+        <div class="small">Writes into master tables and reports</div>
       </section>
-      <section class="panel">
-        <h2>Parse Results</h2>
-        {_table(["Type", "Parse Result", "Status", "Source key", "Warnings"], parse_rows, empty_message="No parse results recorded.")}
-      </section>
-      <section class="panel">
-        <h2>Warnings</h2>
-        {_table(["Code", "Message", "Created"], warning_rows, empty_message="No parser warnings recorded.")}
+      <section class="summary-card">
+        <h3>Issues</h3>
+        <span class="big">{detail.run.warning_count + detail.run.error_count}</span>
+        <div class="small">Warnings {detail.run.warning_count} | Errors {detail.run.error_count}</div>
       </section>
     </section>
+    <section class="panel" style="margin-bottom:18px;">
+      <div class="actions" style="justify-content:space-between; align-items:flex-start;">
+        <div class="stack">
+          <h2 style="margin-bottom:0;">Run Summary</h2>
+          <div class="muted">Trigger: {escape(detail.run.trigger_type)} | Error summary: {escape(detail.run.error_summary or '-')}</div>
+        </div>
+        <div class="run-tabs">{tabs}</div>
+      </div>
+    </section>
+    {tab_body}
     """
     return _control_panel_shell(body, title=f"Run {detail.run.scrape_run_id}", active_path="/ops/control-panel/runs")
 
@@ -1231,7 +1540,7 @@ def _health_page() -> str:
     health = get_health_summary()
     sources = list_sources(limit=250)
     rows = [
-        f"<tr><td><strong>{escape(s.source_name)}</strong><br>{_meta_text(s.source_slug)}</td><td>{_display(s.latest_success_at)}</td><td>{_display(s.freshness_age_days)}</td><td><span class='{_badge_class(s.last_run_status or ('stale' if s.freshness_age_days is None else 'healthy'))}'>{escape(s.last_run_status or 'never run')}</span></td></tr>"
+        f"<tr><td><strong>{_source_runs_link(s.source_slug, s.source_name)}</strong><br>{_meta_text(s.source_slug)}</td><td>{_display(s.latest_success_at)}</td><td>{_display(s.freshness_age_days)}</td><td><span class='{_badge_class(s.last_run_status or ('stale' if s.freshness_age_days is None else 'healthy'))}'>{escape(s.last_run_status or 'never run')}</span></td></tr>"
         for s in sources
     ]
     body = f"""
@@ -1431,8 +1740,8 @@ def control_panel_runs(
 
 
 @router.get("/control-panel/runs/{scrape_run_id}", response_class=HTMLResponse, include_in_schema=False)
-def control_panel_run_detail(scrape_run_id: str) -> str:
-    return _run_detail_page(scrape_run_id)
+def control_panel_run_detail(scrape_run_id: str, tab: str | None = None) -> str:
+    return _run_detail_page(scrape_run_id, tab=tab)
 
 
 @router.get("/control-panel/artifacts", response_class=HTMLResponse, include_in_schema=False)

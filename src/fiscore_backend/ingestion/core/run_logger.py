@@ -1,4 +1,5 @@
 from fiscore_backend.db import get_connection
+from fiscore_backend.ingestion.core.run_issue_store import summarize_scrape_run_issues
 
 
 def mark_scrape_run_running(scrape_run_id: str) -> None:
@@ -24,6 +25,10 @@ def mark_scrape_run_completed(
     warning_count: int,
     error_count: int,
 ) -> None:
+    issue_warning_count, issue_error_count = summarize_scrape_run_issues(scrape_run_id)
+    warning_count = issue_warning_count
+    error_count = max(error_count, issue_error_count)
+
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(

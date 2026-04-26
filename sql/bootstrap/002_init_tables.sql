@@ -21,6 +21,7 @@ create table if not exists ops.source_registry (
     jurisdiction_name text not null,
     source_type text not null,
     base_url text not null,
+    source_config jsonb,
     cadence_type text not null,
     target_freshness_days integer not null,
     parser_id text not null,
@@ -120,6 +121,30 @@ create table if not exists ingestion.parser_warning (
     created_at timestamptz not null default now()
 );
 
+create table if not exists ops.scrape_run_issue (
+    scrape_run_issue_id uuid primary key default gen_random_uuid(),
+    scrape_run_id uuid not null references ops.scrape_run(scrape_run_id),
+    source_id uuid not null references ops.source_registry(source_id),
+    severity text not null,
+    category text not null,
+    issue_code text not null,
+    issue_message text not null,
+    component text,
+    stage text,
+    parse_result_id uuid references ingestion.parse_result(parse_result_id),
+    raw_artifact_id uuid references ingestion.raw_artifact_index(raw_artifact_id),
+    source_record_key text,
+    source_url text,
+    issue_metadata jsonb,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists idx_scrape_run_issue_scrape_run_id
+    on ops.scrape_run_issue(scrape_run_id, created_at desc);
+
+create index if not exists idx_scrape_run_issue_severity
+    on ops.scrape_run_issue(severity, created_at desc);
+
 create table if not exists master.master_restaurant (
     master_restaurant_id uuid primary key default gen_random_uuid(),
     location_fingerprint text not null,
@@ -173,6 +198,7 @@ create table if not exists master.master_inspection (
     inspection_type text,
     score numeric(8, 2),
     grade text,
+    inspector_name text,
     official_status text,
     report_url text,
     is_current boolean not null default true,
@@ -209,6 +235,8 @@ create table if not exists master.master_inspection_finding (
     official_detail_text text,
     official_detail_json jsonb,
     auditor_comments text,
+    corrected_during_inspection boolean,
+    is_repeat_violation boolean,
     normalized_title text,
     normalized_category text,
     severity text,

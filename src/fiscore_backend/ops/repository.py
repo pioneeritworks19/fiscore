@@ -15,6 +15,7 @@ from fiscore_backend.models import (
     OpsHealthSummary,
     OpsParseResultSummary,
     OpsPlatformSummary,
+    OpsRunIssueSummary,
     OpsRerunSummary,
     OpsRunDetail,
     OpsRunSummary,
@@ -400,6 +401,49 @@ def get_run_detail(scrape_run_id: str) -> OpsRunDetail | None:
             cur.execute(
                 """
                 select
+                    sri.scrape_run_issue_id::text as scrape_run_issue_id,
+                    sri.severity,
+                    sri.category,
+                    sri.issue_code,
+                    sri.issue_message,
+                    sri.component,
+                    sri.stage,
+                    sri.parse_result_id::text as parse_result_id,
+                    sri.raw_artifact_id::text as raw_artifact_id,
+                    sri.source_record_key,
+                    sri.source_url,
+                    sri.issue_metadata,
+                    sri.created_at
+                from ops.scrape_run_issue sri
+                where sri.scrape_run_id = %s::uuid
+                order by
+                    case sri.severity
+                        when 'error' then 0
+                        when 'warning' then 1
+                        else 2
+                    end,
+                    sri.created_at desc
+                limit 200
+                """,
+                (scrape_run_id,),
+            )
+            issues = [
+                OpsRunIssueSummary(
+                    **{
+                        **issue,
+                        "issue_metadata": (
+                            issue["issue_metadata"]
+                            if isinstance(issue["issue_metadata"], dict)
+                            else _decode_jsonish(issue["issue_metadata"])
+                        ),
+                    }
+                )
+                for issue in cur.fetchall()
+            ]
+
+            cur.execute(
+                """
+                select
                     pw.parser_warning_id::text as parser_warning_id,
                     pw.parse_result_id::text as parse_result_id,
                     pw.warning_code,
@@ -421,6 +465,7 @@ def get_run_detail(scrape_run_id: str) -> OpsRunDetail | None:
         source_snapshot=_decode_jsonish(row["source_snapshot"]),
         artifacts=artifacts,
         parse_results=parse_results,
+        issues=issues,
         warnings=warnings,
     )
 

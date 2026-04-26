@@ -35,6 +35,7 @@ If you are new to the project, a good starting path is:
 - ingestion and master-data platform design
 - Google Cloud backend bootstrap planning
 - Sword Solutions as the first practical source integration
+- Georgia DPH Food Service as the next platform-validation source
 
 ## Backend Scaffold
 
@@ -43,9 +44,9 @@ The repository now includes an initial Python backend scaffold for:
 - `fiscore-api` via FastAPI
 - `fiscore-worker` via FastAPI on Cloud Run
 - shared config, database, and Cloud Storage integration helpers
-- a dedicated ingestion structure with shared core flow code and source-specific adapters
+- a dedicated ingestion structure with registry-driven adapter dispatch and source-specific adapters
 - SQL bootstrap files for the first `ops`, `ingestion`, and `master` schemas
-- initial Sword source seed data
+- initial Sword and Georgia source seed data
 
 ## Ingestion Control Panel
 
@@ -90,6 +91,7 @@ Source ingestion code is organized under:
 - `src/fiscore_backend/ingestion/core/` for shared ingestion orchestration
 - `src/fiscore_backend/ingestion/sources/` for source-specific adapters
 - `src/fiscore_backend/ingestion/sources/sword/` for the first Sword adapter scaffold
+- `src/fiscore_backend/ingestion/sources/ga_healthinspections/` for the Georgia Tyler county-based sources
 
 ## Local Setup
 
@@ -115,6 +117,7 @@ Bootstrap SQL lives in:
 - `sql/bootstrap/001_init_schemas.sql`
 - `sql/bootstrap/002_init_tables.sql`
 - `sql/seeds/001_seed_sword_sources.sql`
+- `sql/seeds/002_seed_georgia_healthinspections.sql`
 
 These files are intended as the first version-controlled database foundation before a fuller migration system is added.
 
@@ -128,6 +131,11 @@ If your local database was bootstrapped before platform grouping and richer ops 
 
 - `sql/migrations/004_add_scrape_run_context_columns.sql`
 - `sql/migrations/005_add_platform_registry.sql`
+- `sql/migrations/006_add_inspection_and_finding_fields.sql`
+- `sql/migrations/007_add_scrape_run_issue.sql`
+- `sql/migrations/008_add_source_registry_config.sql`
+
+Georgia is now modeled operationally as one source per county under the shared Tyler platform family. The Georgia seed file deactivates the old statewide source slug and inserts county-specific source rows with county config.
 
 ## GCP Deployment
 

@@ -3,6 +3,7 @@ import json
 
 from fiscore_backend.ingestion.core.artifact_index import create_raw_artifact_index
 from fiscore_backend.ingestion.core.parse_result_store import create_parse_result, create_parser_warning
+from fiscore_backend.ingestion.core.run_issue_store import create_scrape_run_issue
 from fiscore_backend.ingestion.core.run_logger import (
     mark_scrape_run_completed,
     mark_scrape_run_failed,
@@ -60,6 +61,46 @@ class SwordSourceAdapter:
         normalized_record_count = 0
         fetcher = SwordFetcher()
 
+        def record_issue(
+            *,
+            severity: str,
+            category: str,
+            code: str,
+            message: str,
+            component: str,
+            stage: str | None = None,
+            parse_result_id: str | None = None,
+            raw_artifact_id: str | None = None,
+            source_record_key: str | None = None,
+            source_url: str | None = None,
+        ) -> None:
+            warnings.append(message)
+            if scrape_run_id is None:
+                return
+            try:
+                create_scrape_run_issue(
+                    scrape_run_id=scrape_run_id,
+                    source_id=source.source_id,
+                    severity=severity,
+                    category=category,
+                    code=code,
+                    message=message,
+                    component=component,
+                    stage=stage,
+                    parse_result_id=parse_result_id,
+                    raw_artifact_id=raw_artifact_id,
+                    source_record_key=source_record_key,
+                    source_url=source_url,
+                )
+            except Exception:  # pragma: no cover - do not fail the run for issue logging
+                logger.exception("Could not persist scrape run issue")
+
+        def record_warning(**kwargs) -> None:
+            record_issue(severity="warning", **kwargs)
+
+        def record_error(**kwargs) -> None:
+            record_issue(severity="error", **kwargs)
+
         try:
             scrape_run_id = create_scrape_run(
                 source_id=source.source_id,
@@ -83,7 +124,13 @@ class SwordSourceAdapter:
             try:
                 mark_scrape_run_running(scrape_run_id)
             except Exception as exc:  # pragma: no cover - environment-specific connectivity
-                warnings.append(f"Could not mark scrape run as running: {exc}")
+                record_warning(
+                    category="db",
+                    code="scrape_run_mark_running_failed",
+                    message=f"Could not mark scrape run as running: {exc}",
+                    component="run_logger",
+                    stage="start",
+                )
 
         try:
             fetched_artifacts = fetcher.fetch_search_results(run_plan)
@@ -129,11 +176,23 @@ class SwordSourceAdapter:
                         )
 
                         for parser_warning in search_parse.warnings:
-                            warnings.append(
-                                f"Search parser (page {fetched_artifact.page_number or '?'}): {parser_warning}"
+                            record_warning(
+                                category="parse",
+                                code="sword_search_parse_warning",
+                                message=f"Search parser (page {fetched_artifact.page_number or '?'}): {parser_warning}",
+                                component="search_parser",
+                                stage="search",
+                                raw_artifact_id=raw_artifact_id,
+                                source_url=fetched_artifact.source_url,
                             )
                 except Exception as exc:  # pragma: no cover - environment-specific connectivity
-                    warnings.append(f"Raw artifact persistence failed: {exc}")
+                    record_warning(
+                        category="storage",
+                        code="raw_artifact_persist_failed",
+                        message=f"Raw artifact persistence failed: {exc}",
+                        component="adapter",
+                        stage="search",
+                    )
 
                 try:
                     for candidate, candidate_raw_artifact_id, candidate_warnings, candidate_source_url in parsed_candidates:
@@ -166,8 +225,19 @@ class SwordSourceAdapter:
                             )
                             normalized_record_count += normalized_inspection.normalized_count
                         except Exception as exc:  # pragma: no cover - environment-specific connectivity
-                            warnings.append(
-                                f"Inspection normalization failed for header {candidate.header_id or candidate.source_record_key}: {exc}"
+                            record_warning(
+                                category="normalize",
+                                code="inspection_normalization_failed",
+                                message=(
+                                    "Inspection normalization failed for header "
+                                    f"{candidate.header_id or candidate.source_record_key}: {exc}"
+                                ),
+                                component="normalizer",
+                                stage="normalize",
+                                parse_result_id=parse_result_id,
+                                raw_artifact_id=candidate_raw_artifact_id,
+                                source_record_key=candidate.source_record_key,
+                                source_url=candidate_source_url,
                             )
 
                         for parser_warning in candidate_warnings:
@@ -209,7 +279,16 @@ class SwordSourceAdapter:
                                     source_url=detail_artifact.source_url,
                                 )
                                 for detail_warning in detail_parse.warnings:
-                                    warnings.append(f"Detail parser: {detail_warning}")
+                                    record_warning(
+                                        category="parse",
+                                        code="sword_detail_parse_warning",
+                                        message=detail_warning,
+                                        component="detail_parser",
+                                        stage="detail",
+                                        raw_artifact_id=detail_raw_artifact_id,
+                                        source_record_key=candidate.source_record_key,
+                                        source_url=detail_artifact.source_url,
+                                    )
 
                                 for finding in detail_parse.findings:
                                     finding_parse_result_id = create_parse_result(
@@ -240,8 +319,19 @@ class SwordSourceAdapter:
                                             ),
                                         )
                                     except Exception as exc:  # pragma: no cover - environment-specific connectivity
-                                        warnings.append(
-                                            f"Finding normalization failed for header {finding.header_id or 'unknown'} detail {finding.detail_id or 'unknown'}: {exc}"
+                                        record_warning(
+                                            category="normalize",
+                                            code="finding_normalization_failed",
+                                            message=(
+                                                "Finding normalization failed for header "
+                                                f"{finding.header_id or 'unknown'} detail {finding.detail_id or 'unknown'}: {exc}"
+                                            ),
+                                            component="normalizer",
+                                            stage="normalize",
+                                            parse_result_id=finding_parse_result_id,
+                                            raw_artifact_id=detail_raw_artifact_id,
+                                            source_record_key=finding.source_record_key,
+                                            source_url=detail_artifact.source_url,
                                         )
 
                                     for detail_warning in detail_parse.warnings:
@@ -251,15 +341,34 @@ class SwordSourceAdapter:
                                             warning_message=detail_warning,
                                         )
                             except Exception as exc:  # pragma: no cover - environment-specific connectivity
-                                warnings.append(
-                                    f"Detail fetch or parse failed for header {candidate.header_id}: {exc}"
+                                record_warning(
+                                    category="fetch",
+                                    code="detail_fetch_or_parse_failed",
+                                    message=f"Detail fetch or parse failed for header {candidate.header_id}: {exc}",
+                                    component="adapter",
+                                    stage="detail",
+                                    source_record_key=candidate.source_record_key,
+                                    source_url=candidate_source_url,
                                 )
                 except Exception as exc:  # pragma: no cover - environment-specific connectivity
-                    warnings.append(f"Search parse persistence failed: {exc}")
+                    record_warning(
+                        category="db",
+                        code="search_parse_persist_failed",
+                        message=f"Search parse persistence failed: {exc}",
+                        component="adapter",
+                        stage="search",
+                    )
         except Exception as exc:  # pragma: no cover - fetch/runtime-specific
             logger.exception("Sword fetch failed")
             if scrape_run_id is not None:
                 try:
+                    record_error(
+                        category="fetch",
+                        code="sword_run_failed",
+                        message=str(exc),
+                        component="adapter",
+                        stage="run",
+                    )
                     mark_scrape_run_failed(scrape_run_id, str(exc))
                 except Exception:
                     pass
@@ -283,7 +392,7 @@ class SwordSourceAdapter:
                     artifact_count=artifact_count,
                     parsed_record_count=parse_result_count,
                     normalized_record_count=normalized_record_count,
-                    warning_count=len(warnings),
+                    warning_count=0,
                     error_count=0,
                 )
             except Exception as exc:  # pragma: no cover - environment-specific connectivity

@@ -121,12 +121,29 @@ class OpsWarningSummary(BaseModel):
     created_at: datetime
 
 
+class OpsRunIssueSummary(BaseModel):
+    scrape_run_issue_id: str
+    severity: str
+    category: str
+    issue_code: str
+    issue_message: str
+    component: str | None = None
+    stage: str | None = None
+    parse_result_id: str | None = None
+    raw_artifact_id: str | None = None
+    source_record_key: str | None = None
+    source_url: str | None = None
+    issue_metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
 class OpsRunDetail(BaseModel):
     run: OpsRunSummary
     request_context: dict[str, Any] = Field(default_factory=dict)
     source_snapshot: dict[str, Any] = Field(default_factory=dict)
     artifacts: list[OpsArtifactSummary] = Field(default_factory=list)
     parse_results: list[OpsParseResultSummary] = Field(default_factory=list)
+    issues: list[OpsRunIssueSummary] = Field(default_factory=list)
     warnings: list[OpsWarningSummary] = Field(default_factory=list)
 
 
