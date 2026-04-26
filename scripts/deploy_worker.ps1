@@ -42,7 +42,7 @@ try {
         --ingress all `
         --no-allow-unauthenticated `
         --add-cloudsql-instances $CloudSqlConnectionName `
-        --set-env-vars "APP_ENV=$Environment,GCP_PROJECT_ID=$ProjectId,GCP_REGION=$Region,DEFAULT_PARSER_VERSION=sword-v1,CLOUD_SQL_CONNECTION_NAME=$CloudSqlConnectionName,CLOUD_SQL_SOCKET_DIR=/cloudsql" `
+        --set-env-vars "APP_ENV=$Environment,GCP_PROJECT_ID=$ProjectId,GCP_REGION=$Region,DEFAULT_PARSER_VERSION=sword-v1,CLOUD_SQL_CONNECTION_NAME=$CloudSqlConnectionName,CLOUD_SQL_SOCKET_DIR=/cloudsql,RUN_DISPATCH_MODE=local" `
         --set-secrets "DB_HOST=DB_HOST:latest,DB_PORT=DB_PORT:latest,DB_NAME=DB_NAME:latest,DB_USER=DB_USER:latest,DB_PASSWORD=DB_PASSWORD:latest,RAW_ARTIFACT_BUCKET=RAW_ARTIFACT_BUCKET:latest"
 }
 finally {
