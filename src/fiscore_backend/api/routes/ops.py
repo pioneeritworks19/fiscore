@@ -8,7 +8,7 @@ from math import ceil
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from fiscore_backend.ingestion.core.dispatcher import dispatch_run
@@ -2759,7 +2759,10 @@ def control_panel_sources(
 
 
 @router.post("/control-panel/sources/{source_slug}/run", include_in_schema=False)
-def control_panel_trigger_run(source_slug: str, run_mode: str = "incremental") -> RedirectResponse:
+def control_panel_trigger_run(
+    source_slug: str,
+    run_mode: str = Form("incremental"),
+) -> RedirectResponse:
     dispatch_run(
         WorkerRunRequest(
             source_slug=source_slug,
