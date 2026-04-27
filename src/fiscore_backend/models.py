@@ -289,6 +289,7 @@ class OpsMasterInspectionSummary(BaseModel):
     source_inspection_key: str
     inspection_date: date
     inspection_type: str | None = None
+    inspector_name: str | None = None
     score: float | None = None
     grade: str | None = None
     official_status: str | None = None
@@ -335,6 +336,7 @@ class OpsMasterFindingSummary(BaseModel):
     official_clause_reference: str | None = None
     official_text: str
     official_detail_text: str | None = None
+    auditor_comments: str | None = None
     normalized_title: str | None = None
     normalized_category: str | None = None
     severity: str | None = None

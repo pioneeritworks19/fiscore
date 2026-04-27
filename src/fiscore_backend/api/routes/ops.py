@@ -443,6 +443,31 @@ def _display(value: object | None) -> str:
     return escape(str(value)) if value not in (None, "") else "&mdash;"
 
 
+def _display_date_compact(value: object | None) -> str:
+    if value in (None, ""):
+        return "&mdash;"
+    return escape(str(value))
+
+
+def _title_case_slug(value: str | None) -> str:
+    if not value:
+        return "Unknown"
+    return " ".join(part.capitalize() for part in value.replace("_", " ").replace("-", " ").split())
+
+
+def _inspection_result_label(inspection: OpsMasterInspectionSummary) -> str:
+    for candidate in (inspection.official_status, inspection.grade):
+        if candidate:
+            return candidate
+    return "Recorded"
+
+
+def _severity_sort_key(value: str | None) -> int:
+    normalized = (value or "").strip().lower()
+    order = {"critical": 0, "major": 1, "minor": 2}
+    return order.get(normalized, 3)
+
+
 def _truncate_middle(value: str, *, max_length: int = 72) -> str:
     if len(value) <= max_length:
         return value
@@ -806,6 +831,11 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str, worksp
       .badge.ok {{ color: #0f6a3c; border-color: #a6debf; background: #edf9f2; }}
       .badge.warn {{ color: #8b5e1f; border-color: #e4c081; background: #fff7e8; }}
       .badge.fail {{ color: #9a2d3f; border-color: #e2adbb; background: #fff1f4; }}
+      .badge.repeat {{ color: #97263a; border-color: #e2adbb; background: #fff1f4; }}
+      .badge.corrected {{ color: #0f6a3c; border-color: #a6debf; background: #edf9f2; }}
+      .badge.severity-critical {{ color: #9a2d3f; border-color: #e2adbb; background: #fff1f4; }}
+      .badge.severity-major {{ color: #8b5e1f; border-color: #e4c081; background: #fff7e8; }}
+      .badge.severity-minor {{ color: #255f9d; border-color: #b9d1ef; background: #eef5ff; }}
       .button.disabled {{
         cursor: default;
         opacity: 0.45;
@@ -1074,6 +1104,215 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str, worksp
         font-size: 0.9rem;
         line-height: 1.5;
       }}
+      .restaurant-hero {{
+        align-items: start;
+      }}
+      .hero-kicker {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: #204a7a;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }}
+      .hero-meta {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        margin-top: 14px;
+        color: var(--muted);
+      }}
+      .hero-meta span {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }}
+      .grade-ring {{
+        min-width: 108px;
+        min-height: 108px;
+        padding: 12px;
+        border-radius: 999px;
+        border: 4px solid #27a17a;
+        background: rgba(240, 252, 247, 0.96);
+        color: #16674d;
+        display: grid;
+        place-items: center;
+        text-align: center;
+      }}
+      .grade-ring .letter {{
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+      }}
+      .grade-ring .caption {{
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }}
+      .overview-facts {{
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px 22px;
+      }}
+      .fact-label {{
+        color: #5a718c;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+      }}
+      .fact-value {{
+        color: #10243d;
+        line-height: 1.45;
+      }}
+      .severity-legend {{
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+        color: #4f647b;
+      }}
+      .severity-legend-item,
+      .severity-inline {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }}
+      .severity-dot {{
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: #90a4b7;
+        display: inline-block;
+        flex: 0 0 auto;
+      }}
+      .severity-dot.critical {{ background: #df4f55; }}
+      .severity-dot.major {{ background: #f0a02b; }}
+      .severity-dot.minor {{ background: #4d88d1; }}
+      .inspection-history {{
+        display: grid;
+        gap: 16px;
+      }}
+      .inspection-card {{
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 252, 255, 0.98) 100%);
+        overflow: hidden;
+      }}
+      .inspection-card summary {{
+        list-style: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 18px 22px;
+      }}
+      .inspection-card summary::-webkit-details-marker {{ display: none; }}
+      .inspection-card[open] summary {{
+        border-bottom: 1px solid var(--line);
+      }}
+      .inspection-card-title {{
+        font-size: 1.08rem;
+        font-weight: 700;
+        color: #11263d;
+      }}
+      .inspection-card-subtitle {{
+        margin-top: 4px;
+        color: #4f647b;
+        font-size: 0.84rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }}
+      .inspection-card-right {{
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        text-align: right;
+      }}
+      .inspection-card-body {{
+        padding: 18px 22px 22px;
+        display: grid;
+        gap: 14px;
+      }}
+      .inspection-meta {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }}
+      .info-chip {{
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #f4f8fc;
+        border: 1px solid var(--line);
+        color: #526779;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }}
+      .finding-list {{
+        display: grid;
+        gap: 14px;
+      }}
+      .finding-item + .finding-item {{
+        border-top: 1px solid #e6eef7;
+        padding-top: 14px;
+      }}
+      .finding-header {{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+      }}
+      .finding-code {{
+        color: #4f647b;
+        font-size: 0.82rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }}
+      .finding-title {{
+        font-size: 1rem;
+        font-weight: 600;
+        color: #132944;
+        margin-bottom: 8px;
+      }}
+      .finding-block {{
+        color: #21364c;
+        line-height: 1.6;
+      }}
+      .finding-block + .finding-block {{
+        margin-top: 10px;
+      }}
+      .finding-block-label {{
+        display: block;
+        margin-bottom: 3px;
+        color: #5a718c;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }}
+      .finding-flags {{
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }}
+      .source-grid {{
+        display: grid;
+        gap: 18px;
+      }}
       .run-tabs {{
         display: flex;
         gap: 10px;
@@ -1190,6 +1429,15 @@ def _control_panel_shell(body_html: str, *, title: str, active_path: str, worksp
         }}
         .grid.two, .grid.three {{ grid-template-columns: 1fr; }}
         .summary-strip {{ grid-template-columns: 1fr; }}
+        .overview-facts {{ grid-template-columns: 1fr; }}
+        .inspection-card summary {{
+          align-items: start;
+          flex-direction: column;
+        }}
+        .inspection-card-right {{
+          justify-content: flex-start;
+          text-align: left;
+        }}
       }}
     </style>
   </head>
@@ -1471,7 +1719,7 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
         for a in detail.artifacts
     ]
     parse_rows = [
-        f"<tr><td>{escape(p.record_type)}</td><td><a href='/ops/control-panel/parse-results/{escape(p.parse_result_id)}'>{escape(p.parse_result_id[:8])}</a></td><td>{escape(p.parse_status)}</td><td>{escape(p.source_record_key or '—')}</td><td>{p.warning_count}</td></tr>"
+        f"<tr><td>{escape(p.record_type)}</td><td><a href='/ops/control-panel/parse-results/{escape(p.parse_result_id)}'>{escape(p.parse_result_id[:8])}</a></td><td>{escape(p.parse_status)}</td><td>{escape(p.source_record_key or '&mdash;')}</td><td>{p.warning_count}</td></tr>"
         for p in detail.parse_results[:100]
     ]
     warning_rows = [
@@ -1481,8 +1729,8 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
     issue_rows = [
         (
             f"<tr><td>{escape(i.severity)}</td><td>{escape(i.category)}</td><td>{escape(i.issue_code)}</td>"
-            f"<td>{_compact_message(i.issue_message)}</td><td>{escape(i.component or '—')}</td>"
-            f"<td>{escape(i.stage or '—')}</td><td>{_display(i.created_at)}</td></tr>"
+            f"<td>{_compact_message(i.issue_message)}</td><td>{escape(i.component or '&mdash;')}</td>"
+            f"<td>{escape(i.stage or '&mdash;')}</td><td>{_display(i.created_at)}</td></tr>"
         )
         for i in detail.issues
     ]
@@ -1525,8 +1773,8 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
             f"<td>{escape(str(pattern['category']))}</td>"
             f"<td>{escape(str(pattern['issue_code']))}</td>"
             f"<td>{pattern['count']}</td>"
-            f"<td>{escape(str(pattern['component'] or '—'))}</td>"
-            f"<td>{escape(str(pattern['stage'] or '—'))}</td>"
+            f"<td>{escape(str(pattern['component'] or '&mdash;'))}</td>"
+            f"<td>{escape(str(pattern['stage'] or '&mdash;'))}</td>"
             f"<td>{_display(pattern['latest_created_at'])}</td></tr>"
         )
         for pattern in sorted(
@@ -1856,7 +2104,7 @@ def _master_restaurant_detail_page(master_restaurant_id: str) -> str:
         raise HTTPException(status_code=404, detail=f"Master restaurant {master_restaurant_id} was not found.")
     restaurant = detail.restaurant
     identifier_rows = [
-        f"<tr><td>{escape(item.identifier_type)}</td><td class='mono'>{escape(item.identifier_value)}</td><td>{escape(item.source_slug or '—')}</td><td>{'yes' if item.is_primary else 'no'}</td><td>{_display(item.confidence)}</td></tr>"
+        f"<tr><td>{escape(item.identifier_type)}</td><td class='mono'>{escape(item.identifier_value)}</td><td>{escape(item.source_slug or '&mdash;')}</td><td>{'yes' if item.is_primary else 'no'}</td><td>{_display(item.confidence)}</td></tr>"
         for item in detail.identifiers
     ]
     source_link_rows = [
@@ -1871,7 +2119,7 @@ def _master_restaurant_detail_page(master_restaurant_id: str) -> str:
         (
             f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.master_inspection_id[:8])}</a></td>"
             f"<td>{escape(item.source_slug)}</td><td class='mono'>{escape(item.source_inspection_key)}</td><td>{_display(item.inspection_date)}</td>"
-            f"<td>{escape(item.inspection_type or '—')}</td><td>{_display(item.score)}</td><td>{escape(item.grade or '—')}</td>"
+            f"<td>{escape(item.inspection_type or '&mdash;')}</td><td>{_display(item.score)}</td><td>{escape(item.grade or '&mdash;')}</td>"
             f"<td><span class='{_badge_class(item.report_availability_status or 'missing')}'>{escape(item.report_availability_status or 'missing')}</span></td><td>{item.finding_count}</td></tr>"
         )
         for item in detail.inspections
@@ -1880,7 +2128,7 @@ def _master_restaurant_detail_page(master_restaurant_id: str) -> str:
     <section class="hero">
       <div>
         <h1>{escape(restaurant.display_name)}</h1>
-        <p>{escape(restaurant.address_line1)} • {escape(restaurant.city)}, {escape(restaurant.state_code)} {escape(restaurant.zip_code or '')}</p>
+        <p>{escape(restaurant.address_line1)} &bull; {escape(restaurant.city)}, {escape(restaurant.state_code)} {escape(restaurant.zip_code or '')}</p>
       </div>
       <div class="actions">
         <a class="button secondary" href="{_build_url('/ops/control-panel/lineage', q=restaurant.display_name)}">View lineage</a>
@@ -1899,7 +2147,7 @@ def _master_restaurant_detail_page(master_restaurant_id: str) -> str:
         <h2>Identity</h2>
         <div class="muted">Master restaurant ID: <span class="mono">{escape(restaurant.master_restaurant_id)}</span></div>
         <div class="muted">Location fingerprint: <span class="mono">{escape(restaurant.location_fingerprint)}</span></div>
-        <div class="muted">Normalized name: {escape(restaurant.normalized_name or '—')}</div>
+        <div class="muted">Normalized name: {escape(restaurant.normalized_name or '&mdash;')}</div>
         <div class="muted">Status: <span class="{_badge_class(restaurant.status)}">{escape(restaurant.status)}</span></div>
         <div class="muted">Latest inspection: {_display(restaurant.latest_inspection_date)}</div>
       </section>
@@ -1942,7 +2190,7 @@ def _master_inspections_page(
             f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.master_inspection_id[:8])}</a></td>"
             f"<td><a href='/ops/control-panel/master-data/restaurants/{escape(item.master_restaurant_id)}'>{escape(item.display_name)}</a><br>{_meta_text(f'{item.city}, {item.state_code}')}</td>"
             f"<td>{escape(item.source_slug)}</td><td class='mono'>{escape(item.source_inspection_key)}</td><td>{_display(item.inspection_date)}</td>"
-            f"<td>{escape(item.inspection_type or '—')}</td><td>{_display(item.score)}</td><td>{escape(item.grade or '—')}</td>"
+            f"<td>{escape(item.inspection_type or '&mdash;')}</td><td>{_display(item.score)}</td><td>{escape(item.grade or '&mdash;')}</td>"
             f"<td><span class='{_badge_class(item.report_availability_status or 'missing')}'>{escape(item.report_availability_status or 'missing')}</span></td><td>{item.finding_count}</td></tr>"
         )
         for item in inspections
@@ -2012,20 +2260,20 @@ def _master_inspection_detail_page(master_inspection_id: str) -> str:
     inspection = detail.inspection
     report_rows = [
         (
-            f"<tr><td>{escape(item.report_role)}</td><td>{escape(item.report_format or '—')}</td>"
+            f"<tr><td>{escape(item.report_role)}</td><td>{escape(item.report_format or '&mdash;')}</td>"
             f"<td><span class='{_badge_class(item.availability_status)}'>{escape(item.availability_status)}</span></td>"
-            f"<td class='mono'>{_compact_text(item.storage_path or '—')}</td>"
-            f"<td class='mono'>{_compact_link(item.source_file_url) if item.source_file_url else '—'}</td>"
+            f"<td class='mono'>{_compact_text(item.storage_path or '&mdash;')}</td>"
+            f"<td class='mono'>{_compact_link(item.source_file_url) if item.source_file_url else '&mdash;'}</td>"
             f"<td>{_display(item.updated_at)}</td></tr>"
         )
         for item in detail.reports
     ]
     finding_rows = [
         (
-            f"<tr><td>{escape(item.official_code or '—')}</td><td>{escape(item.normalized_category or '—')}</td>"
-            f"<td>{escape(item.severity or '—')}</td><td>{_compact_message(item.official_text, max_length=120)}</td>"
-            f"<td>{'yes' if item.corrected_during_inspection else 'no' if item.corrected_during_inspection is not None else '—'}</td>"
-            f"<td>{'yes' if item.is_repeat_violation else 'no' if item.is_repeat_violation is not None else '—'}</td></tr>"
+            f"<tr><td>{escape(item.official_code or '&mdash;')}</td><td>{escape(item.normalized_category or '&mdash;')}</td>"
+            f"<td>{escape(item.severity or '&mdash;')}</td><td>{_compact_message(item.official_text, max_length=120)}</td>"
+            f"<td>{'yes' if item.corrected_during_inspection else 'no' if item.corrected_during_inspection is not None else '&mdash;'}</td>"
+            f"<td>{'yes' if item.is_repeat_violation else 'no' if item.is_repeat_violation is not None else '&mdash;'}</td></tr>"
         )
         for item in detail.findings
     ]
@@ -2041,7 +2289,7 @@ def _master_inspection_detail_page(master_inspection_id: str) -> str:
     <section class="hero">
       <div>
         <h1>Inspection {escape(inspection.master_inspection_id[:8])}</h1>
-        <p><a href='/ops/control-panel/master-data/restaurants/{escape(inspection.master_restaurant_id)}'>{escape(inspection.display_name)}</a> • {escape(inspection.source_name)} • {escape(inspection.source_inspection_key)}</p>
+        <p><a href='/ops/control-panel/master-data/restaurants/{escape(inspection.master_restaurant_id)}'>{escape(inspection.display_name)}</a> &bull; {escape(inspection.source_name)} &bull; {escape(inspection.source_inspection_key)}</p>
       </div>
       <div class="actions">
         <a class="button secondary" href="{_build_url('/ops/control-panel/lineage', q=inspection.source_inspection_key)}">View lineage</a>
@@ -2050,8 +2298,8 @@ def _master_inspection_detail_page(master_inspection_id: str) -> str:
     </section>
     <section class="summary-strip">
       <section class="summary-card"><h3>Date</h3><span class="big">{escape(str(inspection.inspection_date))}</span><div class="small">Inspection date</div></section>
-      <section class="summary-card"><h3>Score</h3><span class="big">{escape(str(inspection.score)) if inspection.score is not None else '—'}</span><div class="small">Normalized score</div></section>
-      <section class="summary-card"><h3>Grade</h3><span class="big">{escape(inspection.grade or '—')}</span><div class="small">Grade from source</div></section>
+      <section class="summary-card"><h3>Score</h3><span class="big">{escape(str(inspection.score)) if inspection.score is not None else '&mdash;'}</span><div class="small">Normalized score</div></section>
+      <section class="summary-card"><h3>Grade</h3><span class="big">{escape(inspection.grade or '&mdash;')}</span><div class="small">Grade from source</div></section>
       <section class="summary-card"><h3>Report</h3><span class="big">{escape(inspection.report_availability_status or 'missing')}</span><div class="small">Current report availability</div></section>
       <section class="summary-card"><h3>Findings</h3><span class="big">{inspection.finding_count}</span><div class="small">Current findings linked</div></section>
     </section>
@@ -2060,10 +2308,10 @@ def _master_inspection_detail_page(master_inspection_id: str) -> str:
         <h2>Inspection Summary</h2>
         <div class="muted">Source: {escape(inspection.source_name)} ({escape(inspection.source_slug)})</div>
         <div class="muted">Restaurant: <a href='/ops/control-panel/master-data/restaurants/{escape(inspection.master_restaurant_id)}'>{escape(inspection.display_name)}</a></div>
-        <div class="muted">Type: {escape(inspection.inspection_type or '—')}</div>
-        <div class="muted">Official status: {escape(inspection.official_status or '—')}</div>
-        <div class="muted">Report URL: {escape(inspection.report_url or '—')}</div>
-        <div class="muted">Stored report: <span class="mono">{escape(inspection.report_storage_path or '—')}</span></div>
+        <div class="muted">Type: {escape(inspection.inspection_type or '&mdash;')}</div>
+        <div class="muted">Official status: {escape(inspection.official_status or '&mdash;')}</div>
+        <div class="muted">Report URL: {escape(inspection.report_url or '&mdash;')}</div>
+        <div class="muted">Stored report: <span class="mono">{escape(inspection.report_storage_path or '&mdash;')}</span></div>
       </section>
       <section class="panel">
         <h2>Reports</h2>
@@ -2104,8 +2352,8 @@ def _master_reports_page(
         (
             f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.display_name)}</a></td>"
             f"<td>{escape(item.source_slug)}</td><td>{_display(item.inspection_date)}</td><td>{escape(item.report_role)}</td>"
-            f"<td>{escape(item.report_format or '—')}</td><td><span class='{_badge_class(item.availability_status)}'>{escape(item.availability_status)}</span></td>"
-            f"<td class='mono'>{_compact_text(item.storage_path or '—')}</td><td>{'yes' if item.is_current else 'no'}</td></tr>"
+            f"<td>{escape(item.report_format or '&mdash;')}</td><td><span class='{_badge_class(item.availability_status)}'>{escape(item.availability_status)}</span></td>"
+            f"<td class='mono'>{_compact_text(item.storage_path or '&mdash;')}</td><td>{'yes' if item.is_current else 'no'}</td></tr>"
         )
         for item in reports
     ]
@@ -2177,9 +2425,9 @@ def _master_findings_page(
     rows = [
         (
             f"<tr><td><a href='/ops/control-panel/master-data/inspections/{escape(item.master_inspection_id)}'>{escape(item.display_name)}</a></td>"
-            f"<td>{escape(item.source_slug)}</td><td>{_display(item.inspection_date)}</td><td>{escape(item.official_code or '—')}</td>"
-            f"<td>{escape(item.normalized_category or '—')}</td><td>{escape(item.severity or '—')}</td>"
-            f"<td>{_compact_message(item.official_text, max_length=120)}</td><td>{_compact_message(item.official_detail_text or '—', max_length=100)}</td></tr>"
+            f"<td>{escape(item.source_slug)}</td><td>{_display(item.inspection_date)}</td><td>{escape(item.official_code or '&mdash;')}</td>"
+            f"<td>{escape(item.normalized_category or '&mdash;')}</td><td>{escape(item.severity or '&mdash;')}</td>"
+            f"<td>{_compact_message(item.official_text, max_length=120)}</td><td>{_compact_message(item.official_detail_text or '&mdash;', max_length=100)}</td></tr>"
         )
         for item in findings
     ]
@@ -2312,21 +2560,20 @@ def _admin_restaurants_page(
     """
     return _control_panel_shell(body, title="FiScore Admin Restaurants", active_path="/ops/control-panel/admin/restaurants", workspace="admin")
 
-
 def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None = None) -> str:
     detail = get_admin_restaurant_detail(master_restaurant_id)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"Admin restaurant {master_restaurant_id} was not found.")
-    active_tab = tab if tab in {"info", "inspections"} else "info"
+    active_tab = tab if tab in {"overview", "sources"} else "overview"
     restaurant = detail.restaurant
     tabs = "".join(
         [
-            _admin_restaurant_tab_link(master_restaurant_id, "info", "Restaurant Info", active_tab=active_tab),
-            _admin_restaurant_tab_link(master_restaurant_id, "inspections", "Inspections", active_tab=active_tab),
+            _admin_restaurant_tab_link(master_restaurant_id, "overview", "Overview", active_tab=active_tab),
+            _admin_restaurant_tab_link(master_restaurant_id, "sources", "Source Data", active_tab=active_tab),
         ]
     )
     identifier_rows = [
-        f"<tr><td>{escape(item.identifier_type)}</td><td class='mono'>{escape(item.identifier_value)}</td><td>{escape(item.source_slug or '—')}</td><td>{'yes' if item.is_primary else 'no'}</td></tr>"
+        f"<tr><td>{escape(item.identifier_type)}</td><td class='mono'>{escape(item.identifier_value)}</td><td>{escape(item.source_slug or '-')}</td><td>{'yes' if item.is_primary else 'no'}</td></tr>"
         for item in detail.identifiers
     ]
     source_link_rows = [
@@ -2338,65 +2585,128 @@ def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None 
         )
         for item in detail.source_links
     ]
-    inspection_blocks = []
+    all_findings = [finding for entry in detail.inspections for finding in entry.findings]
+    total_findings = sum(inspection.inspection.finding_count for inspection in detail.inspections)
+    critical_count = sum(1 for finding in all_findings if (finding.severity or "").strip().lower() == "critical")
+    latest_inspection = detail.inspections[0].inspection if detail.inspections else None
+    latest_grade = latest_inspection.grade if latest_inspection and latest_inspection.grade else None
+    latest_score = (
+        str(int(latest_inspection.score))
+        if latest_inspection and latest_inspection.score is not None and float(latest_inspection.score).is_integer()
+        else str(latest_inspection.score)
+        if latest_inspection and latest_inspection.score is not None
+        else None
+    )
+    latest_grade_ring_value = latest_grade or latest_score or "N/A"
+    latest_grade_ring_caption = "Grade" if latest_grade else "Score" if latest_score else ""
+    inspection_blocks: list[str] = []
     for entry in detail.inspections:
         inspection = entry.inspection
-        report_rows = [
-            f"<tr><td>{escape(report.report_role)}</td><td>{escape(report.report_format or '—')}</td><td><span class='{_badge_class(report.availability_status)}'>{escape(report.availability_status)}</span></td><td class='mono'>{_compact_text(report.storage_path or '—')}</td></tr>"
-            for report in entry.reports
-        ]
-        finding_rows = [
-            (
-                f"<tr><td>{escape(finding.official_code or '—')}</td><td>{escape(finding.normalized_category or '—')}</td>"
-                f"<td>{escape(finding.severity or '—')}</td><td>{_compact_message(finding.official_text, max_length=120)}</td>"
-                f"<td>{'yes' if finding.is_repeat_violation else 'no' if finding.is_repeat_violation is not None else '—'}</td></tr>"
+        inspection_summary_bits = [inspection.inspection_type or "Inspection"]
+        if inspection.inspector_name:
+            inspection_summary_bits.append(f"Inspector {inspection.inspector_name}")
+        score_text = (
+            str(int(inspection.score))
+            if inspection.score is not None and float(inspection.score).is_integer()
+            else str(inspection.score)
+            if inspection.score is not None
+            else None
+        )
+        sorted_findings = sorted(
+            entry.findings,
+            key=lambda finding: (_severity_sort_key(finding.severity), finding.finding_order or 999999),
+        )
+        finding_blocks: list[str] = []
+        for finding in sorted_findings:
+            severity_slug = (finding.severity or "").strip().lower()
+            severity_label = _title_case_slug(finding.severity)
+            category_or_title = finding.normalized_category or finding.normalized_title or "Finding"
+            severity_badge = (
+                f"<span class='badge severity-{escape(severity_slug)}'>{escape(severity_label)}</span>"
+                if severity_slug
+                else ""
             )
-            for finding in entry.findings
-        ]
+            repeat_badge = "<span class='badge repeat'>Repeat finding</span>" if finding.is_repeat_violation else ""
+            corrected_value = (
+                "Corrected during inspection"
+                if finding.corrected_during_inspection
+                else None
+            )
+            flag_badges = "".join(
+                badge
+                for badge in (
+                    severity_badge,
+                    repeat_badge,
+                    f"<span class='badge corrected'>{escape(corrected_value)}</span>" if corrected_value else "",
+                )
+                if badge
+            )
+            finding_blocks.append(
+                f"""
+                <article class="finding-item">
+                  <div class="finding-header">
+                    <span class="finding-code">{escape(finding.official_code or 'No code')}</span>
+                    {flag_badges}
+                  </div>
+                  <div class="finding-title">{escape(category_or_title)}</div>
+                  <div class="finding-block">
+                    <span class="finding-block-label">Official finding</span>
+                    {escape(finding.official_text)}
+                  </div>
+                  {f"<div class='finding-block'><span class='finding-block-label'>Finding details</span>{escape(finding.official_detail_text)}</div>" if finding.official_detail_text else ""}
+                  {f"<div class='finding-block'><span class='finding-block-label'>Auditor comments</span>{escape(finding.auditor_comments)}</div>" if finding.auditor_comments else ""}
+                </article>
+                """
+            )
         inspection_blocks.append(
             f"""
-            <details class="inspection-expander">
+            <details class="inspection-card">
               <summary>
-                {escape(str(inspection.inspection_date))} • {escape(inspection.source_name)} • {escape(inspection.inspection_type or 'Inspection')} •
-                Score {escape(str(inspection.score)) if inspection.score is not None else '—'} •
-                {inspection.finding_count} findings
-              </summary>
-              <div class="inspection-expander-body">
-                <div class="grid two">
-                  <section class="panel stack">
-                    <h2>Inspection Summary</h2>
-                    <div class="muted">Source key: <span class="mono">{escape(inspection.source_inspection_key)}</span></div>
-                    <div class="muted">Grade: {escape(inspection.grade or '—')}</div>
-                    <div class="muted">Status: {escape(inspection.official_status or '—')}</div>
-                    <div class="muted">Report status: <span class="{_badge_class(inspection.report_availability_status or 'missing')}">{escape(inspection.report_availability_status or 'missing')}</span></div>
-                    <div class="actions">
-                      <a class="button secondary" href="/ops/control-panel/master-data/inspections/{escape(inspection.master_inspection_id)}">Ops diagnostics</a>
-                    </div>
-                  </section>
-                  <section class="panel">
-                    <h2>Reports</h2>
-                    {_table(["Role", "Format", "Availability", "Storage"], report_rows, empty_message="No report records linked.")}
-                  </section>
+                <div>
+                  <div class="inspection-card-title">{escape(_display_date_compact(inspection.inspection_date))}</div>
+                  <div class="inspection-card-subtitle">{escape(" - ".join(inspection_summary_bits))}</div>
                 </div>
-                <section class="panel" style="margin-top:14px;">
-                  <h2>Findings</h2>
-                  {_table(["Code", "Category", "Severity", "Official Text", "Repeat"], finding_rows, empty_message="No findings linked.")}
-                </section>
+                <div class="inspection-card-right">
+                  {f"<span class='info-chip'>Score {escape(score_text)}</span>" if score_text else ""}
+                  {f"<span class='info-chip'>Grade {escape(inspection.grade)}</span>" if inspection.grade else ""}
+                  <span class="info-chip">{inspection.finding_count} {('finding' if inspection.finding_count == 1 else 'findings')}</span>
+                </div>
+              </summary>
+              <div class="inspection-card-body">
+                <div class="inspection-meta">
+                  <span class="info-chip">Source {escape(inspection.source_name)}</span>
+                  {f"<span class='info-chip'>Score {escape(score_text)}</span>" if score_text else ""}
+                  {f"<span class='info-chip'>Grade {escape(inspection.grade)}</span>" if inspection.grade else ""}
+                  {f"<span class='info-chip'>Status {escape(inspection.official_status)}</span>" if inspection.official_status else ""}
+                  <span class="info-chip">Report {escape(inspection.report_availability_status or 'missing')}</span>
+                </div>
+                <div class="finding-list">
+                  {''.join(finding_blocks) if finding_blocks else "<div class='muted'>No findings linked to this inspection.</div>"}
+                </div>
               </div>
             </details>
             """
         )
-    if active_tab == "info":
+    if active_tab == "overview":
         tab_body = f"""
-        <section class="grid two">
-          <section class="panel stack">
-            <h2>Restaurant Info</h2>
-            <div class="muted">Master restaurant ID: <span class="mono">{escape(restaurant.master_restaurant_id)}</span></div>
-            <div class="muted">Display name: {escape(restaurant.display_name)}</div>
-            <div class="muted">Normalized name: {escape(restaurant.normalized_name or '—')}</div>
-            <div class="muted">Address: {escape(restaurant.address_line1)}, {escape(restaurant.city)}, {escape(restaurant.state_code)} {escape(restaurant.zip_code or '')}</div>
-            <div class="muted">Status: <span class="{_badge_class(restaurant.status)}">{escape(restaurant.status)}</span></div>
-            <div class="muted">Location fingerprint: <span class="mono">{escape(restaurant.location_fingerprint)}</span></div>
+        <section class="panel">
+          <h2>Inspection History</h2>
+          <div class="inspection-history">
+            {''.join(inspection_blocks) if inspection_blocks else "<div class='muted'>No inspections recorded for this restaurant.</div>"}
+          </div>
+        </section>
+        """
+    else:
+        tab_body = f"""
+        <section class="source-grid">
+          <section class="panel">
+            <h2>Master Record</h2>
+            <div class="overview-facts">
+              <div><div class="fact-label">Master restaurant ID</div><div class="fact-value mono">{escape(restaurant.master_restaurant_id)}</div></div>
+              <div><div class="fact-label">Record status</div><div class="fact-value">{escape(restaurant.status)}</div></div>
+              <div><div class="fact-label">Normalized name</div><div class="fact-value">{escape(restaurant.normalized_name or '-')}</div></div>
+              <div><div class="fact-label">Location fingerprint</div><div class="fact-value mono">{escape(restaurant.location_fingerprint)}</div></div>
+            </div>
           </section>
           <section class="panel">
             <h2>Identifiers</h2>
@@ -2407,10 +2717,8 @@ def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None 
             {_table(["Source", "Source Key", "Method", "Status", "Latest Inspection"], source_link_rows, empty_message="No source links recorded.")}
           </section>
           <section class="panel stack">
-            <h2>Summary</h2>
-            <div class="muted">Inspections: {restaurant.inspection_count}</div>
-            <div class="muted">Linked sources: {restaurant.source_link_count}</div>
-            <div class="muted">Latest inspection: {_display(restaurant.latest_inspection_date)}</div>
+            <h2>Diagnostics</h2>
+            <div class="muted">Use these tools when you need lineage, reconciliation, or other master-data diagnostics.</div>
             <div class="actions">
               <a class="button secondary" href="/ops/control-panel/master-data/restaurants/{escape(restaurant.master_restaurant_id)}">View master data diagnostics</a>
               <a class="button secondary" href="{_build_url('/ops/control-panel/lineage', q=restaurant.display_name)}">View lineage</a>
@@ -2418,32 +2726,30 @@ def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None 
           </section>
         </section>
         """
-    else:
-        tab_body = f"""
-        <section class="panel stack">
-          <h2>Inspections</h2>
-          <div class="muted">Expand an inspection to review its reports and findings in context.</div>
-          <div class="inspection-stack">
-            {''.join(inspection_blocks) if inspection_blocks else "<div class='muted'>No inspections recorded for this restaurant.</div>"}
-          </div>
-        </section>
-        """
     body = f"""
-    <section class="hero">
+    <section class="hero restaurant-hero">
       <div>
+        <div class="hero-kicker">{escape(restaurant.status)} - restaurant record</div>
         <h1>{escape(restaurant.display_name)}</h1>
-        <p>{escape(restaurant.address_line1)} • {escape(restaurant.city)}, {escape(restaurant.state_code)} {escape(restaurant.zip_code or '')}</p>
+        <p>{escape(restaurant.address_line1)}</p>
+        <div class="hero-meta">
+          <span>{escape(f'{restaurant.city}, {restaurant.state_code} {restaurant.zip_code or ""}'.strip())}</span>
+        </div>
       </div>
       <div class="actions">
+        <div class="grade-ring">
+          <span class="letter">{escape(latest_grade_ring_value)}</span>
+          {f"<span class='caption'>{escape(latest_grade_ring_caption)}</span>" if latest_grade_ring_caption else ""}
+        </div>
         <a class="button secondary" href="/ops/control-panel/admin/restaurants">Back to restaurants</a>
       </div>
     </section>
     <section class="summary-strip">
-      <section class="summary-card"><h3>Sources</h3><span class="big">{restaurant.source_link_count}</span><div class="small">Linked source records</div></section>
       <section class="summary-card"><h3>Inspections</h3><span class="big">{restaurant.inspection_count}</span><div class="small">Inspection history</div></section>
-      <section class="summary-card"><h3>Latest</h3><span class="big">{escape(str(restaurant.latest_inspection_date)) if restaurant.latest_inspection_date else '—'}</span><div class="small">Latest inspection date</div></section>
-      <section class="summary-card"><h3>Status</h3><span class="big">{escape(restaurant.status)}</span><div class="small">Restaurant record status</div></section>
-      <section class="summary-card"><h3>Identifiers</h3><span class="big">{restaurant.identifier_count}</span><div class="small">Known external identifiers</div></section>
+      <section class="summary-card"><h3>Total Findings</h3><span class="big">{total_findings}</span><div class="small">Across all linked inspections</div></section>
+      <section class="summary-card"><h3>Critical Findings</h3><span class="big">{critical_count}</span><div class="small">Findings marked with critical severity</div></section>
+      <section class="summary-card"><h3>Last Inspected</h3><span class="big">{escape(_display_date_compact(restaurant.latest_inspection_date))}</span><div class="small">Most recent inspection date</div></section>
+      <section class="summary-card"><h3>Sources</h3><span class="big">{restaurant.source_link_count}</span><div class="small">Linked source records</div></section>
     </section>
     <section class="panel" style="margin-bottom:18px;">
       <div class="run-tabs">{tabs}</div>
@@ -2451,7 +2757,6 @@ def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None 
     {tab_body}
     """
     return _control_panel_shell(body, title=restaurant.display_name, active_path="/ops/control-panel/admin/restaurants", workspace="admin")
-
 
 def _artifacts_page(*, q: str | None, page: int, page_size: int) -> str:
     artifacts, total_count = list_artifacts_page(page=page, page_size=page_size, query=q)
@@ -2564,7 +2869,7 @@ def _parse_result_detail_page(parse_result_id: str) -> str:
         <h2>Summary</h2>
         <div class="muted">Type: {escape(detail.record_type)}</div>
         <div class="muted">Status: {escape(detail.parse_status)}</div>
-        <div class="muted">Source key: {escape(detail.source_record_key or '—')}</div>
+        <div class="muted">Source key: {escape(detail.source_record_key or '&mdash;')}</div>
         <div class="muted">Warnings: {detail.warning_count} | Errors: {detail.error_count}</div>
         <div class="muted">Created: {_display(detail.created_at)}</div>
       </section>
@@ -2604,7 +2909,7 @@ def _health_page() -> str:
 def _alerts_page(*, q: str | None, page: int, page_size: int) -> str:
     alerts, total_count = list_alerts_page(page=page, page_size=page_size, query=q)
     rows = [
-        f"<tr><td><span class='{_badge_class(a.severity)}'>{escape(a.severity)}</span></td><td>{escape(a.title)}</td><td>{escape(a.source_slug or '—')}</td><td>{escape(a.status)}</td><td>{escape(a.message)}</td><td>{_display(a.created_at)}</td></tr>"
+        f"<tr><td><span class='{_badge_class(a.severity)}'>{escape(a.severity)}</span></td><td>{escape(a.title)}</td><td>{escape(a.source_slug or '&mdash;')}</td><td>{escape(a.status)}</td><td>{escape(a.message)}</td><td>{_display(a.created_at)}</td></tr>"
         for a in alerts
     ]
     toolbar = _search_form(
@@ -2635,7 +2940,7 @@ def _reruns_page(*, q: str | None, page: int, page_size: int) -> str:
         for s in list_sources(limit=250)
     )
     rows = [
-        f"<tr><td>{escape(r.source_name)}</td><td>{escape(r.requested_scope)}</td><td>{escape(r.requested_by or '—')}</td><td><span class='{_badge_class(r.status)}'>{escape(r.status)}</span></td><td>{_display(r.created_at)}</td></tr>"
+        f"<tr><td>{escape(r.source_name)}</td><td>{escape(r.requested_scope)}</td><td>{escape(r.requested_by or '&mdash;')}</td><td><span class='{_badge_class(r.status)}'>{escape(r.status)}</span></td><td>{_display(r.created_at)}</td></tr>"
         for r in reruns
     ]
     toolbar = _search_form(
@@ -2675,7 +2980,7 @@ def _reruns_page(*, q: str | None, page: int, page_size: int) -> str:
 def _lineage_page(*, q: str | None, page: int, page_size: int) -> str:
     lineage, total_count = list_lineage_page(page=page, page_size=page_size, query=q)
     rows = [
-        f"<tr><td><strong>{escape(item.display_name)}</strong><br><span class='muted'>{escape(item.city)}, {escape(item.state_code)}</span></td><td>{escape(item.source_slug)}</td><td>{escape(item.source_inspection_key)}</td><td>{_display(item.inspection_date)}</td><td>{escape(item.inspection_type or '—')}</td><td><span class='{_badge_class(item.report_availability_status)}'>{escape(item.report_availability_status or '—')}</span></td><td>{item.finding_count}</td></tr>"
+        f"<tr><td><strong>{escape(item.display_name)}</strong><br><span class='muted'>{escape(item.city)}, {escape(item.state_code)}</span></td><td>{escape(item.source_slug)}</td><td>{escape(item.source_inspection_key)}</td><td>{_display(item.inspection_date)}</td><td>{escape(item.inspection_type or '&mdash;')}</td><td><span class='{_badge_class(item.report_availability_status)}'>{escape(item.report_availability_status or '&mdash;')}</span></td><td>{item.finding_count}</td></tr>"
         for item in lineage
     ]
     toolbar = _search_form(
@@ -2702,7 +3007,7 @@ def _lineage_page(*, q: str | None, page: int, page_size: int) -> str:
 def _versions_page(*, q: str | None, page: int, page_size: int) -> str:
     versions, total_count = list_source_versions_page(page=page, page_size=page_size, query=q)
     rows = [
-        f"<tr><td>{escape(v.source_slug)}</td><td>{escape(v.entity_type)}</td><td>{escape(v.source_entity_key or '—')}</td><td>{v.version_number}</td><td><span class='{_badge_class('current' if v.is_current else 'historical')}'>{'current' if v.is_current else 'historical'}</span></td><td>{escape(v.change_type)}</td><td>{_display(v.effective_at)}</td></tr>"
+        f"<tr><td>{escape(v.source_slug)}</td><td>{escape(v.entity_type)}</td><td>{escape(v.source_entity_key or '&mdash;')}</td><td>{v.version_number}</td><td><span class='{_badge_class('current' if v.is_current else 'historical')}'>{'current' if v.is_current else 'historical'}</span></td><td>{escape(v.change_type)}</td><td>{_display(v.effective_at)}</td></tr>"
         for v in versions
     ]
     toolbar = _search_form(
