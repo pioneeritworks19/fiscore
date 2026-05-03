@@ -54,12 +54,22 @@ class SwordSourceAdapter:
                 message=f"No Sword source registry record exists for {request.source_slug}.",
             )
 
-        run_plan = build_run_plan(source, request.run_mode)
+        run_plan = build_run_plan(source, request)
         scrape_run_id: str | None = None
         artifact_count = 0
         parse_result_count = 0
         normalized_record_count = 0
         fetcher = SwordFetcher()
+        target_master_restaurant_id = request.request_context.get("target_master_restaurant_id")
+
+        def build_inspection_payload(candidate, source_url: str) -> dict:
+            payload = candidate.to_payload(
+                county_name=source.jurisdiction_name,
+                source_url=source_url,
+            )
+            if target_master_restaurant_id:
+                payload["target_master_restaurant_id"] = target_master_restaurant_id
+            return payload
 
         def record_issue(
             *,
@@ -133,17 +143,15 @@ class SwordSourceAdapter:
                 )
 
         try:
-            fetched_artifacts = fetcher.fetch_search_results(run_plan)
-            if not fetched_artifacts:
-                raise ValueError("Sword search returned zero result pages.")
-
             raw_artifact_id: str | None = None
             storage = RawArtifactStorage()
             parsed_candidates: list[tuple[object, str | None, list[str], str]] = []
+            found_search_artifact = False
 
             if scrape_run_id is not None:
                 try:
-                    for fetched_artifact in fetched_artifacts:
+                    for fetched_artifact in fetcher.fetch_search_results(run_plan):
+                        found_search_artifact = True
                         content_hash = hash_text(fetched_artifact.content)
                         artifact_path = storage.build_html_path(
                             source_slug=request.source_slug,
@@ -165,6 +173,9 @@ class SwordSourceAdapter:
                         )
                         artifact_count += 1
 
+                        if not fetched_artifact.should_parse_candidates:
+                            continue
+
                         search_parse = parse_search_results(
                             fetched_artifact.content,
                             source_url=fetched_artifact.source_url,
@@ -179,12 +190,17 @@ class SwordSourceAdapter:
                             record_warning(
                                 category="parse",
                                 code="sword_search_parse_warning",
-                                message=f"Search parser (page {fetched_artifact.page_number or '?'}): {parser_warning}",
+                                message=(
+                                    f"Search parser ({fetched_artifact.partition_key or 'all'} "
+                                    f"page {fetched_artifact.page_number or '?'}): {parser_warning}"
+                                ),
                                 component="search_parser",
                                 stage="search",
                                 raw_artifact_id=raw_artifact_id,
                                 source_url=fetched_artifact.source_url,
                             )
+                    if not found_search_artifact:
+                        raise ValueError("Sword search returned zero result pages.")
                 except Exception as exc:  # pragma: no cover - environment-specific connectivity
                     record_warning(
                         category="storage",
@@ -195,7 +211,19 @@ class SwordSourceAdapter:
                     )
 
                 try:
+                    unique_candidates: list[tuple[object, str | None, list[str], str]] = []
+                    seen_candidate_keys: set[str] = set()
                     for candidate, candidate_raw_artifact_id, candidate_warnings, candidate_source_url in parsed_candidates:
+                        candidate_key = candidate.header_id or candidate.source_record_key
+                        if candidate_key in seen_candidate_keys:
+                            continue
+                        seen_candidate_keys.add(candidate_key)
+                        unique_candidates.append(
+                            (candidate, candidate_raw_artifact_id, candidate_warnings, candidate_source_url)
+                        )
+
+                    for candidate, candidate_raw_artifact_id, candidate_warnings, candidate_source_url in unique_candidates:
+                        inspection_payload = build_inspection_payload(candidate, candidate_source_url)
                         parse_result_id = create_parse_result(
                             source_id=source.source_id,
                             scrape_run_id=scrape_run_id,
@@ -206,22 +234,14 @@ class SwordSourceAdapter:
                             parse_status=(
                                 "parsed_with_warnings" if candidate_warnings else "parsed"
                             ),
-                            payload=json.dumps(
-                                candidate.to_payload(
-                                    county_name=source.jurisdiction_name,
-                                    source_url=candidate_source_url,
-                                )
-                            ),
+                            payload=json.dumps(inspection_payload),
                             warning_count=len(candidate_warnings),
                         )
                         parse_result_count += 1
                         try:
                             normalized_inspection = normalize_inspection_payload(
                                 source_id=source.source_id,
-                                payload=candidate.to_payload(
-                                    county_name=source.jurisdiction_name,
-                                    source_url=candidate_source_url,
-                                ),
+                                payload=inspection_payload,
                             )
                             normalized_record_count += normalized_inspection.normalized_count
                         except Exception as exc:  # pragma: no cover - environment-specific connectivity

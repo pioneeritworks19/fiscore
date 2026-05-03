@@ -125,7 +125,7 @@ def list_platforms() -> list[OpsPlatformSummary]:
 
 
 def list_sources(*, limit: int = 250) -> list[OpsSourceSummary]:
-    return list_sources_page(page=1, page_size=limit)[0]
+    return list_sources_page(page=1, page_size=limit, status=None)[0]
 
 
 def list_sources_page(
@@ -134,6 +134,7 @@ def list_sources_page(
     page_size: int = 100,
     query: str | None = None,
     platform_slug: str | None = None,
+    status: str | None = None,
     never_run_only: bool = False,
 ) -> tuple[list[OpsSourceSummary], int]:
     safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=250)
@@ -158,6 +159,9 @@ def list_sources_page(
     if platform_slug:
         where_parts.append("coalesce(pr.platform_slug, '') = %s")
         params.append(platform_slug)
+    if status:
+        where_parts.append("sr.status = %s")
+        params.append(status)
     if never_run_only:
         where_parts.append(
             """
@@ -191,6 +195,7 @@ def list_sources_page(
             sr.parser_version,
             sr.status,
             last_run.scrape_run_id::text as last_run_id,
+            last_run.run_mode as last_run_mode,
             last_run.run_status as last_run_status,
             last_run.started_at as last_started_at,
             last_run.completed_at as last_completed_at,
@@ -412,6 +417,30 @@ def get_run_detail(scrape_run_id: str) -> OpsRunDetail | None:
             cur.execute(
                 """
                 select
+                    count(*)::int as live_artifact_count,
+                    count(*) filter (where source_url like '%%action=get_locations%%')::int as live_search_artifact_count,
+                    count(*) filter (where source_url like '%%action=get_details%%')::int as live_detail_artifact_count,
+                    max(fetched_at) as latest_artifact_at
+                from ingestion.raw_artifact_index
+                where scrape_run_id = %s::uuid
+                """,
+                (scrape_run_id,),
+            )
+            artifact_progress = cur.fetchone() or {}
+
+            cur.execute(
+                """
+                select count(*)::int as live_parse_result_count
+                from ingestion.parse_result
+                where scrape_run_id = %s::uuid
+                """,
+                (scrape_run_id,),
+            )
+            parse_progress = cur.fetchone() or {}
+
+            cur.execute(
+                """
+                select
                     sri.scrape_run_issue_id::text as scrape_run_issue_id,
                     sri.severity,
                     sri.category,
@@ -472,6 +501,11 @@ def get_run_detail(scrape_run_id: str) -> OpsRunDetail | None:
 
     return OpsRunDetail(
         run=run,
+        live_artifact_count=artifact_progress.get("live_artifact_count", 0) or 0,
+        live_search_artifact_count=artifact_progress.get("live_search_artifact_count", 0) or 0,
+        live_detail_artifact_count=artifact_progress.get("live_detail_artifact_count", 0) or 0,
+        live_parse_result_count=parse_progress.get("live_parse_result_count", 0) or 0,
+        latest_artifact_at=artifact_progress.get("latest_artifact_at"),
         request_context=_decode_jsonish(row["request_context"]),
         source_snapshot=_decode_jsonish(row["source_snapshot"]),
         artifacts=artifacts,

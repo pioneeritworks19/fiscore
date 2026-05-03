@@ -13,6 +13,8 @@ from bs4 import BeautifulSoup
 @dataclass(frozen=True)
 class GeorgiaInspectionDetail:
     county_name: str | None
+    facility_token_raw: str | None
+    inspection_id_raw: str | None
     restaurant_name_raw: str | None
     license_number_raw: str | None
     address_raw: str | None
@@ -31,9 +33,11 @@ class GeorgiaInspectionDetail:
     def to_payload(self, *, source_url: str) -> dict[str, Any]:
         return {
             "county_name": self.county_name,
-            "inspection_id_raw": self.source_record_key,
+            "facility_token": self.facility_token_raw,
+            "inspection_id_raw": self.inspection_id_raw,
             "source_url": source_url,
             "restaurant": {
+                "facility_token": self.facility_token_raw,
                 "restaurant_name_raw": self.restaurant_name_raw,
                 "license_number_raw": self.license_number_raw,
                 "address_raw": self.address_raw,
@@ -55,6 +59,7 @@ class GeorgiaInspectionDetail:
 
 @dataclass(frozen=True)
 class GeorgiaFinding:
+    violation_index_raw: str | None
     violation_code_raw: str | None
     violation_category_raw: str | None
     points_deducted_raw: str | None
@@ -74,6 +79,9 @@ class GeorgiaFinding:
             "county_name": inspection_payload.get("county_name"),
             "restaurant": inspection_payload.get("restaurant"),
             "inspection_summary": inspection_payload.get("inspection_summary"),
+            "facility_token": inspection_payload.get("facility_token"),
+            "inspection_id_raw": inspection_payload.get("inspection_id_raw"),
+            "violation_index_raw": self.violation_index_raw,
             "violation_code_raw": self.violation_code_raw,
             "violation_category_raw": self.violation_category_raw,
             "points_deducted_raw": self.points_deducted_raw,
@@ -235,6 +243,8 @@ def _parse_html_detail_record(
     )
     inspection = GeorgiaInspectionDetail(
         county_name=county_name,
+        facility_token_raw=(fallback_restaurant or {}).get("facility_token"),
+        inspection_id_raw=None,
         restaurant_name_raw=restaurant_name,
         license_number_raw=_clean_text(permit_number),
         address_raw=_clean_text(address),
@@ -308,6 +318,7 @@ def _parse_html_detail_record(
 
             findings.append(
                 GeorgiaFinding(
+                    violation_index_raw=None,
                     violation_code_raw=_clean_text(code_line),
                     violation_category_raw=_clean_text(violation_category),
                     points_deducted_raw=points_value,
@@ -413,6 +424,7 @@ def _parse_inspection_json_history(
         return None
 
     restaurant_name = (fallback_restaurant or {}).get("restaurant_name_raw")
+    facility_token = _clean_text((fallback_restaurant or {}).get("facility_token"))
     permit_number = (fallback_restaurant or {}).get("license_number_raw")
     address = (fallback_restaurant or {}).get("address_raw")
     city = (fallback_restaurant or {}).get("city_raw")
@@ -467,6 +479,8 @@ def _parse_inspection_json_history(
         )
         inspection = GeorgiaInspectionDetail(
             county_name=county_name,
+            facility_token_raw=facility_token,
+            inspection_id_raw=inspection_id,
             restaurant_name_raw=restaurant_name,
             license_number_raw=permit_number,
             address_raw=address,
@@ -513,6 +527,7 @@ def _parse_inspection_json_history(
 
                 record_findings.append(
                     GeorgiaFinding(
+                        violation_index_raw=_clean_text(violation_index),
                         violation_code_raw=code,
                         violation_category_raw=title,
                         points_deducted_raw=points,

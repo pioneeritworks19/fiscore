@@ -4,6 +4,7 @@ from typing import Protocol
 
 from fiscore_backend.ingestion.core.source_registry import SourceRegistryRecord
 from fiscore_backend.ingestion.sources.ga_healthinspections.adapter import GeorgiaHealthInspectionsAdapter
+from fiscore_backend.ingestion.sources.nyc_dohmh.adapter import NYCDOHMHAdapter
 from fiscore_backend.ingestion.sources.sword.adapter import SwordSourceAdapter
 
 
@@ -16,4 +17,6 @@ def get_adapter_for_source(source: SourceRegistryRecord) -> SourceAdapter | None
         return SwordSourceAdapter()
     if source.parser_id == "ga-healthinspections":
         return GeorgiaHealthInspectionsAdapter()
+    if source.parser_id == "nyc-dohmh":
+        return NYCDOHMHAdapter()
     return None

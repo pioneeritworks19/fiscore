@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
+from fiscore_backend.ingestion.core.lookback import is_small_incremental_run, resolve_lookback_days
 from fiscore_backend.ingestion.core.source_registry import SourceRegistryRecord
-from fiscore_backend.models import RunMode
+from fiscore_backend.models import RunMode, WorkerRunRequest
 
 
 @dataclass(frozen=True)
@@ -14,7 +15,8 @@ class GeorgiaRunPlan:
     request_context: dict[str, str | bool | None]
 
 
-def build_run_plan(source: SourceRegistryRecord, run_mode: RunMode) -> GeorgiaRunPlan:
+def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> GeorgiaRunPlan:
+    run_mode = request.run_mode
     today = datetime.now(UTC).date()
     county_name = source.source_config.get("county_name")
 
@@ -39,11 +41,19 @@ def build_run_plan(source: SourceRegistryRecord, run_mode: RunMode) -> GeorgiaRu
             },
         )
 
-    lookback_days = 30 if run_mode == "incremental" else 180
+    lookback_days = resolve_lookback_days(
+        request=request,
+        incremental_default=30,
+        reconciliation_default=180,
+    )
     date_from = today - timedelta(days=lookback_days)
     return GeorgiaRunPlan(
         run_mode=run_mode,
-        strategy="statewide_county_partition_date_refresh",
+        strategy=(
+            "statewide_county_partition_small_incremental_refresh"
+            if is_small_incremental_run(request=request)
+            else "statewide_county_partition_date_refresh"
+        ),
         date_from=date_from,
         date_to=today,
         request_context={
@@ -54,6 +64,7 @@ def build_run_plan(source: SourceRegistryRecord, run_mode: RunMode) -> GeorgiaRu
             "county_name": county_name,
             "permit_type_label": "Food Service",
             "partition_mode": "target_single_county_from_landing_page",
+            "lookback_days": str(lookback_days),
             "from_date": date_from.isoformat(),
             "to_date": today.isoformat(),
             "notes": (

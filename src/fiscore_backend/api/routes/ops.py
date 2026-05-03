@@ -116,6 +116,7 @@ def get_sources(
     page: int = 1,
     page_size: int = 100,
     platform_slug: str | None = None,
+    status: str | None = "active",
     never_run_only: bool = False,
 ) -> list[OpsSourceSummary]:
     return list_sources_page(
@@ -123,6 +124,7 @@ def get_sources(
         page_size=page_size,
         query=q,
         platform_slug=platform_slug,
+        status=status,
         never_run_only=never_run_only,
     )[0]
 
@@ -360,6 +362,7 @@ def trigger_run(source_slug: str, request: TriggerRunRequest) -> WorkerRunRespon
             source_slug=source_slug,
             run_mode=request.run_mode,
             trigger_type="manual",
+            request_context=request.request_context,
         )
     )
 
@@ -449,6 +452,24 @@ def _display_date_compact(value: object | None) -> str:
     return escape(str(value))
 
 
+def _duration_compact(value: datetime | None) -> str:
+    if value is None:
+        return "n/a"
+    now = datetime.now(DISPLAY_TIMEZONE)
+    localized = value.astimezone(DISPLAY_TIMEZONE)
+    seconds = max(int((now - localized).total_seconds()), 0)
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {seconds:02d}s"
+    hours, minutes = divmod(minutes, 60)
+    if hours < 24:
+        return f"{hours}h {minutes:02d}m"
+    days, hours = divmod(hours, 24)
+    return f"{days}d {hours}h"
+
+
 def _title_case_slug(value: str | None) -> str:
     if not value:
         return "Unknown"
@@ -528,6 +549,23 @@ def _compact_message(value: str, *, max_length: int = 140) -> str:
     )
 
 
+def _supports_restaurant_refresh(source_slug: str) -> bool:
+    return source_slug.startswith("sword_")
+
+
+def _admin_restaurant_refresh_action(master_restaurant_id: str, source_link) -> str:
+    if not _supports_restaurant_refresh(source_link.source_slug):
+        return "<span class='muted'>Not available</span>"
+    return (
+        f"<form method='post' action='/ops/control-panel/admin/restaurants/{escape(master_restaurant_id)}/refresh-source-link' class='inline-form'>"
+        f"<input type='hidden' name='source_slug' value='{escape(source_link.source_slug)}' />"
+        f"<input type='hidden' name='source_restaurant_key' value='{escape(source_link.source_restaurant_key)}' />"
+        "<input type='hidden' name='run_mode' value='backfill' />"
+        "<button type='submit' class='button secondary'>Refresh</button>"
+        "</form>"
+    )
+
+
 def _table(headers: list[str], rows: list[str], *, empty_message: str, colspan: int | None = None) -> str:
     head_html = "".join(f"<th>{escape(header)}</th>" for header in headers)
     if not rows:
@@ -599,6 +637,15 @@ def _platform_filter_select(current: str | None) -> str:
             f"<option value='{escape(platform.platform_slug)}' {selected}>{escape(platform.platform_name)}</option>"
         )
     return f"<select name='platform_slug'>{''.join(options)}</select>"
+
+
+def _source_status_filter_select(current: str | None) -> str:
+    options = [("", "All statuses"), ("active", "Active"), ("inactive", "Inactive")]
+    rendered = []
+    for value, label in options:
+        selected = "selected" if (current or "") == value else ""
+        rendered.append(f"<option value='{escape(value)}' {selected}>{escape(label)}</option>")
+    return f"<select name='status'>{''.join(rendered)}</select>"
 
 
 def _source_filter_select(current: str | None) -> str:
@@ -1572,6 +1619,7 @@ def _sources_page(
     page: int,
     page_size: int,
     platform_slug: str | None,
+    status: str | None,
     never_run_only: bool,
 ) -> str:
     sources, total_count = list_sources_page(
@@ -1579,6 +1627,7 @@ def _sources_page(
         page_size=page_size,
         query=q,
         platform_slug=platform_slug,
+        status=status,
         never_run_only=never_run_only,
     )
     grouped: dict[tuple[str | None, str], list[OpsSourceSummary]] = defaultdict(list)
@@ -1603,7 +1652,8 @@ def _sources_page(
                 f"<tr><td><strong>{_source_runs_link(source.source_slug, source.source_name)}</strong><br>{_meta_text(source.source_slug)}</td>"
                 f"<td>{escape(source.jurisdiction_name)}</td>"
                 f"<td><span class='{_badge_class(source.status)}'>{escape(source.status)}</span></td>"
-                f"<td><span class='{_badge_class(source.last_run_status)}'>{escape(source.last_run_status or 'never run')}</span></td>"
+                f"<td><span class='{_badge_class(source.last_run_status)}'>{escape(source.last_run_status or 'never run')}</span>"
+                f"{f'<br>{_meta_text(source.last_run_mode)}' if source.last_run_mode else ''}</td>"
                 f"<td>{_display(source.latest_success_at)}</td>"
                 f"<td>{_display(source.freshness_age_days)}</td>"
                 f"<td class='action-cell'>{run_form}</td></tr>"
@@ -1630,6 +1680,7 @@ def _sources_page(
         extra_fields="".join(
             [
                 _platform_filter_select(platform_slug),
+                _source_status_filter_select(status),
                 _checkbox_field(name="never_run_only", label="Never run only", checked=never_run_only),
             ]
         ),
@@ -1641,6 +1692,7 @@ def _sources_page(
         total_count=total_count,
         q=q,
         platform_slug=platform_slug,
+        status=status,
         never_run_only="true" if never_run_only else None,
     )
     body = f"""
@@ -1711,6 +1763,26 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
     detail = get_run_detail(scrape_run_id)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"Run {scrape_run_id} was not found.")
+    is_running = detail.run.run_status == "running"
+    artifact_count = detail.live_artifact_count if is_running else detail.run.artifact_count
+    parsed_count = detail.live_parse_result_count if is_running else detail.run.parsed_record_count
+    live_progress_note = (
+        f"Live progress from ingestion tables. Search {detail.live_search_artifact_count} | Detail {detail.live_detail_artifact_count}"
+        if is_running
+        else "Fetched and stored during this run"
+    )
+    idle_note = _duration_compact(detail.latest_artifact_at) if detail.latest_artifact_at else "No artifacts yet"
+    status_note = (
+        f"Started {_display(detail.run.started_at)}<br>Still running"
+        f"{f' &bull; Last artifact {_display(detail.latest_artifact_at)} &bull; Idle {escape(idle_note)}' if detail.latest_artifact_at else ' &bull; No artifacts yet'}"
+        if is_running
+        else f"Started {_display(detail.run.started_at)}<br>Completed {_display(detail.run.completed_at)}"
+    )
+    run_state_banner = (
+        "<div class='badge warn' style='display:inline-flex; margin-top:8px;'>Run is still active. Counts below update from live ingestion writes.</div>"
+        if is_running
+        else ""
+    )
     active_tab = tab if tab in {"overview", "issues", "data"} else (
         "issues" if detail.run.warning_count > 0 or detail.run.error_count > 0 else "overview"
     )
@@ -1875,6 +1947,7 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
       <div>
         <h1>Run {escape(detail.run.scrape_run_id[:8])}</h1>
         <p>{escape(detail.run.source_name)} - {escape(detail.run.source_slug)} - {escape(detail.run.run_mode)}</p>
+        {run_state_banner}
       </div>
       <div class="actions">
         <a class="button secondary" href="{_build_url('/ops/control-panel/master-data/inspections', scrape_run_id=detail.run.scrape_run_id)}">Resulting master records</a>
@@ -1887,17 +1960,17 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
         <div class="actions">
           <span class="{_badge_class(detail.run.run_status)}">{escape(detail.run.run_status)}</span>
         </div>
-        <div class="small">Started {_display(detail.run.started_at)}<br>Completed {_display(detail.run.completed_at)}</div>
+        <div class="small">{status_note}</div>
       </section>
       <section class="summary-card">
         <h3>Artifacts</h3>
-        <span class="big">{detail.run.artifact_count}</span>
-        <div class="small">Fetched and stored during this run</div>
+        <span class="big">{artifact_count}</span>
+        <div class="small">{live_progress_note}</div>
       </section>
       <section class="summary-card">
         <h3>Parsed</h3>
-        <span class="big">{detail.run.parsed_record_count}</span>
-        <div class="small">Inspection and finding parse results</div>
+        <span class="big">{parsed_count}</span>
+        <div class="small">{'Live parse results recorded so far' if is_running else 'Inspection and finding parse results'}</div>
       </section>
       <section class="summary-card">
         <h3>Normalized</h3>
@@ -2581,7 +2654,8 @@ def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None 
             f"<tr><td>{escape(item.source_name)}<br>{_meta_text(item.source_slug)}</td>"
             f"<td class='mono'>{escape(item.source_restaurant_key)}</td><td>{escape(item.match_method)}</td>"
             f"<td><span class='{_badge_class(item.match_status)}'>{escape(item.match_status)}</span></td>"
-            f"<td>{_display(item.latest_inspection_date)}</td></tr>"
+            f"<td>{_display(item.latest_inspection_date)}</td>"
+            f"<td>{_admin_restaurant_refresh_action(master_restaurant_id, item)}</td></tr>"
         )
         for item in detail.source_links
     ]
@@ -2714,7 +2788,7 @@ def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None 
           </section>
           <section class="panel">
             <h2>Linked Sources</h2>
-            {_table(["Source", "Source Key", "Method", "Status", "Latest Inspection"], source_link_rows, empty_message="No source links recorded.")}
+            {_table(["Source", "Source Key", "Method", "Status", "Latest Inspection", "Refresh"], source_link_rows, empty_message="No source links recorded.")}
           </section>
           <section class="panel stack">
             <h2>Diagnostics</h2>
@@ -3052,6 +3126,7 @@ def control_panel_sources(
     page: int = 1,
     page_size: int = 50,
     platform_slug: str | None = None,
+    status: str | None = "active",
     never_run_only: bool = False,
 ) -> str:
     return _sources_page(
@@ -3059,6 +3134,7 @@ def control_panel_sources(
         page=page,
         page_size=page_size,
         platform_slug=platform_slug,
+        status=status,
         never_run_only=never_run_only,
     )
 
@@ -3076,6 +3152,34 @@ def control_panel_trigger_run(
         )
     )
     return RedirectResponse(url="/ops/control-panel/runs", status_code=303)
+
+
+@router.post("/control-panel/admin/restaurants/{master_restaurant_id}/refresh-source-link", include_in_schema=False)
+def control_panel_refresh_restaurant_source_link(
+    master_restaurant_id: str,
+    source_slug: str = Form(...),
+    source_restaurant_key: str = Form(...),
+    run_mode: str = Form("backfill"),
+) -> RedirectResponse:
+    response = dispatch_run(
+        WorkerRunRequest(
+            source_slug=source_slug,
+            run_mode=run_mode,  # type: ignore[arg-type]
+            trigger_type="manual",
+            request_context={
+                "target_master_restaurant_id": master_restaurant_id,
+                "target_source_restaurant_keys": [source_restaurant_key],
+                "targeted_refresh": True,
+                "targeted_refresh_scope": "restaurant_source_link",
+            },
+        )
+    )
+    if response.scrape_run_id:
+        return RedirectResponse(url=f"/ops/control-panel/runs/{response.scrape_run_id}", status_code=303)
+    return RedirectResponse(
+        url=f"/ops/control-panel/admin/restaurants/{master_restaurant_id}?tab=sources",
+        status_code=303,
+    )
 
 
 @router.get("/control-panel/runs", response_class=HTMLResponse, include_in_schema=False)

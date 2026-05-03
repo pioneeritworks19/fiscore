@@ -19,6 +19,7 @@ class WorkerRunRequest(BaseModel):
     source_slug: str = Field(..., description="Source slug such as sword_mi_wayne")
     run_mode: RunMode = "incremental"
     trigger_type: TriggerType = "api"
+    request_context: dict[str, Any] = Field(default_factory=dict)
 
 
 class WorkerRunResponse(BaseModel):
@@ -39,6 +40,7 @@ class WorkerRunResponse(BaseModel):
 
 class TriggerRunRequest(BaseModel):
     run_mode: RunMode = "incremental"
+    request_context: dict[str, Any] = Field(default_factory=dict)
 
 
 class OpsPlatformSummary(BaseModel):
@@ -68,6 +70,7 @@ class OpsSourceSummary(BaseModel):
     parser_version: str
     status: str
     last_run_id: str | None = None
+    last_run_mode: str | None = None
     last_run_status: str | None = None
     last_started_at: datetime | None = None
     last_completed_at: datetime | None = None
@@ -139,6 +142,11 @@ class OpsRunIssueSummary(BaseModel):
 
 class OpsRunDetail(BaseModel):
     run: OpsRunSummary
+    live_artifact_count: int = 0
+    live_search_artifact_count: int = 0
+    live_detail_artifact_count: int = 0
+    live_parse_result_count: int = 0
+    latest_artifact_at: datetime | None = None
     request_context: dict[str, Any] = Field(default_factory=dict)
     source_snapshot: dict[str, Any] = Field(default_factory=dict)
     artifacts: list[OpsArtifactSummary] = Field(default_factory=list)

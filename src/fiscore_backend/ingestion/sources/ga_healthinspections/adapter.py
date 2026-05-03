@@ -58,7 +58,7 @@ class GeorgiaHealthInspectionsAdapter:
                 message=f"No Georgia source registry record exists for {request.source_slug}.",
             )
 
-        run_plan = build_run_plan(source, request.run_mode)
+        run_plan = build_run_plan(source, request)
         scrape_run_id: str | None = None
         artifact_count = 0
         parse_result_count = 0

@@ -192,6 +192,7 @@ create table if not exists master.master_restaurant_source_link (
 create table if not exists master.master_inspection (
     master_inspection_id uuid primary key default gen_random_uuid(),
     master_restaurant_id uuid not null references master.master_restaurant(master_restaurant_id),
+    platform_id uuid not null references ops.platform_registry(platform_id),
     source_id uuid not null references ops.source_registry(source_id),
     source_inspection_key text not null,
     inspection_date date not null,
@@ -206,6 +207,9 @@ create table if not exists master.master_inspection (
     updated_at timestamptz not null default now(),
     unique (source_id, source_inspection_key)
 );
+
+create index if not exists idx_master_inspection_platform_source_key
+    on master.master_inspection(platform_id, source_inspection_key);
 
 create table if not exists master.master_inspection_report (
     master_inspection_report_id uuid primary key default gen_random_uuid(),
@@ -244,6 +248,9 @@ create table if not exists master.master_inspection_finding (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+create index if not exists idx_master_inspection_finding_parent_source_key
+    on master.master_inspection_finding(master_inspection_id, source_finding_key);
 
 create table if not exists master.source_clause_reference (
     source_clause_reference_id uuid primary key default gen_random_uuid(),

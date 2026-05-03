@@ -141,6 +141,7 @@ Georgia is now modeled operationally as one source per county under the shared T
 
 For the current rollout order and deploy helpers, use:
 
+- `docs/backend/PRODUCTION_DEPLOY_COMMANDS.md`
 - `docs/backend/GCP_DEPLOYMENT_RUNBOOK.md`
 - `scripts/deploy_worker.ps1`
 - `scripts/deploy_api.ps1`

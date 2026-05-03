@@ -30,6 +30,7 @@ class GeorgiaSearchCandidate:
             "facility_token": self.facility_token,
             "source_url": source_url,
             "restaurant": {
+                "facility_token": self.facility_token,
                 "restaurant_name_raw": self.establishment_name_raw,
                 "license_number_raw": self.permit_number_raw,
                 "address_raw": self.address_raw,
