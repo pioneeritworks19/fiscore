@@ -173,8 +173,4 @@ def parse_detail_results(raw_text: str, *, source_url: str) -> SwordDetailParseR
             )
         )
 
-    warnings: list[str] = []
-    if not findings:
-        warnings.append("no_detail_findings_parsed")
-
-    return SwordDetailParseResult(findings=findings, warnings=warnings)
+    return SwordDetailParseResult(findings=findings, warnings=[])

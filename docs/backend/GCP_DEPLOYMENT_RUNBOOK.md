@@ -75,8 +75,14 @@ These non-secret runtime values are also required:
 - `GCP_PROJECT_ID=fiscore-dev`
 - `GCP_REGION=us-central1`
 - `DEFAULT_PARSER_VERSION=sword-v1`
+- `RUN_DISPATCH_MODE=worker_http` on the API service
 - `CLOUD_SQL_CONNECTION_NAME=fiscore-dev:us-central1:fiscore-dev-pg`
 - `CLOUD_SQL_SOCKET_DIR=/cloudsql`
+
+The API service also needs the private worker target:
+
+- `WORKER_BASE_URL=https://your-worker-url`
+- `WORKER_AUDIENCE=https://your-worker-url`
 
 ### Step 3: Deploy `fiscore-worker`
 
@@ -94,6 +100,7 @@ What this does:
 2. pushes the image to Artifact Registry
 3. deploys `fiscore-worker` to Cloud Run
 4. wires env vars and secrets into the service
+5. keeps the worker in local execution mode with `RUN_DISPATCH_MODE=local`
 
 ### Step 4: Test One Manual Worker Run
 
@@ -156,7 +163,7 @@ After the worker path is proven, deploy the API service.
 Use:
 
 ```powershell
-.\scripts\deploy_api.ps1
+.\scripts\deploy_api.ps1 -WorkerUrl "https://your-worker-url"
 ```
 
 What this does:
@@ -165,6 +172,7 @@ What this does:
 2. pushes the image to Artifact Registry
 3. deploys `fiscore-api` to Cloud Run
 4. wires env vars and secrets into the service
+5. configures the API to dispatch manual runs to the private worker with Google ID tokens
 
 ### Step 8: Test the Ops Console on GCP
 
@@ -187,12 +195,29 @@ Success criteria:
 
 Do not leave the ops console broadly public.
 
-Minimum recommendation:
+Recommended internal-only setup:
 
-- require authenticated access on Cloud Run
-- grant access only to you or a small admin set
+- require authenticated access on Cloud Run for `fiscore-api`
+- create a Google Group such as `fiscore-ops@pioneeritworks.com`
+- grant `roles/run.invoker` on `fiscore-api` only to that group
+- do not grant browser users access to `fiscore-worker`
+- grant `roles/run.invoker` on `fiscore-worker` only to trusted service accounts
 
-This can be tightened later with a fuller auth strategy.
+Recommended service account split:
+
+- `fiscore-runtime@...` for the API runtime
+- `fiscore-scheduler@...` for scheduler jobs
+
+Required worker access grants:
+
+- `serviceAccount:fiscore-runtime@...` -> `roles/run.invoker` on `fiscore-worker`
+- `serviceAccount:fiscore-scheduler@...` -> `roles/run.invoker` on `fiscore-worker`
+
+Required API access grant:
+
+- `group:fiscore-ops@pioneeritworks.com` -> `roles/run.invoker` on `fiscore-api`
+
+This keeps the console and ingestion entirely inside company-managed Google identity.
 
 ### Step 10: Add Remaining Scheduler Jobs
 
@@ -251,6 +276,7 @@ Recommended starting settings:
 - Min instances: `0`
 - Authentication: required
 - Service account: `fiscore-runtime`
+- Invocation allowed only for trusted service accounts
 
 ### `fiscore-api`
 
@@ -262,17 +288,20 @@ Recommended starting settings:
 - Min instances: `0`
 - Authentication: required
 - Service account: `fiscore-runtime`
+- Invocation allowed only for the internal Google Group
 
 ## Current Architecture Note
 
 Today, the ops console manual run action still dispatches work through the API process in local development.
 
-For GCP operations, the intended deployment flow is:
+For GCP operations, the current deployment flow is:
 
-- manual runs from the ops console should eventually target the worker service
-- scheduled runs should target the worker service directly
+- browser users access only `fiscore-api`
+- manual runs from the ops console hit the API service
+- the API service calls the private worker service with an ID token
+- scheduled runs target the worker service directly with OIDC
 
-The worker should be treated as the execution service.
+The worker is the execution service and should not be directly exposed to browser users.
 
 ## Cloud SQL Access From Cloud Run
 
@@ -301,7 +330,7 @@ Use this exact sequence:
 6. verify one scheduled run
 7. deploy `fiscore-api`
 8. test the ops console on GCP
-9. restrict access
+9. restrict API and worker access with IAM
 10. add remaining scheduler jobs
 
 ## Files That Support This Runbook

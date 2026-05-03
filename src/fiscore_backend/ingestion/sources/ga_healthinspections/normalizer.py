@@ -21,14 +21,6 @@ class NormalizedInspectionResult:
     normalized_count: int
 
 
-WAYNE_GROUP_SOURCE_SLUGS = {
-    "sword_mi_wayne_core",
-    "sword_mi_wayne_east",
-    "sword_mi_wayne_south",
-    "sword_mi_wayne_west",
-}
-
-
 def _clean_text(value: Any) -> str | None:
     if value is None:
         return None
@@ -53,7 +45,7 @@ def _normalize_name(value: str | None) -> str | None:
 def _location_fingerprint(payload: dict[str, Any]) -> str:
     restaurant = payload.get("restaurant", {})
     city = _clean_text(restaurant.get("city_raw"))
-    state = _clean_text(restaurant.get("state_raw")) or "MI"
+    state = _clean_text(restaurant.get("state_raw")) or "GA"
     zip_code = _clean_text(restaurant.get("zip_code_raw"))
     address = _clean_text(restaurant.get("address_raw"))
     joined = "|".join(
@@ -83,18 +75,33 @@ def _location_fingerprint(payload: dict[str, Any]) -> str:
 
 
 def _source_restaurant_key(payload: dict[str, Any]) -> str:
+    facility_token = _clean_text(payload.get("facility_token"))
+    if facility_token:
+        return f"ga-facility:{facility_token}"
+
     restaurant = payload.get("restaurant", {})
-    county_name = _clean_text(payload.get("county_name"))
-    license_number = _clean_text(restaurant.get("license_number_raw"))
-    if county_name and license_number:
-        return f"{county_name}|{license_number}"
+    facility_token = _clean_text(restaurant.get("facility_token"))
+    if facility_token:
+        return f"ga-facility:{facility_token}"
+
+    permit_number = _clean_text(restaurant.get("license_number_raw"))
+    if permit_number:
+        return f"ga-permit:{permit_number}"
     return _location_fingerprint(payload)
 
 
 def _source_inspection_key(payload: dict[str, Any]) -> str:
-    header_id = _clean_text(payload.get("header_id"))
-    if header_id:
-        return f"sword-header:{header_id}"
+    inspection_id_raw = _clean_text(payload.get("inspection_id_raw"))
+    if inspection_id_raw:
+        return f"ga-inspection:{inspection_id_raw}"
+
+    report_url = _clean_text(payload.get("report_url"))
+    if report_url:
+        return f"ga-report:{report_url}"
+
+    detail_url = _clean_text(payload.get("detail_url"))
+    if detail_url:
+        return f"ga-detail:{detail_url}"
 
     inspection = payload.get("inspection_summary", {})
     restaurant = payload.get("restaurant", {})
@@ -110,18 +117,36 @@ def _source_inspection_key(payload: dict[str, Any]) -> str:
     return sha256(joined.encode("utf-8")).hexdigest()
 
 
+def _source_finding_key(payload: dict[str, Any]) -> str:
+    inspection_id_raw = _clean_text(payload.get("inspection_id_raw"))
+    violation_index_raw = _clean_text(payload.get("violation_index_raw"))
+    if inspection_id_raw and violation_index_raw:
+        return f"ga-finding:{inspection_id_raw}:{violation_index_raw}"
+
+    joined = "|".join(
+        value or ""
+        for value in [
+            _source_inspection_key(payload),
+            _clean_text(payload.get("violation_code_raw")),
+            _clean_text(payload.get("official_text")),
+            _clean_text(payload.get("official_detail_text")),
+        ]
+    )
+    return sha256(joined.encode("utf-8")).hexdigest()
+
+
 def _parse_date(value: str | None) -> date | None:
     cleaned = _clean_text(value)
     if cleaned is None:
         return None
-    if " " in cleaned:
-        cleaned = cleaned.split(" ", 1)[0]
-    return date.fromisoformat(cleaned)
+    cleaned = cleaned.replace("-", "/")
+    month, day, year = cleaned.split("/")
+    return date(int(year), int(month), int(day))
 
 
 def _parse_score(value: str | None) -> float | None:
     cleaned = _clean_text(value)
-    if cleaned is None or cleaned == "0":
+    if cleaned is None:
         return None
     return float(cleaned)
 
@@ -147,21 +172,6 @@ def _get_source_metadata(source_id: str) -> tuple[str, str]:
             return row["platform_id"], row["source_slug"]
 
 
-def _source_precedence(source_slug: str) -> int:
-    if source_slug.startswith("sword_mi_wayne_") and source_slug not in WAYNE_GROUP_SOURCE_SLUGS:
-        return 0
-    if source_slug in WAYNE_GROUP_SOURCE_SLUGS:
-        return 1
-    if source_slug == "sword_mi_wayne":
-        return 2
-    return 3
-
-
-def _preferred_master_restaurant_id(payload: dict[str, Any]) -> str | None:
-    preferred = _clean_text(payload.get("target_master_restaurant_id"))
-    return preferred
-
-
 def _find_existing_inspection(cur, *, platform_id: str, source_inspection_key: str) -> dict[str, Any] | None:
     cur.execute(
         """
@@ -170,124 +180,61 @@ def _find_existing_inspection(cur, *, platform_id: str, source_inspection_key: s
             mi.master_restaurant_id::text as master_restaurant_id,
             mi.platform_id::text as platform_id,
             mi.source_id::text as source_id,
-            mi.created_at,
-            sr.source_slug
+            mi.created_at
         from master.master_inspection mi
-        join ops.source_registry sr on sr.source_id = mi.source_id
         where
             mi.platform_id = %s::uuid
             and mi.source_inspection_key = %s
         order by mi.created_at, mi.master_inspection_id
+        limit 1
         """,
         (platform_id, source_inspection_key),
     )
-    rows = cur.fetchall()
-    if not rows:
-        return None
-    return min(
-        rows,
-        key=lambda row: (
-            _source_precedence(row["source_slug"]),
-            row["created_at"],
-            row["master_inspection_id"],
-        ),
-    )
-
-
-def _resolve_canonical_source_id(
-    cur,
-    *,
-    existing_inspection_id: str,
-    source_inspection_key: str,
-    existing_source_id: str,
-    existing_source_slug: str,
-    current_source_id: str,
-    current_source_slug: str,
-) -> str:
-    if _source_precedence(current_source_slug) >= _source_precedence(existing_source_slug):
-        return existing_source_id
-
-    cur.execute(
-        """
-        select 1
-        from master.master_inspection
-        where
-            master_inspection_id <> %s::uuid
-            and source_id = %s::uuid
-            and source_inspection_key = %s
-        limit 1
-        """,
-        (existing_inspection_id, current_source_id, source_inspection_key),
-    )
-    if cur.fetchone() is not None:
-        return existing_source_id
-    return current_source_id
+    return cur.fetchone()
 
 
 def _get_or_create_restaurant(cur, payload: dict[str, Any]) -> tuple[str, int]:
     restaurant = payload.get("restaurant", {})
+    facility_token = _clean_text(payload.get("facility_token")) or _clean_text(
+        restaurant.get("facility_token")
+    )
     location_fingerprint = _location_fingerprint(payload)
     display_name = _clean_text(restaurant.get("restaurant_name_raw")) or "Unknown restaurant"
     address_line1 = _clean_text(restaurant.get("address_raw")) or "Unknown address"
     city = _clean_text(restaurant.get("city_raw")) or "Unknown city"
-    state_code = _clean_text(restaurant.get("state_raw")) or "MI"
+    state_code = _clean_text(restaurant.get("state_raw")) or "GA"
     zip_code = _clean_text(restaurant.get("zip_code_raw"))
     normalized_name = _normalize_name(display_name)
     normalized_address1 = _normalize_name(address_line1)
-    preferred_master_restaurant_id = _preferred_master_restaurant_id(payload)
 
-    if preferred_master_restaurant_id is not None:
+    row = None
+    if facility_token is not None:
+        cur.execute(
+            """
+            select mri.master_restaurant_id::text as master_restaurant_id
+            from master.master_restaurant_identifier mri
+            where
+                mri.identifier_type = 'facility_token'
+                and mri.identifier_value = %s
+            order by mri.created_at
+            limit 1
+            """,
+            (facility_token,),
+        )
+        row = cur.fetchone()
+
+    if row is None:
         cur.execute(
             """
             select master_restaurant_id::text as master_restaurant_id
             from master.master_restaurant
-            where master_restaurant_id = %s::uuid
+            where location_fingerprint = %s
+            order by created_at
             limit 1
             """,
-            (preferred_master_restaurant_id,),
+            (location_fingerprint,),
         )
-        preferred_row = cur.fetchone()
-        if preferred_row is not None:
-            cur.execute(
-                """
-                update master.master_restaurant
-                set
-                    location_fingerprint = %s,
-                    display_name = %s,
-                    normalized_name = %s,
-                    address_line1 = %s,
-                    normalized_address1 = %s,
-                    city = %s,
-                    state_code = %s,
-                    zip_code = coalesce(%s, zip_code),
-                    updated_at = now()
-                where master_restaurant_id = %s::uuid
-                """,
-                (
-                    location_fingerprint,
-                    display_name,
-                    normalized_name,
-                    address_line1,
-                    normalized_address1,
-                    city,
-                    state_code,
-                    zip_code,
-                    preferred_row["master_restaurant_id"],
-                ),
-            )
-            return preferred_row["master_restaurant_id"], 1
-
-    cur.execute(
-        """
-        select master_restaurant_id::text as master_restaurant_id
-        from master.master_restaurant
-        where location_fingerprint = %s
-        order by created_at
-        limit 1
-        """,
-        (location_fingerprint,),
-    )
-    row = cur.fetchone()
+        row = cur.fetchone()
     if row is not None:
         cur.execute(
             """
@@ -347,9 +294,43 @@ def _get_or_create_restaurant(cur, payload: dict[str, Any]) -> tuple[str, int]:
 
 def _ensure_identifier(cur, *, master_restaurant_id: str, source_id: str, payload: dict[str, Any]) -> int:
     restaurant = payload.get("restaurant", {})
-    license_number = _clean_text(restaurant.get("license_number_raw"))
-    if license_number is None:
-        return 0
+    inserted = 0
+    facility_token = _clean_text(payload.get("facility_token")) or _clean_text(
+        restaurant.get("facility_token")
+    )
+    if facility_token is not None:
+        cur.execute(
+            """
+            select master_restaurant_identifier_id::text
+            from master.master_restaurant_identifier
+            where
+                master_restaurant_id = %s::uuid
+                and identifier_type = 'facility_token'
+                and identifier_value = %s
+            limit 1
+            """,
+            (master_restaurant_id, facility_token),
+        )
+        if cur.fetchone() is None:
+            cur.execute(
+                """
+                insert into master.master_restaurant_identifier (
+                    master_restaurant_id,
+                    source_id,
+                    identifier_type,
+                    identifier_value,
+                    is_primary,
+                    confidence
+                )
+                values (%s::uuid, %s::uuid, 'facility_token', %s, false, 1.00)
+                """,
+                (master_restaurant_id, source_id, facility_token),
+            )
+            inserted += 1
+
+    permit_number = _clean_text(restaurant.get("license_number_raw"))
+    if permit_number is None:
+        return inserted
 
     cur.execute(
         """
@@ -358,11 +339,11 @@ def _ensure_identifier(cur, *, master_restaurant_id: str, source_id: str, payloa
         where
             master_restaurant_id = %s::uuid
             and source_id = %s::uuid
-            and identifier_type = 'license_number'
+            and identifier_type = 'permit_number'
             and identifier_value = %s
         limit 1
         """,
-        (master_restaurant_id, source_id, license_number),
+        (master_restaurant_id, source_id, permit_number),
     )
     if cur.fetchone() is not None:
         return 0
@@ -377,11 +358,11 @@ def _ensure_identifier(cur, *, master_restaurant_id: str, source_id: str, payloa
             is_primary,
             confidence
         )
-        values (%s::uuid, %s::uuid, 'license_number', %s, true, 1.00)
+        values (%s::uuid, %s::uuid, 'permit_number', %s, true, 1.00)
         """,
-        (master_restaurant_id, source_id, license_number),
+        (master_restaurant_id, source_id, permit_number),
     )
-    return 1
+    return inserted + 1
 
 
 def _ensure_source_link(cur, *, master_restaurant_id: str, source_id: str, payload: dict[str, Any]) -> int:
@@ -416,14 +397,17 @@ def _upsert_official_report(
     master_inspection_id: str,
     source_id: str,
     payload: dict[str, Any],
+    storage_path: str | None = None,
+    report_format: str | None = None,
 ) -> int:
+    report_url = _clean_text(payload.get("report_url"))
     cur.execute(
         """
         select master_inspection_report_id::text as master_inspection_report_id
         from master.master_inspection_report
         where
             master_inspection_id = %s::uuid
-            and report_role = 'official_source_report'
+            and report_role = 'official_audit_report'
         limit 1
         """,
         (master_inspection_id,),
@@ -446,19 +430,23 @@ def _upsert_official_report(
             values (
                 %s::uuid,
                 %s::uuid,
-                'official_source_report',
-                null,
-                'not_provided_by_source',
+                'official_audit_report',
                 %s,
-                null,
-                null,
+                %s,
+                %s,
+                %s,
+                %s,
                 true
             )
             """,
             (
                 master_inspection_id,
                 source_id,
+                report_format,
+                "available" if report_url else "not_provided_by_source",
                 _clean_text(payload.get("detail_url")),
+                report_url,
+                storage_path,
             ),
         )
         return 1
@@ -468,18 +456,22 @@ def _upsert_official_report(
         update master.master_inspection_report
         set
             source_id = %s::uuid,
-            report_format = null,
-            availability_status = 'not_provided_by_source',
+            report_format = %s,
+            availability_status = %s,
             source_page_url = %s,
-            source_file_url = null,
-            storage_path = null,
+            source_file_url = %s,
+            storage_path = %s,
             is_current = true,
             updated_at = now()
         where master_inspection_report_id = %s::uuid
         """,
         (
             source_id,
+            report_format,
+            "available" if report_url else "not_provided_by_source",
             _clean_text(payload.get("detail_url")),
+            report_url,
+            storage_path,
             existing["master_inspection_report_id"],
         ),
     )
@@ -489,7 +481,7 @@ def _upsert_official_report(
 def normalize_inspection_payload(*, source_id: str, payload: dict[str, Any]) -> NormalizedInspectionResult:
     inspection = payload.get("inspection_summary", {})
     source_inspection_key = _source_inspection_key(payload)
-    platform_id, current_source_slug = _get_source_metadata(source_id)
+    platform_id, _ = _get_source_metadata(source_id)
 
     with get_connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -526,6 +518,7 @@ def normalize_inspection_payload(*, source_id: str, payload: dict[str, Any]) -> 
                         inspection_type,
                         score,
                         grade,
+                        inspector_name,
                         report_url,
                         is_current
                     )
@@ -533,6 +526,7 @@ def normalize_inspection_payload(*, source_id: str, payload: dict[str, Any]) -> 
                         %s::uuid,
                         %s::uuid,
                         %s::uuid,
+                        %s,
                         %s,
                         %s,
                         %s,
@@ -552,32 +546,24 @@ def normalize_inspection_payload(*, source_id: str, payload: dict[str, Any]) -> 
                         _clean_text(inspection.get("inspection_type_raw")),
                         _parse_score(inspection.get("inspection_score_raw")),
                         _clean_text(inspection.get("inspection_grade_raw")),
-                        None,
+                        _clean_text(inspection.get("inspector_name_raw")),
+                        _clean_text(payload.get("report_url")),
                     ),
                 )
                 master_inspection_id = cur.fetchone()["master_inspection_id"]
                 canonical_source_id = source_id
             else:
-                canonical_source_id = _resolve_canonical_source_id(
-                    cur,
-                    existing_inspection_id=existing["master_inspection_id"],
-                    source_inspection_key=source_inspection_key,
-                    existing_source_id=existing["source_id"],
-                    existing_source_slug=existing["source_slug"],
-                    current_source_id=source_id,
-                    current_source_slug=current_source_slug,
-                )
                 cur.execute(
                     """
                     update master.master_inspection
                     set
                         master_restaurant_id = %s::uuid,
                         platform_id = %s::uuid,
-                        source_id = %s::uuid,
                         inspection_date = %s,
                         inspection_type = %s,
                         score = %s,
                         grade = %s,
+                        inspector_name = %s,
                         report_url = %s,
                         updated_at = now()
                     where master_inspection_id = %s::uuid
@@ -585,16 +571,17 @@ def normalize_inspection_payload(*, source_id: str, payload: dict[str, Any]) -> 
                     (
                         master_restaurant_id,
                         platform_id,
-                        canonical_source_id,
                         _parse_date(inspection.get("inspection_date_raw")),
                         _clean_text(inspection.get("inspection_type_raw")),
                         _parse_score(inspection.get("inspection_score_raw")),
                         _clean_text(inspection.get("inspection_grade_raw")),
-                        None,
+                        _clean_text(inspection.get("inspector_name_raw")),
+                        _clean_text(payload.get("report_url")),
                         existing["master_inspection_id"],
                     ),
                 )
                 master_inspection_id = existing["master_inspection_id"]
+                canonical_source_id = existing["source_id"]
             normalized_count += 1
             normalized_count += _upsert_official_report(
                 cur,
@@ -612,15 +599,39 @@ def normalize_inspection_payload(*, source_id: str, payload: dict[str, Any]) -> 
     )
 
 
-def normalize_finding_payload(*, source_id: str, payload: dict[str, Any]) -> int:
-    header_id = _clean_text(payload.get("header_id"))
-    if header_id is None:
-        return 0
+def attach_report_artifact(
+    *,
+    source_id: str,
+    inspection_payload: dict[str, Any],
+    storage_path: str,
+    report_format: str,
+) -> int:
+    source_inspection_key = _source_inspection_key(inspection_payload)
+    platform_id, _ = _get_source_metadata(source_id)
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            inspection_row = _find_existing_inspection(
+                cur,
+                platform_id=platform_id,
+                source_inspection_key=source_inspection_key,
+            )
+            if inspection_row is None:
+                return 0
+            _upsert_official_report(
+                cur,
+                master_inspection_id=inspection_row["master_inspection_id"],
+                source_id=inspection_row["source_id"],
+                payload=inspection_payload,
+                storage_path=storage_path,
+                report_format=report_format,
+            )
+        conn.commit()
+    return 1
 
-    source_inspection_key = f"sword-header:{header_id}"
-    source_finding_key = _clean_text(payload.get("detail_id"))
-    if source_finding_key:
-        source_finding_key = f"sword-detail:{source_finding_key}"
+
+def normalize_finding_payload(*, source_id: str, payload: dict[str, Any]) -> int:
+    source_inspection_key = _source_inspection_key(payload)
+    source_finding_key = _source_finding_key(payload)
     platform_id, _ = _get_source_metadata(source_id)
 
     with get_connection() as conn:
@@ -646,6 +657,24 @@ def normalize_finding_payload(*, source_id: str, payload: dict[str, Any]) -> int
             )
             existing = cur.fetchone()
 
+            params = (
+                inspection_row["master_inspection_id"],
+                inspection_row["source_id"],
+                source_finding_key,
+                _clean_text(payload.get("violation_code_raw")),
+                _clean_text(payload.get("violation_code_raw")),
+                _clean_text(payload.get("official_text")) or "Unknown finding",
+                _clean_text(payload.get("official_detail_text")),
+                json.dumps(payload.get("official_detail_json"))
+                if payload.get("official_detail_json") is not None
+                else None,
+                _clean_text(payload.get("auditor_comments")),
+                payload.get("corrected_during_inspection"),
+                payload.get("is_repeat_violation"),
+                _clean_text(payload.get("violation_category_raw")),
+                _clean_text(payload.get("violation_category_raw")),
+            )
+
             if existing is None:
                 cur.execute(
                     """
@@ -659,6 +688,8 @@ def normalize_finding_payload(*, source_id: str, payload: dict[str, Any]) -> int
                         official_detail_text,
                         official_detail_json,
                         auditor_comments,
+                        corrected_during_inspection,
+                        is_repeat_violation,
                         normalized_title,
                         normalized_category,
                         severity,
@@ -672,6 +703,8 @@ def normalize_finding_payload(*, source_id: str, payload: dict[str, Any]) -> int
                         %s,
                         %s,
                         %s,
+                        %s::jsonb,
+                        %s,
                         %s,
                         %s,
                         %s,
@@ -680,22 +713,7 @@ def normalize_finding_payload(*, source_id: str, payload: dict[str, Any]) -> int
                         true
                     )
                     """,
-                    (
-                        inspection_row["master_inspection_id"],
-                        inspection_row["source_id"],
-                        source_finding_key,
-                        _clean_text(payload.get("violation_code_raw")),
-                        _clean_text(payload.get("violation_code_raw")),
-                        _clean_text(payload.get("official_text")) or "Unknown finding",
-                        _clean_text(payload.get("official_detail_text")),
-                        json.dumps(payload.get("official_detail_json"))
-                        if payload.get("official_detail_json") is not None
-                        else None,
-                        _clean_text(payload.get("auditor_comments")),
-                        _clean_text(payload.get("violation_category_raw")),
-                        _clean_text(payload.get("violation_category_raw")),
-                        None,
-                    ),
+                    (*params, None),
                 )
             else:
                 cur.execute(
@@ -710,6 +728,8 @@ def normalize_finding_payload(*, source_id: str, payload: dict[str, Any]) -> int
                         official_detail_text = %s,
                         official_detail_json = %s::jsonb,
                         auditor_comments = %s,
+                        corrected_during_inspection = %s,
+                        is_repeat_violation = %s,
                         normalized_title = %s,
                         normalized_category = %s,
                         updated_at = now()
@@ -726,6 +746,8 @@ def normalize_finding_payload(*, source_id: str, payload: dict[str, Any]) -> int
                         if payload.get("official_detail_json") is not None
                         else None,
                         _clean_text(payload.get("auditor_comments")),
+                        payload.get("corrected_during_inspection"),
+                        payload.get("is_repeat_violation"),
                         _clean_text(payload.get("violation_category_raw")),
                         _clean_text(payload.get("violation_category_raw")),
                         existing["master_inspection_finding_id"],

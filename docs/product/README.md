@@ -4,6 +4,39 @@ FiScore is a food safety and restaurant inspection management platform designed 
 
 The primary experience is a mobile app for iOS and Android, supported by a lighter companion web app. FiScore is built with Flutter and Firebase.
 
+## How To Use This Folder
+
+This folder mixes product overview material and deeper product design references.
+
+For most work:
+
+1. read [FEATURES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FEATURES.md) for scope and behavior
+2. read [WORKFLOWS.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\WORKFLOWS.md) for user flow
+3. read [USER_ROLES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\USER_ROLES.md) for permissions
+4. then use the specialized docs only if your task needs them
+
+## Product Source Of Truth
+
+Within the product folder, these docs should be treated as primary:
+
+- feature scope:
+  [FEATURES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FEATURES.md)
+- user workflows:
+  [WORKFLOWS.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\WORKFLOWS.md)
+- roles and permissions:
+  [USER_ROLES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\USER_ROLES.md)
+- business entities:
+  [DATA_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DATA_MODEL.md)
+- sync rules:
+  [SYNC_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SYNC_STRATEGY.md)
+- scoring and grading:
+  [SCORING_RULES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SCORING_RULES.md)
+
+Specialized reference doc:
+
+- audit checklist engine:
+  [AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md)
+
 ## Problem Statement
 
 Restaurants often struggle to keep inspection results, internal audits, follow-up actions, and team accountability organized in one place. FiScore helps restaurants improve food safety practices, reduce repeat violations, and stay better prepared for health department inspections.

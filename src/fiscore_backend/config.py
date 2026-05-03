@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     db_password: str = Field(alias="DB_PASSWORD")
 
     default_parser_version: str = Field(default="sword-v1", alias="DEFAULT_PARSER_VERSION")
+    run_dispatch_mode: str = Field(default="local", alias="RUN_DISPATCH_MODE")
+    worker_base_url: str | None = Field(default=None, alias="WORKER_BASE_URL")
+    worker_audience: str | None = Field(default=None, alias="WORKER_AUDIENCE")
 
     @property
     def database_connection_kwargs(self) -> dict[str, str | int]:
@@ -46,6 +49,10 @@ class Settings(BaseSettings):
             kwargs["host"] = self.db_host
 
         return kwargs
+
+    @property
+    def resolved_worker_audience(self) -> str | None:
+        return self.worker_audience or self.worker_base_url
 
 
 @lru_cache

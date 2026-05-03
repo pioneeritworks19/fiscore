@@ -26,6 +26,17 @@ class RawArtifactStorage:
         path = f"raw/html/{source_slug}/{scrape_run_id}/{filename}"
         return RawArtifactPath(bucket=self.bucket_name, path=path)
 
+    def build_raw_path(
+        self,
+        *,
+        source_slug: str,
+        scrape_run_id: str,
+        filename: str,
+        content_family: str,
+    ) -> RawArtifactPath:
+        path = f"raw/{content_family}/{source_slug}/{scrape_run_id}/{filename}"
+        return RawArtifactPath(bucket=self.bucket_name, path=path)
+
     def bucket_exists(self) -> bool:
         bucket = self.client.lookup_bucket(self.bucket_name)
         return bucket is not None
@@ -36,6 +47,16 @@ class RawArtifactStorage:
         blob.upload_from_string(content, content_type=content_type)
         return artifact.uri
 
+    def upload_bytes(self, artifact: RawArtifactPath, content: bytes, content_type: str) -> str:
+        bucket = self.client.bucket(self.bucket_name)
+        blob = bucket.blob(artifact.path)
+        blob.upload_from_string(content, content_type=content_type)
+        return artifact.uri
+
 
 def hash_text(content: str) -> str:
     return sha256(content.encode("utf-8")).hexdigest()
+
+
+def hash_bytes(content: bytes) -> str:
+    return sha256(content).hexdigest()
