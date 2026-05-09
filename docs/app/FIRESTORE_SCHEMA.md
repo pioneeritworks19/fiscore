@@ -25,7 +25,7 @@ This document is intentionally different from `MASTER_DATA_SCHEMA.md`.
 
 ### 1. Tenant Isolation
 
-All app data should be clearly scoped to a tenant. Tenant users should only access the data for restaurants and workflows that belong to their tenant.
+All app data should be clearly scoped to a tenant. Tenant users should only access the data for sites and workflows that belong to their tenant.
 
 ### 2. Document-Oriented Read Models
 
@@ -54,7 +54,7 @@ Avoid unbounded growth in single documents. Use subcollections for history, atta
 
 ## Top-Level Strategy
 
-The Firestore schema should center around tenants and their restaurants.
+The Firestore schema should center around tenants and their sites.
 
 Recommended top-level collections:
 
@@ -93,6 +93,8 @@ Stores user profile data used across tenants.
 
 - Authentication itself is handled by Firebase Authentication
 - This collection stores app profile metadata, not credentials
+- email should be treated as the primary invitation identifier in version 1
+- `phoneNumber` is profile/contact information and should not be the primary tenant invite key in version 1
 
 ## 2. Tenants Collection
 
@@ -116,7 +118,7 @@ Represents a restaurant organization or customer account.
 ### Example subcollections
 
 - `members`
-- `restaurants`
+- `sites`
 - `audits`
 - `violations`
 - `publicInspections`
@@ -153,23 +155,23 @@ Stores tenant-level access and role information for a user.
 - `auditor`
 - `staff`
 
-## 4. Tenant Restaurants
+## 4. Tenant Sites
 
 ### Collection
 
-`tenants/{tenantId}/restaurants/{restaurantId}`
+`tenants/{tenantId}/sites/{siteId}`
 
 ### Purpose
 
-Represents a restaurant location inside the tenant app context.
+Represents a tenant site inside the tenant app context.
 
-This is the tenant-owned restaurant record linked to the master data platform.
+This is the tenant-owned site record used by the app. It may be linked to the master data platform or may exist as a manual unlinked site.
 
 ### Suggested fields
 
 - `tenantId`
-- `restaurantName`
-- `normalizedRestaurantName`
+- `siteName`
+- `normalizedSiteName`
 - `addressLine1`
 - `addressLine2`
 - `city`
@@ -182,6 +184,11 @@ This is the tenant-owned restaurant record linked to the master data platform.
 - `locationFingerprint`
 - `masterLinkStatus`
 - `masterLinkMethod`
+- `manuallyCreated`
+- `manualEntrySource`
+- `publicInspectionAvailability`
+- `matchConfidence`
+- `pendingMatchReview`
 - `linkedAt`
 - `linkedBy`
 - `latestInspectionDate`
@@ -194,15 +201,29 @@ This is the tenant-owned restaurant record linked to the master data platform.
 
 ### Notes
 
-- duplicate a few summary fields here to power restaurant list screens efficiently
-- do not force the app to query many collections just to build the restaurant dashboard
-- this collection is also the foundation for a tenant-level restaurants overview screen
+- duplicate a few summary fields here to power site list screens efficiently
+- do not force the app to query many collections just to build the site dashboard
+- this collection is also the foundation for a tenant-level sites overview screen
+- this collection should support both linked and manual sites
+
+### Suggested `masterLinkStatus` values
+
+- `linked_to_master`
+- `manual_unlinked`
+- `pending_match_review`
+- `archived`
+
+### Suggested `publicInspectionAvailability` values
+
+- `available`
+- `unavailable_until_linked`
+- `not_supported_for_source`
 
 ### Recommended Summary Fields for Portfolio View
 
 These fields are especially useful for a cross-restaurant landing page:
 
-- `restaurantName`
+- `siteName`
 - `city`
 - `state`
 - `latestInspectionDate`
@@ -213,24 +234,24 @@ These fields are especially useful for a cross-restaurant landing page:
 - `lastAuditDate` if available later
 - `draftAuditCount` if tracked later
 
-## 5A. Future Restaurant Modules
+## 5A. Future Site Modules
 
-FiScore should leave room under each tenant restaurant for future operational modules beyond inspections and violations.
+FiScore should leave room under each tenant site for future operational modules beyond inspections and violations.
 
 Potential future collections may include:
 
-- `tenants/{tenantId}/restaurants/{restaurantId}/assets/{assetId}`
-- `tenants/{tenantId}/restaurants/{restaurantId}/complaints/{complaintId}`
+- `tenants/{tenantId}/sites/{siteId}/assets/{assetId}`
+- `tenants/{tenantId}/sites/{siteId}/complaints/{complaintId}`
 
-These do not need to be implemented in version 1, but the restaurant-centered data model should leave clear space for them.
+These do not need to be implemented in version 1, but the site-centered data model should leave clear space for them.
 
-## 5. Restaurant Team Membership
+## 5. Site Team Membership
 
 If restaurant-level permissions become distinct from tenant-level permissions:
 
 ### Collection
 
-`tenants/{tenantId}/restaurants/{restaurantId}/members/{userId}`
+`tenants/{tenantId}/sites/{siteId}/members/{userId}`
 
 ### Suggested fields
 
@@ -248,11 +269,11 @@ This can be deferred if tenant membership is enough for version 1.
 
 ### Collection
 
-`tenants/{tenantId}/restaurants/{restaurantId}/publicInspections/{publicInspectionId}`
+`tenants/{tenantId}/sites/{siteId}/publicInspections/{publicInspectionId}`
 
 ### Purpose
 
-Stores tenant-readable projections of public inspection data for linked restaurants.
+Stores tenant-readable projections of public inspection data for linked sites.
 
 These are derived from the master data platform and should be treated as read-only from the tenant app perspective.
 
@@ -282,6 +303,7 @@ These are derived from the master data platform and should be treated as read-on
 
 - tenant users should not edit official public inspection content
 - tenant workflows should link back to this projected record where relevant
+- these records should only exist for sites that are linked to a master restaurant and have public data coverage
 
 ### Suggested `reportAvailability` values
 
@@ -294,7 +316,7 @@ These are derived from the master data platform and should be treated as read-on
 
 ### Collection
 
-`tenants/{tenantId}/restaurants/{restaurantId}/publicInspections/{publicInspectionId}/reports/{reportId}`
+`tenants/{tenantId}/sites/{siteId}/publicInspections/{publicInspectionId}/reports/{reportId}`
 
 ### Purpose
 
@@ -333,11 +355,11 @@ Stores report metadata for both official public-source reports and tenant-upload
 
 ### Collection
 
-`tenants/{tenantId}/restaurants/{restaurantId}/publicInspections/{publicInspectionId}/findings/{findingId}`
+`tenants/{tenantId}/sites/{siteId}/publicInspections/{publicInspectionId}/findings/{findingId}`
 
 ### Purpose
 
-Stores tenant-readable public findings or violations from a public inspection.
+Stores tenant-readable copies of public inspection findings for historical source visibility.
 
 ### Suggested fields
 
@@ -358,8 +380,9 @@ Stores tenant-readable public findings or violations from a public inspection.
 
 ### Notes
 
-- public findings can remain read-only here
+- these records should remain read-only historical source records
 - tenant-owned workflow records live separately in the tenant violation model
+- the tenant app should treat violations, not public findings, as the actionable operational records
 
 ## 8. Audit Checklist Templates
 
@@ -379,11 +402,12 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - `description`
 - `category`
 - `templateSource`
+- `templateScope`
+- `sourceTemplateId`
 - `ownerUserId`
 - `ownerDisplayNameSnapshot`
 - `tagIds`
 - `tagLabels`
-- `assignedRestaurantIds`
 - `assignedSiteIds`
 - `status`
 - `version`
@@ -403,6 +427,21 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - some teams keep templates in Firestore
 - some teams keep template definitions elsewhere and project read models into Firestore
 - this doc assumes Firestore-hosted tenant-facing templates are acceptable for version 1
+- `assignedSiteIds` should be treated as a tenant-side availability control
+- if `assignedSiteIds` is empty or omitted, the template is available to all sites in that tenant
+- if `assignedSiteIds` is populated, the template is restricted to those sites
+- FiScore-owned system templates should be represented either through tenant-adopted copies or tenant-side enablement records before site assignment is applied
+
+### Suggested `templateSource` values
+
+- `fiscore_prebuilt`
+- `tenant_custom`
+- `tenant_cloned_from_prebuilt`
+
+### Suggested `templateScope` values
+
+- `system`
+- `tenant`
 
 ## 9. Checklist Sections
 
@@ -495,8 +534,10 @@ Stores conditional logic, required evidence rules, and auto-follow-up behavior f
 - `require_comment`
 - `require_photo`
 - `require_signature`
-- `create_action_on_submit`
+- `create_violation_on_submit`
 - `flag_critical_response`
+- `suggest_training`
+- `flag_repeat_issue`
 
 ### Notes
 
@@ -511,13 +552,13 @@ Stores conditional logic, required evidence rules, and auto-follow-up behavior f
 
 ### Purpose
 
-Represents a specific audit execution for a restaurant.
+Represents a specific audit execution for a site.
 
 ### Suggested fields
 
 - `tenantId`
-- `restaurantId`
-- `restaurantNameSnapshot`
+- `siteId`
+- `siteNameSnapshot`
 - `scheduleId`
 - `scheduleInstanceId`
 - `auditOrigin`
@@ -567,13 +608,11 @@ Represents a specific audit execution for a restaurant.
 
 ### Purpose
 
-Stores one-time and recurring audit schedule definitions for restaurants or sites.
+Stores one-time and recurring audit schedule definitions for sites.
 
 ### Suggested fields
 
 - `tenantId`
-- `restaurantId`
-- `restaurantNameSnapshot`
 - `siteId`
 - `siteNameSnapshot`
 - `checklistTemplateId`
@@ -612,7 +651,7 @@ Stores one-time and recurring audit schedule definitions for restaurants or site
 
 - one-time schedules can use `scheduleType = one_time` with `dueAt`
 - recurring schedules can store a recurrence definition and generate child instances
-- `siteId` can be optional if version 1 schedules are restaurant-level only
+- schedules should be site-scoped in version 1
 
 ## 11B. Audit Schedule Instances
 
@@ -628,8 +667,6 @@ Stores generated scheduled audit occurrences and their operational state.
 
 - `scheduleId`
 - `tenantId`
-- `restaurantId`
-- `restaurantNameSnapshot`
 - `siteId`
 - `siteNameSnapshot`
 - `checklistTemplateId`
@@ -797,8 +834,8 @@ Stores tenant-owned violation workflow records regardless of source.
 ### Suggested fields
 
 - `tenantId`
-- `restaurantId`
-- `restaurantNameSnapshot`
+- `siteId`
+- `siteNameSnapshot`
 - `sourceType`
 - `sourceReferenceId`
 - `sourceInspectionId`
@@ -851,8 +888,8 @@ Stores tenant-owned violation workflow records regardless of source.
 
 ### Notes
 
-- this collection is top-level under the tenant because cross-restaurant filtering is important
-- duplicate restaurant display fields here to support list and dashboard screens efficiently
+- this collection is top-level under the tenant because cross-site filtering is important
+- duplicate site display fields here to support list and dashboard screens efficiently
 
 ## 16. Violation Responses
 
@@ -862,16 +899,16 @@ Stores tenant-owned violation workflow records regardless of source.
 
 ### Purpose
 
-Stores simple responses and CAPA responses over the life of a violation.
+Stores the structured record of how a violation was addressed over its life cycle.
 
 ### Suggested fields
 
-- `responseType`
 - `status`
-- `summary`
-- `correctiveAction`
-- `preventiveAction`
-- `rootCause`
+- `responseGeneral`
+- `responseContainment`
+- `responseRootCause`
+- `responseCorrectiveAction`
+- `responsePreventiveAction`
 - `verificationNotes`
 - `submittedForReviewAt`
 - `submittedForReviewBy`
@@ -880,14 +917,40 @@ Stores simple responses and CAPA responses over the life of a violation.
 - `rejectedAt`
 - `rejectedBy`
 - `rejectionReason`
+- `latestThreadEntryId`
 - `createdAt`
 - `createdBy`
 - `updatedAt`
 
-### Suggested `responseType` values
+## 16A. Violation Threads
 
-- `simple`
-- `capa`
+### Collection
+
+`tenants/{tenantId}/violations/{violationId}/threads/{threadEntryId}`
+
+### Purpose
+
+Stores discussion entries, status notes, assignment updates, and other operational thread history for a violation.
+
+### Suggested fields
+
+- `entryType`
+- `body`
+- `mentionedUserIds`
+- `attachmentIds`
+- `statusSnapshot`
+- `assignmentSnapshot`
+- `createdAt`
+- `createdBy`
+- `updatedAt`
+
+### Suggested `entryType` values
+
+- `comment`
+- `status_update`
+- `assignment_update`
+- `photo_update`
+- `system_note`
 
 ## 17. Violation Attachments
 
@@ -977,8 +1040,8 @@ Stores cross-tenant activity for dashboards and timeline views.
 
 - `entityType`
 - `entityId`
-- `restaurantId`
-- `restaurantNameSnapshot`
+- `siteId`
+- `siteNameSnapshot`
 - `eventType`
 - `summary`
 - `performedBy`
@@ -989,6 +1052,109 @@ Stores cross-tenant activity for dashboards and timeline views.
 
 - useful for dashboards without querying many subcollections
 - can be built by Cloud Functions or app-side event publishing
+
+## 20A. Trainings
+
+### Collection
+
+`tenants/{tenantId}/trainings/{trainingId}`
+
+### Purpose
+
+Stores training content metadata available to the tenant.
+
+### Suggested fields
+
+- `title`
+- `description`
+- `trainingType`
+- `durationMinutes`
+- `topicIds`
+- `relatedRiskAreas`
+- `status`
+- `hasQuickCheck`
+- `createdAt`
+- `updatedAt`
+
+### Suggested `trainingType` values
+
+- `full_course`
+- `micro_learning`
+
+## 20B. Training Topics
+
+### Collection
+
+`tenants/{tenantId}/trainings/{trainingId}/topics/{topicId}`
+
+### Purpose
+
+Stores individual topics within a training item.
+
+### Suggested fields
+
+- `title`
+- `description`
+- `displayOrder`
+- `estimatedMinutes`
+- `createdAt`
+- `updatedAt`
+
+## 20C. Training Assignments
+
+### Collection
+
+`tenants/{tenantId}/trainingAssignments/{assignmentId}`
+
+### Purpose
+
+Stores assignments of training to users for operational remediation or improvement.
+
+### Suggested fields
+
+- `tenantId`
+- `siteId`
+- `trainingId`
+- `assignedTo`
+- `assignedBy`
+- `dueDate`
+- `status`
+- `linkedViolationId`
+- `linkedViolationResponseId`
+- `linkedAuditId`
+- `linkedRiskArea`
+- `completedAt`
+- `createdAt`
+- `updatedAt`
+
+### Suggested `status` values
+
+- `assigned`
+- `in_progress`
+- `completed`
+- `overdue`
+- `cancelled`
+
+## 20D. Training Progress
+
+### Collection
+
+`tenants/{tenantId}/trainingAssignments/{assignmentId}/progress/{progressId}`
+
+### Purpose
+
+Stores progress or completion data for assigned training.
+
+### Suggested fields
+
+- `progressPercent`
+- `startedAt`
+- `lastActiveAt`
+- `completedAt`
+- `quickCheckResult`
+- `acknowledgedAppliedAt`
+- `createdAt`
+- `updatedAt`
 
 ## 21. Sync Queue or Client Sync Metadata
 
@@ -1028,10 +1194,10 @@ Firestore works best when certain fields are repeated intentionally.
 
 Recommended duplicated fields:
 
-- restaurant name on audits and violations
+- site name on audits and violations
 - checklist name on audit sessions
 - question prompt snapshots on audit responses
-- latest score/grade summaries on restaurants
+- latest score/grade summaries on sites
 - latest response summary on violations
 - source summary fields on tenant violation records
 
@@ -1041,12 +1207,14 @@ This duplication is normal and desirable for Firestore.
 
 The schema should support these common queries efficiently:
 
-- restaurants for a tenant
-- audit schedules for a tenant filtered by restaurant and status
+- sites for a tenant
+- manual unlinked sites for a tenant
+- sites pending master-match review
+- audit schedules for a tenant filtered by site and status
 - upcoming or overdue audit schedule instances
-- audits for a tenant filtered by restaurant and status
-- violations for a tenant filtered by restaurant, status, assignee, severity, and due date
-- latest public inspections for a restaurant
+- audits for a tenant filtered by site and status
+- violations for a tenant filtered by site, status, assignee, severity, and due date
+- latest public inspections for a site
 - findings for one public inspection
 - responses for one audit
 - responses and evidence for one violation
@@ -1055,13 +1223,18 @@ The schema should support these common queries efficiently:
 
 The exact index set will depend on app screens, but likely needs include:
 
-- `auditSchedules` by `restaurantId + status`
+- `sites` by `masterLinkStatus`
+- `sites` by `masterLinkStatus + zipCode`
+- `auditSchedules` by `siteId + status`
 - `auditSchedules` by `nextDueAt`
 - `auditSchedules/{scheduleId}/instances` by `status + dueAt`
-- `violations` by `restaurantId + status`
+- `trainingAssignments` by `assignedTo + status`
+- `trainingAssignments` by `siteId + status`
+- `trainingAssignments` by `status + dueDate`
+- `violations` by `siteId + status`
 - `violations` by `status + assignedTo`
 - `violations` by `status + dueDate`
-- `audits` by `restaurantId + status`
+- `audits` by `siteId + status`
 - `audits` by `startedAt`
 - `publicInspections` by `inspectionDate`
 
@@ -1074,7 +1247,7 @@ Tenant users should only read and write data within tenants where they are membe
 ### Recommended Security Pattern
 
 - check membership in `tenants/{tenantId}/members/{userId}`
-- enforce role-based write restrictions for manager/owner-only actions
+- enforce role-based write restrictions for manager-only violation closure
 - treat public inspection projections as read-only to tenant users
 - allow tenant-owned records such as audits and violations to be writable according to role
 
@@ -1097,15 +1270,18 @@ For version 1, the most important Firestore collections are:
 - `users`
 - `tenants`
 - `tenants/{tenantId}/members`
-- `tenants/{tenantId}/restaurants`
+- `tenants/{tenantId}/sites`
 - `tenants/{tenantId}/auditSchedules`
 - `tenants/{tenantId}/auditSchedules/{scheduleId}/instances`
 - `tenants/{tenantId}/audits`
 - `tenants/{tenantId}/audits/{auditId}/responses`
 - `tenants/{tenantId}/violations`
+- `tenants/{tenantId}/violations/{violationId}/threads`
 - `tenants/{tenantId}/violations/{violationId}/responses`
-- `tenants/{tenantId}/restaurants/{restaurantId}/publicInspections`
-- `tenants/{tenantId}/restaurants/{restaurantId}/publicInspections/{publicInspectionId}/findings`
+- `tenants/{tenantId}/trainings`
+- `tenants/{tenantId}/trainingAssignments`
+- `tenants/{tenantId}/sites/{siteId}/publicInspections`
+- `tenants/{tenantId}/sites/{siteId}/publicInspections/{publicInspectionId}/findings`
 
 These are enough to support the main tenant workflows.
 

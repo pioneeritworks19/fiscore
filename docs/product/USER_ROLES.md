@@ -13,6 +13,14 @@ The goal is to create a role model that is:
 
 This document focuses on tenant-side product roles used by restaurant organizations inside FiScore.
 
+## Identity And Invitation Direction
+
+For version 1:
+
+- email should be the primary invitation identifier
+- phone number may be stored on the user profile
+- phone should be treated as contact information rather than the primary invite key
+
 ## Version 1 Roles
 
 For version 1, FiScore should support these main tenant roles:
@@ -33,13 +41,13 @@ This role is intended to represent the primary customer account owner.
 
 ### 2. Admin
 
-The admin role supports day-to-day administrative control of the tenant, restaurants, team members, and configuration.
+The admin role supports day-to-day administrative control of the tenant, sites, team members, and configuration.
 
 Admins help manage the tenant without necessarily being the original tenant owner.
 
 ### 3. Manager
 
-Managers are responsible for restaurant operations, team oversight, responses to findings and actions, and final closure of action items.
+Managers are responsible for site operations, team oversight, responses to findings and violations, and final closure of violations.
 
 ### 4. Auditor
 
@@ -49,7 +57,7 @@ They may also help manage checklist templates and scoring configuration.
 
 ### 5. Staff
 
-Staff members participate in operational follow-up, including responding to actions and supporting remediation work.
+Staff members participate in operational follow-up, including responding to violations and supporting remediation work.
 
 They are not final approvers for closure-sensitive workflows.
 
@@ -61,21 +69,21 @@ The tenant owner has the highest tenant-level authority and should be able to ma
 
 ### 2. Role Scope Is Tenant-Wide in Version 1
 
-A user may belong to multiple restaurants within the same tenant, but their role remains the same across those restaurants.
+A user may belong to multiple sites within the same tenant, but their role remains the same across those sites.
 
 This means:
 
-- one user can access multiple restaurants
+- one user can access multiple sites
 - users switch one restaurant at a time in the app
 - role differences by restaurant are not part of version 1
 
 ### 3. Restaurant Context Is Still Important
 
-Although the role is tenant-wide, the app experience is restaurant-specific. Users work in one restaurant context at a time and switch restaurants when needed.
+Although the role is tenant-wide, the app experience is site-specific. Users work in one site context at a time and switch sites when needed.
 
 ### 4. Sensitive Actions Need Stronger Roles
 
-Actions such as closing action items, managing tenant settings, or adding restaurants should be restricted to higher-trust roles.
+Sensitive operations such as closing violations, managing tenant settings, or adding sites should be restricted to higher-trust roles.
 
 ## Capability Matrix
 
@@ -84,10 +92,12 @@ The table below summarizes the intended version 1 permissions.
 | Capability | Tenant Owner | Admin | Manager | Auditor | Staff |
 |---|---|---|---|---|---|
 | View tenant | Yes | Yes | Yes | Yes | Yes |
-| View assigned restaurants | Yes | Yes | Yes | Yes | Yes |
-| View all restaurants in tenant | Yes | Yes | No | No | No |
-| Add restaurant to tenant | Yes | Yes | No | No | No |
-| Remove restaurant from tenant | Yes | Yes | No | No | No |
+| View assigned sites | Yes | Yes | Yes | Yes | Yes |
+| View all sites in tenant | Yes | Yes | No | No | No |
+| Add site to tenant | Yes | Yes | No | No | No |
+| Manually add site to tenant | Yes | Yes | No | No | No |
+| Link manual site to master restaurant | Yes | Yes | No | No | No |
+| Remove site from tenant | Yes | Yes | No | No | No |
 | Invite team members | No | Yes | Yes | No | No |
 | Change user roles | No | Yes | Yes | No | No |
 | Deactivate users | No | Yes | Yes | No | No |
@@ -100,13 +110,13 @@ The table below summarizes the intended version 1 permissions.
 | Complete internal audits | No | No | Yes | Yes | No |
 | Create or edit checklist templates | No | Yes | Yes | Yes | No |
 | Create or edit scoring rules | No | Yes | Yes | Yes | No |
-| Create standalone action | No | Yes | Yes | Yes | No |
-| Create recurring action | No | Yes | Yes | No | No |
-| Respond to actions | No | No | Yes | Yes | Yes |
-| Submit action response for review | No | No | Yes | Yes | Yes |
-| Approve action response | No | No | Yes | No | No |
-| Close action | No | No | Yes | No | No |
-| Reopen action | No | No | Yes | No | No |
+| Assign training | No | No | Yes | No | No |
+| Complete assigned training | No | No | Yes | Yes | Yes |
+| Respond to violations | No | No | Yes | Yes | Yes |
+| Submit violation response for review | No | No | Yes | Yes | Yes |
+| Approve violation response | No | No | Yes | No | No |
+| Close violation | No | No | Yes | No | No |
+| Reopen violation | No | No | Yes | No | No |
 
 ## Detailed Role Definitions
 
@@ -118,9 +128,11 @@ The tenant owner is the original account owner for the tenant and has the highes
 
 ### Key Permissions
 
-- view all restaurants within the tenant
-- add restaurants to the tenant
-- remove restaurants from the tenant
+- view all sites within the tenant
+- add sites to the tenant
+- manually add sites to the tenant
+- link manual sites to master restaurant records
+- remove sites from the tenant
 - edit tenant-level settings
 - view analytics and reports
 - upload onsite health inspection reports
@@ -135,12 +147,14 @@ The tenant owner is the original account owner for the tenant and has the highes
 
 ### Description
 
-The admin role is the main tenant administration role for managing restaurants, team membership, and configuration.
+The admin role is the main tenant administration role for managing sites, team membership, and configuration.
 
 ### Key Permissions
 
-- view all restaurants within the tenant
-- add and remove restaurants
+- view all sites within the tenant
+- add and remove sites
+- manually add sites
+- link manual sites to master restaurant records
 - invite team members
 - change roles
 - deactivate users
@@ -163,23 +177,22 @@ Managers are operational leaders who oversee audit completion, remediation work,
 ### Key Permissions
 
 - create and complete internal audits
-- create standalone actions
-- create recurring actions
+- assign training
 - invite team members
 - change roles
 - deactivate users
 - create or edit checklist templates and scoring rules
-- respond to actions
-- approve action responses
-- close actions
-- reopen actions
+- respond to violations
+- approve violation responses
+- close violations
+- reopen violations
 - view analytics and reports
 - upload onsite health inspection reports
 
 ### Notes
 
-- manager is the only role allowed to close actions in version 1
-- manager is also the key review role for action responses submitted by staff or auditors
+- manager is the only role allowed to close violations in version 1
+- manager is also the key review role for violation responses submitted by staff or auditors
 - this role should be able to guide daily restaurant compliance activity
 
 ## Auditor
@@ -191,18 +204,18 @@ Auditors are focused on internal inspections, checklist execution, and audit pro
 ### Key Permissions
 
 - create and complete internal audits
-- create standalone actions
 - create or edit checklist templates
 - create or edit scoring rules
-- respond to actions
-- submit action responses for review
+- complete assigned training
+- respond to violations
+- submit violation responses for review
 - view analytics and reports
 - upload onsite health inspection reports
 
 ### Notes
 
 - auditors can create findings through audit workflows
-- auditors cannot close actions in version 1
+- auditors cannot close violations in version 1
 - auditors can participate deeply in compliance operations without having final managerial approval authority
 
 ## Staff
@@ -214,29 +227,30 @@ Staff members support corrective action work and day-to-day operational follow-u
 ### Key Permissions
 
 - view their accessible restaurant context
-- respond to actions
+- complete assigned training
+- respond to violations
 - submit responses for review
 
 ### Notes
 
-- staff cannot close actions
-- staff do not manage tenant settings, restaurants, or user administration
+- staff cannot close violations
+- staff do not manage tenant settings, sites, or user administration
 - staff should remain focused on execution rather than approval
 
 ## Restaurant Access Model
 
 ### Version 1 Rules
 
-- a tenant may contain multiple restaurants
-- the app shows one restaurant at a time
-- users can switch restaurants they have access to
-- a user may belong to multiple restaurants
-- a user's role remains the same across restaurants in the same tenant
+- a tenant may contain multiple sites
+- the app shows one site at a time
+- users can switch sites they have access to
+- a user may belong to multiple sites
+- a user's role remains the same across sites in the same tenant
 
 ### Visibility Rules
 
-- tenant owner and admin can view all restaurants in the tenant
-- other roles should only see restaurants they are assigned or allowed to access
+- tenant owner and admin can view all sites in the tenant
+- other roles should only see sites they are assigned or allowed to access
 
 ## User Management Rules
 
@@ -269,12 +283,21 @@ Recommended version 1 product guardrails:
 
 ### Add and Remove Restaurants
 
-Only these roles can add or remove restaurants from a tenant:
+Only these roles can add or remove sites from a tenant:
 
 - tenant owner
 - admin
 
 This is important because adding a restaurant creates a connection between the tenant and the master public data platform.
+
+### Manual Site Creation and Later Linking
+
+Only these roles can manually create tenant sites or later link a manual site to a master restaurant:
+
+- tenant owner
+- admin
+
+This keeps portfolio integrity and master-data linkage under higher-trust roles.
 
 ## Audit Permissions
 
@@ -304,28 +327,26 @@ This is important because adding a restaurant creates a connection between the t
 - this allows operational and compliance-focused users to own the audit program
 - staff do not control audit design in version 1
 
-## Action Permissions
+## Violation Permissions
 
-Actions may come from:
+Violations may come from:
 
 - public inspection data
 - internal audits
 - audit-triggered findings
-- manual operational identification
-- recurring operational work
+- manual site-level identification
 
-### Roles Allowed to Create Standalone Actions
+### Roles Allowed to Assign Training
 
-- admin
+- manager
+
+### Roles Allowed to Complete Assigned Training
+
 - manager
 - auditor
+- staff
 
-### Roles Allowed to Create Recurring Actions
-
-- admin
-- manager
-
-### Roles Allowed to Respond to Actions
+### Roles Allowed to Respond to Violations
 
 - manager
 - auditor
@@ -337,13 +358,13 @@ Actions may come from:
 - auditor
 - staff
 
-### Roles Allowed to Approve, Close, or Reopen Actions
+### Roles Allowed to Approve, Close, or Reopen Violations
 
 - manager
 
 ### Important Rule
 
-Action closure should always be controlled by a manager in version 1.
+Violation closure should always be controlled by a manager in version 1.
 
 This matches your intended product direction:
 
@@ -394,9 +415,10 @@ Recommended enforcement areas:
 
 - tenant membership validation for all tenant reads
 - role-based write checks for restaurant add/remove
+- role-based write checks for manual site creation and later master linking
 - role-based checks for user invites, deactivation, and role changes
-- role-based checks for standalone and recurring action creation
-- manager-only checks for action closure
+- role-based checks for site add/remove and violation workflows
+- manager-only checks for violation closure
 - read-only access to public inspection projections
 - admin/manager/auditor checks for checklist editing
 - tenant-owner/admin/manager/auditor checks for onsite public inspection report uploads
@@ -420,10 +442,11 @@ These questions do not need to block version 1, but should be revisited later:
 - should tenant owner also inherit all admin and manager powers explicitly in UI and backend rules
 - should manager role changes be limited to lower-privilege roles only
 - should auditor be allowed to assign violations
+- should admins eventually be allowed to assign training directly
 - should staff be limited to only their own assigned violations
 - should there be a future `regional_manager` role
 - should FiScore internal platform roles be documented separately from tenant roles
 
 ## Summary
 
-FiScore version 1 should use a tenant-wide role model with five main roles: `tenant_owner`, `admin`, `manager`, `auditor`, and `staff`. Tenant owner and admin handle tenant-wide setup and restaurant portfolio control. Managers oversee operational compliance, including final action closure. Auditors manage audit execution and checklist logic while also participating in action workflows. Staff support remediation work without final approval authority.
+FiScore version 1 should use a tenant-wide role model with five main roles: `tenant_owner`, `admin`, `manager`, `auditor`, and `staff`. Tenant owner and admin handle tenant-wide setup and site portfolio control. Managers oversee operational compliance, including final violation closure. Auditors manage audit execution and checklist logic while also participating in violation workflows. Staff support remediation work without final approval authority.

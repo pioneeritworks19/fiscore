@@ -38,6 +38,10 @@ Use these documents as canonical unless a later doc explicitly replaces them:
   [product/SCORING_RULES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SCORING_RULES.md)
 - Audit checklist engine design:
   [product/AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md)
+- Onboarding experience:
+  [product/ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
+- Team invitation and membership flow:
+  [product/TEAM_INVITE_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TEAM_INVITE_FLOW.md)
 - Master-data platform architecture:
   [backend/MASTER_DATA_ARCHITECTURE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\backend\MASTER_DATA_ARCHITECTURE.md)
 - Master-data relational schema:
@@ -74,6 +78,8 @@ When adding future markdown files, prefer extending an existing canonical doc un
   Ingestion workflows, operations, matching, and master-list strategy
 - `source-integrations/`
   Source-specific ingestion planning and parser documentation
+- `design-references/`
+  Mockups and UI reference material used to guide implementation
 
 ## Recommended Docs By Task
 
@@ -91,6 +97,8 @@ If you are coding in a specific area, start here:
   `backend/MASTER_DATA_ARCHITECTURE.md`, `backend/MASTER_DATA_SCHEMA.md`, `ingestion/INGESTION_WORKFLOWS.md`
 - Building Sword integration:
   `source-integrations/sword/`
+- Using visual mockups during app implementation:
+  `design-references/`
 
 ## Documentation Hygiene Rules
 

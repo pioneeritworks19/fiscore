@@ -1,6 +1,6 @@
 # FiScore
 
-FiScore is a restaurant compliance and operations platform focused on public health inspections, internal audits, violations, corrective action workflows, and future operational modules.
+FiScore is a restaurant compliance and operations platform focused on public health inspections, internal audits, violations, remediation workflows, and future operational modules.
 
 This repository now contains the project documentation plus an initial backend scaffold for the ingestion and master-data platform.
 
@@ -16,6 +16,7 @@ Main sections:
 - [App Docs](docs/app/)
 - [Backend Docs](docs/backend/)
 - [Ingestion Docs](docs/ingestion/)
+- [Design References](docs/design-references/)
 - [Sword Source Integration](docs/source-integrations/sword/)
 
 ## Recommended Reading Order

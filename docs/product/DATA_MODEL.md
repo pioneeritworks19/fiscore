@@ -8,6 +8,7 @@ The data model is designed for:
 
 - multi-tenant restaurant organizations
 - offline-first mobile usage
+- tenant-managed operating sites
 - checklist-driven audits
 - checklist-specific scoring and grading
 - unified violation management
@@ -21,9 +22,9 @@ This is a conceptual and logical model, not a final Firestore schema. It is inte
 
 All operational data should belong to a tenant so FiScore can support organizations with one or many restaurant locations.
 
-### 2. Restaurant-Centric
+### 2. Site-Centric
 
-Most workflows are performed in the context of a restaurant location. Core entities should therefore carry `restaurantId` when applicable.
+Most workflows are performed in the context of a tenant site. Core entities should therefore carry `siteId`.
 
 ### 3. Audit and Violation Traceability
 
@@ -45,7 +46,7 @@ Suggested shared fields:
 
 - `id`
 - `tenantId`
-- `restaurantId` when applicable
+- `siteId` when applicable
 - `createdAt`
 - `createdBy`
 - `updatedAt`
@@ -69,11 +70,12 @@ Suggested `syncStatus` values:
 The current product scope can be grouped into these model areas:
 
 - tenant and user management
-- restaurants and membership
+- tenant sites, master restaurants, and membership
 - audit checklist templates
 - audit execution
 - scoring and grading
 - violations and remediation
+- training and improvement
 - evidence attachments
 - external inspection ingestion
 - sync and audit trail support
@@ -95,7 +97,7 @@ Suggested fields:
 
 Relationships:
 
-- one tenant has many restaurants
+- one tenant has many tenant sites
 - one tenant has many users through memberships
 - one tenant has many checklist templates
 
@@ -118,6 +120,8 @@ Notes:
 
 - Authentication may come from Google or Apple
 - A user may belong to multiple tenants if the business allows it
+- email should be the primary invitation identifier in version 1
+- phoneNumber may be stored as profile or contact information
 
 ## 3. Tenant Membership
 
@@ -141,15 +145,18 @@ Suggested roles:
 - `staff`
 - `auditor` if needed later
 
-## 4. Restaurant
+## 4. Tenant Site
 
-Represents a restaurant location within a tenant.
+Represents an operating restaurant location within a tenant.
+
+This is the tenant-owned site record used by day-to-day app workflows. It may be linked to a master restaurant record or may exist as a manual unlinked site.
 
 Suggested fields:
 
 - `id`
 - `tenantId`
 - `name`
+- `siteDisplayName`
 - `externalReference`
 - `address`
 - `city`
@@ -159,28 +166,59 @@ Suggested fields:
 - `phoneNumber`
 - `timezone`
 - `status`
+- `masterRestaurantId`
+- `masterLinkStatus`
+- `masterLinkMethod`
+- `manuallyCreated`
+- `publicInspectionAvailability`
 - `healthDepartmentMetadata`
 
 Relationships:
 
-- one restaurant has many audits
-- one restaurant has many violations
-- one restaurant may have many imported health inspections
+- one tenant site has many audits
+- one tenant site has many violations
+- one tenant site may have many imported health inspections if linked
+
+Suggested `masterLinkStatus` values:
+
+- `linked_to_master`
+- `manual_unlinked`
+- `pending_match_review`
+- `archived`
+
+## 4A. Master Restaurant Reference
+
+Represents the external or canonical restaurant identity from the master-data platform.
+
+In the tenant-side conceptual model, this may be represented as a reference rather than a full local entity.
+
+Suggested fields:
+
+- `id`
+- `canonicalName`
+- `locationFingerprint`
+- `publicSourceCoverage`
+- `status`
+
+Important notes:
+
+- a tenant site may exist before a master restaurant match exists
+- later linking should not destroy tenant-created audits, violations, or assignments
 
 ## 5. Restaurant Membership
 
-Represents which users can access which restaurant.
+Represents which users can access which site.
 
 Suggested fields:
 
 - `id`
 - `tenantId`
-- `restaurantId`
+- `siteId`
 - `userId`
 - `role`
 - `status`
 
-This allows a tenant-level user to have restaurant-specific permissions if needed.
+This allows a tenant-level user to have site-specific permissions if needed.
 
 ## Checklist and Audit Template Model
 
@@ -387,13 +425,13 @@ Suggested `actionType` values:
 
 ## 14. Audit Session
 
-Represents an instance of a user performing a checklist audit for a restaurant.
+Represents an instance of a user performing a checklist audit for a site.
 
 Suggested fields:
 
 - `id`
 - `tenantId`
-- `restaurantId`
+- `siteId`
 - `checklistTemplateId`
 - `checklistVersion`
 - `scoringConfigVersion`
@@ -514,7 +552,7 @@ Suggested fields:
 
 - `id`
 - `tenantId`
-- `restaurantId`
+- `siteId`
 - `sourceType`
 - `sourceReferenceId`
 - `sourceQuestionId`
@@ -612,6 +650,37 @@ Suggested fields:
 - `responseLabelSnapshot`
 - `wasAutoCreated`
 
+## 19A. Violation Thread Entry
+
+Represents a discussion item attached to a violation.
+
+Suggested fields:
+
+- `id`
+- `violationId`
+- `threadType`
+- `messageType`
+- `body`
+- `mentionedUserIds`
+- `attachmentIds`
+- `statusSnapshot`
+- `assignmentSnapshot`
+- `createdAt`
+- `createdBy`
+
+Suggested `messageType` values:
+
+- `comment`
+- `status_update`
+- `assignment_update`
+- `photo_update`
+- `system_note`
+
+Important notes:
+
+- thread history should remain part of the operational and compliance record
+- entries may support both user-authored and system-authored events
+
 ## 20. Violation Response
 
 Represents work performed by a user in response to a violation.
@@ -651,26 +720,33 @@ Notes:
 - There may be multiple responses over the life of one violation
 - The latest approved response may be used for closure support
 
-## 21. CAPA Plan
+## 21A. Structured Violation Response
 
-Represents structured corrective and preventive action details for a violation response.
+Represents the structured record of how a violation was addressed alongside the discussion thread.
 
 Suggested fields:
 
 - `id`
-- `violationResponseId`
-- `issueSummary`
-- `rootCause`
-- `correctiveActionPlan`
-- `preventiveActionPlan`
-- `responsiblePersonId`
-- `targetCompletionDate`
-- `actualCompletionDate`
-- `effectivenessCheck`
-- `effectivenessCheckedAt`
-- `effectivenessCheckedBy`
+- `tenantId`
+- `siteId`
+- `violationId`
+- `sourceThreadId`
+- `responseGeneral`
+- `responseContainment`
+- `responseRootCause`
+- `responseCorrectiveAction`
+- `responsePreventiveAction`
+- `status`
+- `createdAt`
+- `createdBy`
+- `updatedAt`
+- `updatedBy`
 
-This could also be embedded into `ViolationResponse` if the team prefers a simpler model.
+Important notes:
+
+- the thread remains the collaboration space
+- the structured response remains the official remediation record
+- the response may be completed over time in phases
 
 ## 22. Violation Review Decision
 
@@ -722,7 +798,7 @@ Suggested fields:
 
 - `id`
 - `tenantId`
-- `restaurantId`
+- `siteId`
 - `ownerType`
 - `ownerId`
 - `attachmentType`
@@ -772,7 +848,7 @@ Suggested fields:
 
 - `id`
 - `tenantId`
-- `restaurantId`
+- `siteId`
 - `agencyName`
 - `inspectionDate`
 - `inspectionType`
@@ -796,7 +872,7 @@ Suggested fields:
 - `id`
 - `inspectionId`
 - `tenantId`
-- `restaurantId`
+- `siteId`
 - `code`
 - `title`
 - `description`
@@ -806,6 +882,88 @@ Suggested fields:
 - `mappedViolationId`
 
 This model allows the system to preserve the official record even if a normalized `Violation` is also created for workflow purposes.
+
+## 26A. Training
+
+Represents a training item that can be assigned to users.
+
+Suggested fields:
+
+- `id`
+- `tenantId`
+- `title`
+- `description`
+- `trainingType`
+- `durationMinutes`
+- `topicIds`
+- `relatedRiskAreas`
+- `status`
+- `hasQuickCheck`
+- `createdAt`
+- `updatedAt`
+
+Suggested `trainingType` values:
+
+- `full_course`
+- `micro_learning`
+
+## 26B. Training Topic
+
+Represents a focused topic inside training content.
+
+Suggested fields:
+
+- `id`
+- `trainingId`
+- `title`
+- `description`
+- `displayOrder`
+- `estimatedMinutes`
+
+## 26C. Training Assignment
+
+Represents assignment of training to a user.
+
+Suggested fields:
+
+- `id`
+- `tenantId`
+- `siteId`
+- `trainingId`
+- `assignedTo`
+- `assignedBy`
+- `dueDate`
+- `status`
+- `linkedViolationId`
+- `linkedViolationResponseId`
+- `linkedAuditId`
+- `linkedRiskArea`
+- `completedAt`
+- `createdAt`
+- `updatedAt`
+
+Suggested `status` values:
+
+- `assigned`
+- `in_progress`
+- `completed`
+- `overdue`
+- `cancelled`
+
+## 26D. Training Progress
+
+Represents progress or completion data for a training assignment.
+
+Suggested fields:
+
+- `id`
+- `trainingAssignmentId`
+- `progressPercent`
+- `startedAt`
+- `lastActiveAt`
+- `completedAt`
+- `quickCheckResult`
+- `acknowledgedAppliedAt`
 
 ## Activity and Audit Trail Model
 
@@ -817,7 +975,7 @@ Suggested fields:
 
 - `id`
 - `tenantId`
-- `restaurantId`
+- `siteId`
 - `entityType`
 - `entityId`
 - `eventType`
@@ -876,10 +1034,10 @@ Suggested `status` values:
 
 Key relationship patterns:
 
-- Tenant -> many Restaurants
+- Tenant -> many Tenant Sites
 - Tenant -> many Checklist Templates
 - User -> many Tenant Memberships
-- Restaurant -> many Audit Sessions
+- Tenant Site -> many Audit Sessions
 - Checklist Template -> many Sections
 - Checklist Section -> many Questions
 - Question -> many Response Options
@@ -892,6 +1050,12 @@ Key relationship patterns:
 - Audit Response or Violation Response -> many Attachments
 - Imported Health Inspection -> many Imported Inspection Findings
 - Imported Inspection Finding -> optional mapped Violation
+- Tenant Site -> optional Master Restaurant Reference
+- Violation -> many Violation Thread Entries
+- Violation -> optional Structured Violation Response
+- Training -> many Training Topics
+- Training -> many Training Assignments
+- Training Assignment -> optional Training Progress
 
 ## Implementation Notes for Firestore
 
@@ -916,7 +1080,7 @@ For version 1, the most important entities to implement first are:
 
 - Tenant
 - User
-- Restaurant
+- Tenant Site
 - Checklist Template
 - Checklist Section
 - Checklist Question
@@ -930,6 +1094,8 @@ For version 1, the most important entities to implement first are:
 - Attachment
 - Health Department Inspection
 - Imported Inspection Finding
+- Training
+- Training Assignment
 
 These cover the essential operational workflows without overcomplicating the first release.
 
@@ -938,7 +1104,9 @@ These cover the essential operational workflows without overcomplicating the fir
 These items still need product and engineering decisions:
 
 - whether restaurant membership should be separate from tenant membership
+- how manual tenant sites should later be reconciled to master restaurant records
 - whether CAPA should be embedded into violation response or modeled separately
+- whether structured violation response fields should live directly on the violation response record in implementation
 - whether section results are stored or derived
 - how much attachment metadata is stored locally versus only in cloud records
 - whether review decisions are separate documents or part of violation history
@@ -946,6 +1114,6 @@ These items still need product and engineering decisions:
 
 ## Summary
 
-FiScore's data model should center on tenants, restaurants, versioned audit checklists, checklist-specific scoring, audit execution, and unified violation remediation. The model should preserve source traceability, support offline-first operation, and keep historical audit and scoring outcomes stable even as checklist definitions evolve.
+FiScore's data model should center on tenants, tenant-managed sites, optional master restaurant linkage, versioned audit checklists, checklist-specific scoring, audit execution, and unified violation remediation. The model should preserve source traceability, support offline-first operation, and keep historical audit and scoring outcomes stable even as checklist definitions evolve.
 
 The violation model in particular should support both simple text-based representation and richer structured context. Some violations may only have a short description and type, while others may need to preserve official clause references or internal section-question-response context for accurate display and reporting.

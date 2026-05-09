@@ -1,6 +1,6 @@
 # FiScore
 
-FiScore is a food safety and restaurant inspection management platform designed for restaurant owners, managers, and staff. It helps teams review local health department inspection reports, run internal audits, track violations, and take corrective action before future inspections.
+FiScore is a food safety and restaurant inspection management platform designed for restaurant owners, managers, and staff. It helps teams review local health department inspection reports, run internal audits, track violations, and document remediation before future inspections.
 
 The primary experience is a mobile app for iOS and Android, supported by a lighter companion web app. FiScore is built with Flutter and Firebase.
 
@@ -36,10 +36,20 @@ Specialized reference doc:
 
 - audit checklist engine:
   [AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md)
+- training module:
+  [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
+- onboarding flow:
+  [ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
+- team invite flow:
+  [TEAM_INVITE_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TEAM_INVITE_FLOW.md)
 
 ## Problem Statement
 
-Restaurants often struggle to keep inspection results, internal audits, follow-up actions, and team accountability organized in one place. FiScore helps restaurants improve food safety practices, reduce repeat violations, and stay better prepared for health department inspections.
+Restaurants often struggle to keep inspection results, internal audits, follow-up work, and team accountability organized in one place. FiScore helps restaurants improve food safety practices, reduce repeat violations, and stay better prepared for health department inspections.
+
+The intended closed-loop operating model is:
+
+`Audit -> Violation -> Discussion -> Structured Response -> Training -> Improved Behavior -> Better Audit`
 
 ## Target Users
 
@@ -62,12 +72,12 @@ Restaurants often struggle to keep inspection results, internal audits, follow-u
 
 ## Core Features
 
-### Tenant and Restaurant Setup
+### Tenant and Site Setup
 
 - User registration and onboarding
 - Tenant-style setup for organizations with multiple restaurant locations
-- Find and add restaurants
-- Switch between restaurants
+- Find and add sites
+- Switch between sites
 
 ### Inspection and Audit Workflows
 
@@ -94,6 +104,9 @@ The core product design documents in this folder include:
 - [SCORING_RULES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SCORING_RULES.md)
 - [SYNC_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SYNC_STRATEGY.md)
 - [AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md)
+- [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
+- [ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
+- [TEAM_INVITE_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TEAM_INVITE_FLOW.md)
 
 ## Offline-First Requirement
 
@@ -115,7 +128,7 @@ Important sync principles:
 
 - Use an offline-first approach where changes are stored locally before syncing to the cloud
 - Queue writes locally and retry them automatically when the device reconnects
-- Show sync status clearly for important records and actions
+- Show sync status clearly for important records and workflows
 - Preserve user trust by avoiding silent overwrites whenever possible
 - Track update timestamps, device context, and user identity for important changes
 - Design conflict handling rules for concurrent edits across devices and team members
@@ -124,24 +137,24 @@ Important sync principles:
 
 The implementation should favor a predictable and user-trust-focused sync model:
 
-- Save user actions locally first so the app feels immediate and dependable
+- Save user work locally first so the app feels immediate and dependable
 - Sync in the background whenever connectivity is available
 - Mark records with statuses such as `draft`, `pending sync`, `synced`, or `sync issue`
 - Use server timestamps and revision metadata to detect conflicting edits
 - Prefer field-level merges where safe, especially for additive data like notes, photos, and checklist progress
 - For high-risk conflicts, surface a review flow instead of silently replacing one user's work
-- Keep an audit trail for key actions such as creating, updating, closing, and reopening violations
+- Keep an audit trail for key events such as creating, updating, closing, and reopening violations
 
 ## User Experience Requirements for Sync
 
 To reduce anxiety and improve confidence, the app should communicate sync behavior clearly:
 
 - Show whether the device is offline or online
-- Confirm that actions were saved locally even when offline
+- Confirm that work was saved locally even when offline
 - Indicate when background sync is in progress
 - Show when sync has completed successfully
 - Warn users when the same record was changed elsewhere and needs review
-- Avoid implying that cloud sync happened instantly if the action is only stored locally
+- Avoid implying that cloud sync happened instantly if the record is only stored locally
 
 ## Authentication
 
@@ -171,7 +184,7 @@ Potential future additions may include:
 - Notifications and reminders for unresolved violations
 - Role-based permissions for owners, managers, and staff
 - Trend analysis across locations
-- Photo evidence uploads for violations and corrective actions
+- Photo evidence uploads for violations and remediation responses
 - Downloadable compliance reports
 - Advanced conflict resolution workflows for multi-user editing
 

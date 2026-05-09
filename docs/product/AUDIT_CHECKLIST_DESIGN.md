@@ -28,7 +28,7 @@ It is a configurable audit and inspection engine that supports:
 - required evidence and follow-up rules
 - scoring and grading
 - version-controlled audit history
-- action creation from findings
+- violation creation from findings
 
 This is the right long-term product framing if FiScore is going to compete with audit and operations platforms rather than only basic inspection trackers.
 
@@ -52,7 +52,7 @@ The checklist engine should support enough input types to handle real inspection
 
 ### 5. Follow-Up Should Be Rule-Driven
 
-Certain responses should be able to require evidence, comments, or follow-up action creation automatically.
+Certain responses should be able to require evidence, comments, or follow-up violation creation automatically.
 
 ### 6. Prior Context Should Help, Not Hide
 
@@ -64,8 +64,8 @@ Showing prior answers and using smart pre-fill should reduce effort, but the cur
 
 FiScore should support both:
 
+- system templates owned by FiScore and made available across tenants
 - custom checklists and forms created by tenant users
-- pre-built templates provided by FiScore
 
 Examples of pre-built template categories:
 
@@ -102,13 +102,29 @@ Suggested source values:
 
 ### Assigned Scope
 
-Templates may be assigned at:
+Template ownership and availability should be understood separately.
+
+Ownership:
+
+- `system template`
+  owned by FiScore and available across tenants
+- `tenant template`
+  owned by a tenant and available only inside that tenant
+
+Availability:
+
+- a tenant template may be available to all sites in that tenant
+- a tenant template may be restricted to selected sites in that tenant
+- a FiScore system template should not be directly assigned to sites globally at the source definition layer
+- if site assignment is needed for a FiScore template, that assignment should happen in the tenant's adopted copy or tenant-side enablement record
+
+Templates may therefore be assigned at:
 
 - tenant-wide level
-- restaurant level
-- site or operational area level later if needed
+- site level
+- operational area level later if needed
 
-Version 1 can start with tenant-wide and restaurant-level assignment.
+Version 1 can start with tenant-wide and site-level assignment.
 
 ## Versioning Model
 
@@ -275,19 +291,22 @@ That prevents historical audits from changing behavior later when rules evolve.
 
 ## Required Follow-Up Rules
 
-Certain responses should be able to force follow-up actions.
+Certain responses should be able to force follow-up violations.
 
 Recommended rule-driven requirements:
 
 - require photo upload
 - require comment
-- require task or action creation
+- require violation creation
+- suggest training
+- flag repeat issue
 - require manager review later if configured
 
 Examples:
 
 - if refrigeration temperature exceeds threshold, require photo plus comment
-- if handwashing station fails, require comment and create violation-type action on submission
+- if handwashing station fails, require comment and create a violation on submission
+- if the same failure has repeated at the site, surface a repeat-issue alert and recommend training
 - if compliance sign-off section is completed, require signature
 
 ### Important Design Principle
@@ -369,7 +388,46 @@ When used in a live audit, the checklist engine should support:
 - saving answers locally during execution
 - attaching evidence during the audit
 - showing previous responses where configured
-- deferring auto-created action generation until audit submission
+- keeping triggered follow-up inline rather than navigating away
+- explaining why triggers fired
+- preserving section and question hierarchy during triggered expansion
+- supporting collapse state for triggered blocks
+- deferring auto-created violation generation until audit submission
+
+## Severity-Driven Response Behavior
+
+Severity should be a stronger first-class signal in the checklist engine.
+
+Recommended severity levels:
+
+- critical
+- high
+- medium
+- low
+
+Severity may influence:
+
+- required evidence
+- required comment
+- violation creation
+- manager review expectations
+- training recommendation
+- risk display in the audit UI
+
+## Suggested Intelligence
+
+When supported by rules or historical context, the audit experience may surface:
+
+- repeat violation alerts
+- suggested fixes
+- risk explanations
+- recommended training
+
+This should stay concise and operational rather than becoming noisy.
+
+## Audit UX Reference
+
+See [AUDIT_UX_GUIDELINES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\app\AUDIT_UX_GUIDELINES.md) for the intended interaction behavior of live audits, including inline trigger expansion, progressive disclosure, and context-preserving follow-up UX.
 
 ## Data Model Implications
 
@@ -381,9 +439,9 @@ The data model should support:
 - stable section and question identifiers
 - question-level response snapshots
 - structured answer storage by type
-- rule definitions for conditional logic and required actions
+- rule definitions for conditional logic and required violation behavior
 - template metadata including tags and owner
-- assignment of templates to restaurants or sites
+- assignment of templates to sites
 - prior-response lookup by restaurant or site plus stable question id
 
 ## Recommended Phasing
@@ -415,7 +473,7 @@ The data model should support:
 
 When describing this capability externally or internally, FiScore should use wording closer to:
 
-"Audit Checklist is a configurable inspection engine for restaurant operations and food safety. It supports reusable templates, version-controlled compliance forms, rich response types, conditional logic, prior-response visibility, evidence capture, scoring, and automatic follow-up action creation."
+"Audit Checklist is a configurable inspection engine for restaurant operations and food safety. It supports reusable templates, version-controlled compliance forms, rich response types, conditional logic, prior-response visibility, evidence capture, scoring, and automatic violation creation."
 
 That positioning better reflects the true scope of the feature.
 

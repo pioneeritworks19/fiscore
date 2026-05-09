@@ -9,7 +9,7 @@ The goal is to create a navigation model that is:
 - mobile-first
 - easy to understand for restaurant operators
 - optimized for the most common daily tasks
-- aligned with the one-restaurant-at-a-time product model
+- aligned with the one-site-at-a-time product model
 - flexible enough to support role-based access
 
 This document covers:
@@ -23,11 +23,11 @@ This document covers:
 
 ## Navigation Design Principles
 
-### 1. One Restaurant at a Time
+### 1. One Site at a Time
 
-FiScore should always make the current restaurant context obvious. Users work inside one restaurant at a time and switch explicitly when needed.
+FiScore should always make the current site context obvious. Users work inside one site at a time and switch explicitly when needed.
 
-This should not prevent the product from offering a tenant-level overview of all accessible restaurants. Users often need a portfolio snapshot before drilling into one location.
+This should not prevent the product from offering a tenant-level overview of all accessible sites. Users often need a portfolio snapshot before drilling into one location.
 
 ### 2. Daily Work First
 
@@ -36,7 +36,7 @@ The most frequent actions in the app are likely to be:
 - reviewing active violations
 - conducting audits
 - checking recent inspections
-- switching restaurant context
+- switching site context
 
 Navigation should prioritize those workflows over less frequent administrative areas.
 
@@ -48,7 +48,7 @@ Because of that:
 
 - public inspections should be visible as a reference/history area
 - audits should be a task-oriented workflow area
-- violations should be a top-level action area
+- violations should be a top-level daily-work area
 
 ### 4. Role Complexity Should Not Overcomplicate Navigation
 
@@ -66,13 +66,13 @@ FiScore should be designed as a restaurant operations platform, not only a food-
 - complaint tracking
 - additional operations or compliance modules
 
-The initial navigation should therefore separate restaurant context from module context so the app can grow cleanly over time.
+The initial navigation should therefore separate site context from module context so the app can grow cleanly over time.
 
 ## Recommended Top-Level Sections
 
 For version 1, the recommended top-level sections are:
 
-- `Restaurants`
+- `Sites`
 - `Dashboard`
 - `Violations`
 - `Audits`
@@ -87,7 +87,7 @@ This keeps the most active daily workflows close at hand without overcrowding th
 
 Use a bottom tab navigation with five destinations:
 
-1. `Restaurants`
+1. `Sites`
 2. `Dashboard`
 3. `Violations`
 4. `Audits`
@@ -97,7 +97,7 @@ Use a bottom tab navigation with five destinations:
 
 - bottom tabs are familiar for mobile users
 - the most important daily destinations stay one tap away
-- restaurant operations users benefit from simple, consistent navigation
+- site operations users benefit from simple, consistent navigation
 - the `More` tab gives room for less-frequent destinations without making the main tab bar too busy
 
 ### Where Inspections Goes on Mobile
@@ -106,8 +106,8 @@ On mobile, `Inspections` should live under the restaurant dashboard and within `
 
 Reason:
 
-- users need a restaurant portfolio view at the top level
-- violations and audits are more action-oriented daily destinations
+- users need a site portfolio view at the top level
+- violations and audits are more execution-oriented daily destinations
 - inspections remain important, but they are more reference-oriented than violations in day-to-day use
 
 ## Recommended Web Navigation
@@ -116,7 +116,7 @@ Reason:
 
 Use a left sidebar with the same information architecture:
 
-- Restaurants
+- Sites
 - Dashboard
 - Violations
 - Audits
@@ -133,33 +133,33 @@ Use a left sidebar with the same information architecture:
 - sidebar navigation works better for table-heavy and management-heavy screens
 - the same conceptual structure can remain consistent with the mobile app
 
-## Restaurant Context and Switching
+## Site Context and Switching
 
 ### Recommendation
 
-Restaurant switching should live in the top app header as a persistent restaurant context control once a user is inside a restaurant-specific module or screen.
+Site switching should live in the top app header as a persistent site context control once a user is inside a site-specific module or screen.
 
 ### Recommended Pattern
 
-- current restaurant name shown in the top header
-- tapping it opens a restaurant switcher
-- users only see restaurants they are allowed to access
-- tenant owner and admin can see all restaurants in the tenant
+- current site name shown in the top header
+- tapping it opens a site switcher
+- users only see sites they are allowed to access
+- tenant owner and admin can see all sites in the tenant
 
 ### Why
 
-- restaurant context is central to almost every workflow
+- site context is central to almost every workflow
 - placing the switcher in the header keeps it visible without taking up a bottom-tab slot
-- users should always know which restaurant they are currently operating in
+- users should always know which site they are currently operating in
 
-### Restaurant Overview vs Restaurant Context
+### Site Overview vs Site Context
 
 FiScore should support both:
 
-- a tenant-level restaurant overview screen that shows all accessible restaurants with summary data
-- a single active restaurant context for detailed work
+- a tenant-level site overview screen that shows all accessible sites with summary data
+- a single active site context for detailed work
 
-This gives users a portfolio snapshot without losing the one-restaurant-at-a-time operating model.
+This gives users a portfolio snapshot without losing the one-site-at-a-time operating model.
 
 ## Recommended Default Landing Screen
 
@@ -167,41 +167,47 @@ This gives users a portfolio snapshot without losing the one-restaurant-at-a-tim
 
 After login, the default landing experience should be:
 
-- `Restaurants` overview if the user has access to multiple restaurants
-- `Dashboard` for the last active restaurant if that is the preferred resume path later
-- onboarding or add-restaurant flow if the tenant has no restaurants yet
+- `Sites` overview if the user has access to multiple sites
+- `Dashboard` for the only accessible site if the user has exactly one site
+- onboarding or add-site flow if the tenant has no sites yet
 
 ### Why
 
-- a restaurant overview gives users a cross-location snapshot
-- it supports quick drill-down into one restaurant
-- it creates a more scalable pattern as the tenant grows to multiple restaurants
+- a site overview gives users a cross-location snapshot
+- it supports quick drill-down into one site
+- it creates a more scalable pattern as the tenant grows to multiple sites
+
+### Important Version 1 Rule
+
+Users with permission to add sites should still see an `Add Site` entry point even if they currently have access to only one site.
+
+This should be permission-based, not count-based.
 
 ## Recommended Entry Model
 
-### 1. Restaurants Overview
+### 1. Sites Overview
 
-This is the tenant-level landing area for selecting and scanning restaurants.
+This is the tenant-level landing area for selecting and scanning sites.
 
-### 2. Restaurant Dashboard
+### 2. Site Dashboard
 
-This is the active-location operational home once a restaurant is selected.
+This is the active-location operational home once a site is selected.
 
 This distinction is important because:
 
-- overview is cross-restaurant
-- dashboard is restaurant-specific
+- overview is cross-site
+- dashboard is site-specific
 
-## 1. Restaurants
+## 1. Sites
 
 ### Purpose
 
-The Restaurants section is the portfolio-level landing experience. It shows all restaurants the user can access and provides a quick summary of health/compliance status.
+The Sites section is the portfolio-level landing experience. It shows all sites the user can access and provides a quick summary of health/compliance status.
 
 ### Recommended content
 
-- restaurant cards or rows
-- restaurant name and location
+- site cards or rows
+- site name and location
 - latest inspection date
 - latest inspection score or grade when available
 - open violation count
@@ -211,13 +217,13 @@ The Restaurants section is the portfolio-level landing experience. It shows all 
 
 ### Recommended actions
 
-- open restaurant dashboard
-- switch active restaurant
-- add restaurant if permitted
+- open site dashboard
+- switch active site
+- add site if permitted
 
 ### Why
 
-- users need a portfolio snapshot before drilling into one restaurant
+- users need a portfolio snapshot before drilling into one site
 - this works especially well for owners, admins, and managers overseeing multiple sites
 - it creates a strong foundation for future multi-module restaurant operations management
 
@@ -227,11 +233,11 @@ The Restaurants section is the portfolio-level landing experience. It shows all 
 
 ### Purpose
 
-The dashboard is the operational home screen for the currently selected restaurant.
+The dashboard is the operational home screen for the currently selected site.
 
 ### Recommended content
 
-- restaurant summary
+- site summary
 - latest public inspection summary
 - active violation counts
 - pending review count
@@ -243,7 +249,7 @@ The dashboard is the operational home screen for the currently selected restaura
 - start audit
 - view open violations
 - review latest inspection
-- switch restaurant
+- switch site
 
 ## 2. Violations
 ## 3. Violations
@@ -259,11 +265,11 @@ Violations should be a top-level destination because they are one of the most ac
 - response editor
 - attachments
 - status history
-- review actions for managers
+- review controls for managers
 
 ### Why Top-Level
 
-- violations are a daily action queue
+- violations are a daily operational queue
 - they combine public and internal findings into one operational workflow
 - users should not need to drill through inspections or audits just to work on them
 
@@ -302,7 +308,7 @@ Use a hybrid section-based audit experience:
 
 ### Purpose
 
-This section should provide access to public health department inspection history and findings for the current restaurant.
+This section should provide access to public health department inspection history and findings for the current site.
 
 ### Recommended screens
 
@@ -345,24 +351,24 @@ This area should contain lower-frequency destinations and role-based management 
 
 - Login
 - Tenant registration
-- Restaurant setup prompt
-- Add restaurant from master list
+- Site setup prompt
+- Add site from master restaurant list
 
 ## Main App
 
-- Restaurants overview
+- Sites overview
 - Dashboard
 - Violations
 - Audits
 - Inspections
 - More
 
-## Restaurants Branch
+## Sites Branch
 
-- Restaurants overview
-- Restaurant detail entry point
-- Add restaurant
-- Restaurant switcher
+- Sites overview
+- Site detail entry point
+- Add site
+- Site switcher
 
 ## Dashboard Branch
 
@@ -378,7 +384,7 @@ This area should contain lower-frequency destinations and role-based management 
 - Edit response
 - Attach evidence
 - Submit for review
-- Manager review actions
+- Manager review controls
 
 ## Audits Branch
 
@@ -411,15 +417,15 @@ Navigation should be role-aware, but avoid making the app feel radically differe
 
 ### Dashboard
 
-- visible to all tenant users with restaurant access
+- visible to all tenant users with site access
 
-### Restaurants
+### Sites
 
-- visible to all tenant users with restaurant access
+- visible to all tenant users with site access
 
 ### Violations
 
-- visible to all tenant users with restaurant access
+- visible to all tenant users with site access
 
 ### Audits
 
@@ -428,7 +434,7 @@ Navigation should be role-aware, but avoid making the app feel radically differe
 
 ### Inspections
 
-- visible to all tenant users with restaurant access
+- visible to all tenant users with site access
 
 ### Analytics
 
@@ -512,7 +518,7 @@ On web:
 
 The dashboard should likely include:
 
-- `Current Restaurant`
+- `Current Site`
 - `Latest Inspection`
 - `Open Violations`
 - `Pending Review`
@@ -523,9 +529,9 @@ This makes the dashboard a true control center rather than just a generic summar
 
 ## Recommended Restaurants Overview Card Model
 
-Each restaurant summary card or row should likely include:
+Each site summary card or row should likely include:
 
-- restaurant name
+- site name
 - city or short address
 - latest inspection score or grade
 - latest inspection date
@@ -542,10 +548,10 @@ This lets users quickly scan the portfolio and choose where to drill in.
 
 1. user logs in
 2. user creates tenant
-3. user adds restaurant from master list
+3. user adds site from master restaurant list
 4. app imports public inspections and latest active findings
 5. user lands on Restaurants overview
-6. user opens the selected restaurant dashboard
+6. user opens the selected site dashboard
 
 ## Journey 2: Auditor Runs an Audit
 
@@ -593,7 +599,7 @@ The version 1 app should likely include these screens:
 - Login
 - Tenant registration
 - Restaurants overview
-- Add restaurant
+- Add site
 - Restaurant switcher
 - Dashboard
 - Violation list
@@ -612,4 +618,4 @@ The version 1 app should likely include these screens:
 
 ## Summary
 
-FiScore version 1 should use a mobile-first navigation model built around bottom tabs for `Restaurants`, `Dashboard`, `Violations`, `Audits`, and `More`, with the current restaurant shown in a persistent header switcher whenever the user is inside restaurant-specific work. This creates a better balance between portfolio visibility and one-restaurant-at-a-time execution, while also leaving room for future modules like assets and complaints as FiScore evolves into a broader restaurant operations platform.
+FiScore version 1 should use a mobile-first navigation model built around bottom tabs for `Sites`, `Dashboard`, `Violations`, `Audits`, and `More`, with the current site shown in a persistent header switcher whenever the user is inside site-specific work. This creates a better balance between portfolio visibility and one-site-at-a-time execution, while also leaving room for future modules like assets and complaints as FiScore evolves into a broader restaurant operations platform.
