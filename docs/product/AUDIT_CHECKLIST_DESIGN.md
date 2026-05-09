@@ -181,8 +181,27 @@ Each checklist may define:
 - its own scoring rules
 - its own critical-response rules
 - its own follow-up requirements
+- whether a full section may be marked not applicable
 
 This allows FiScore to support different audit programs without forcing one structure on all customers.
+
+## Section-Level Not Applicable
+
+Some audit programs need the ability to mark an entire section as not applicable.
+
+Recommended behavior:
+
+- section-level N/A should be configurable per checklist section
+- the auditor may mark the full section as not applicable only when the checklist allows it
+- when a section is marked not applicable, unanswered questions in that section should not block completion
+- section-level N/A should be visible in progress and summary views
+- section-level N/A should be excluded from scoring denominator when the checklist scoring rules exclude not-applicable content
+
+Best-practice expectations:
+
+- section-level N/A should require explicit confirmation
+- optional note may be captured when policy requires explanation
+- the audit summary should clearly distinguish completed sections from not-applicable sections
 
 ## Question Types
 
@@ -265,6 +284,11 @@ Each question should be able to define:
 - validation rules
 - conditional logic rules
 - follow-up trigger rules
+
+Each section should also be able to define:
+
+- whether section-level N/A is allowed
+- whether a note is required when the section is marked N/A
 
 ## Conditional Logic
 
@@ -388,11 +412,45 @@ When used in a live audit, the checklist engine should support:
 - saving answers locally during execution
 - attaching evidence during the audit
 - showing previous responses where configured
+- showing section progress clearly
+- showing overall audit progress clearly
+- surfacing unanswered and incomplete items clearly
+- allowing navigation back to incomplete sections and questions
+- allowing question flagging or review marking when supported by the checklist UX
 - keeping triggered follow-up inline rather than navigating away
 - explaining why triggers fired
 - preserving section and question hierarchy during triggered expansion
 - supporting collapse state for triggered blocks
+- allowing section-level not applicable when configured by the checklist
 - deferring auto-created violation generation until audit submission
+
+## Audit Summary And Reporting Expectations
+
+At the end of the audit, the auditor should be able to review a clean and lightweight summary before leaving the site.
+
+Recommended summary content:
+
+- site name
+- checklist name and version
+- audit date and auditor
+- section completion summary
+- overall score
+- final grade
+- critical findings summary
+- created violations summary
+- not-applicable sections summary
+
+Recommended report behavior:
+
+- the device should be able to generate or share a lightweight on-site summary view or lightweight PDF
+- this lightweight summary is intended for immediate operational review or on-site sharing
+- the final official audit report should be generated server-side after submission
+- the server-generated final report should become the canonical audit report attached to the audit record
+
+Important product distinction:
+
+- lightweight local summary is immediate and operational
+- server-generated final report is the durable final audit artifact
 
 ## Severity-Driven Response Behavior
 
@@ -437,12 +495,15 @@ The data model should support:
 
 - stable checklist template id plus version
 - stable section and question identifiers
+- section-level not-applicable configuration
 - question-level response snapshots
 - structured answer storage by type
 - rule definitions for conditional logic and required violation behavior
 - template metadata including tags and owner
 - assignment of templates to sites
 - prior-response lookup by restaurant or site plus stable question id
+- lightweight audit-summary generation inputs
+- final server-generated audit-report attachment metadata
 
 ## Recommended Phasing
 

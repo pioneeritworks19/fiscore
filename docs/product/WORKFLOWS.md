@@ -592,12 +592,19 @@ Allow users to add a violation during an audit even when it was not initiated fr
 1. user is conducting an audit
 2. user identifies an issue that should be tracked even if it was not auto-triggered
 3. user adds a manual violation
-4. FiScore links the violation to the current audit and site
-5. the violation enters the standard violation lifecycle
+4. user enters initial issue-capture details such as:
+   - title
+   - severity
+   - creator comments or issue description
+   - optional photo or other lightweight evidence
+5. FiScore links the violation to the current audit and site
+6. the violation enters the standard violation lifecycle
 
 ### Product Recommendation
 
 Manual violation creation during the audit should be supported even when the issue did not come from a configured question trigger.
+
+The initial capture should stay lightweight so the auditor can quickly record what was observed without being forced to complete the full remediation response at creation time.
 
 ## 17. Respond to Violation Workflow
 

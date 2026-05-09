@@ -36,6 +36,10 @@ Specialized reference doc:
 
 - audit checklist engine:
   [AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md)
+- audit execution flow:
+  [AUDIT_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_EXECUTION_FLOW.md)
+- violation execution flow:
+  [VIOLATION_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\VIOLATION_EXECUTION_FLOW.md)
 - training module:
   [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
 - onboarding flow:
@@ -104,6 +108,8 @@ The core product design documents in this folder include:
 - [SCORING_RULES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SCORING_RULES.md)
 - [SYNC_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SYNC_STRATEGY.md)
 - [AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md)
+- [AUDIT_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_EXECUTION_FLOW.md)
+- [VIOLATION_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\VIOLATION_EXECUTION_FLOW.md)
 - [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
 - [ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
 - [TEAM_INVITE_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TEAM_INVITE_FLOW.md)

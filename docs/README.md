@@ -38,6 +38,10 @@ Use these documents as canonical unless a later doc explicitly replaces them:
   [product/SCORING_RULES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\SCORING_RULES.md)
 - Audit checklist engine design:
   [product/AUDIT_CHECKLIST_DESIGN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_CHECKLIST_DESIGN.md)
+- Audit execution user flow:
+  [product/AUDIT_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_EXECUTION_FLOW.md)
+- Violation execution user flow:
+  [product/VIOLATION_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\VIOLATION_EXECUTION_FLOW.md)
 - Onboarding experience:
   [product/ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
 - Team invitation and membership flow:

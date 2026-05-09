@@ -457,6 +457,8 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - `displayOrder`
 - `weight`
 - `isScored`
+- `allowsSectionNotApplicable`
+- `requiresNoteWhenSectionNotApplicable`
 - `createdAt`
 - `updatedAt`
 
@@ -582,6 +584,11 @@ Represents a specific audit execution for a site.
 - `gradeAdjustmentSummary`
 - `criticalRuleSummary`
 - `openViolationCount`
+- `sectionCount`
+- `completedSectionCount`
+- `notApplicableSectionCount`
+- `unansweredQuestionCount`
+- `flaggedQuestionCount`
 - `syncStatus`
 - `createdAt`
 - `updatedAt`
@@ -760,6 +767,41 @@ Stores per-question audit responses.
 - avoid trying to reconstruct historical results from mutable templates later
 - `stableQuestionId` supports prior-response lookup and cross-version reporting when question wording changes but the logical question remains the same
 
+## 12A. Audit Section States
+
+### Collection
+
+`tenants/{tenantId}/audits/{auditId}/sections/{sectionStateId}`
+
+### Purpose
+
+Stores section-level execution state for long audits and section-based navigation.
+
+### Suggested fields
+
+- `sectionId`
+- `stableSectionId`
+- `sectionTitleSnapshot`
+- `displayOrder`
+- `status`
+- `isNotApplicable`
+- `notApplicableReason`
+- `answeredQuestionCount`
+- `unansweredQuestionCount`
+- `flaggedQuestionCount`
+- `scoreEarned`
+- `scorePossible`
+- `startedAt`
+- `completedAt`
+- `updatedAt`
+
+### Suggested `status` values
+
+- `not_started`
+- `in_progress`
+- `completed`
+- `not_applicable`
+
 ## 13. Audit Attachments
 
 ### Collection
@@ -821,6 +863,46 @@ Stores the final scoring and grading output for the audit.
 - a single-document subcollection or embedded object both work
 - if the result is modest in size, embedding inside the audit document is also acceptable
 
+## 14A. Audit Reports
+
+### Collection
+
+`tenants/{tenantId}/audits/{auditId}/reports/{reportId}`
+
+### Purpose
+
+Stores metadata for both lightweight on-site audit summaries and final server-generated audit reports.
+
+### Suggested fields
+
+- `reportType`
+- `storagePath`
+- `downloadUrl`
+- `fileName`
+- `mimeType`
+- `fileSizeBytes`
+- `generationStatus`
+- `generatedAt`
+- `generatedBy`
+- `createdAt`
+- `updatedAt`
+
+### Suggested `reportType` values
+
+- `lightweight_summary_pdf`
+- `final_server_report_pdf`
+
+### Suggested `generationStatus` values
+
+- `queued`
+- `generated`
+- `failed`
+
+### Notes
+
+- lightweight summary reports are intended for immediate operational use or on-site sharing
+- final server-generated reports are the canonical audit report artifacts for the audit record
+
 ## 15. Violations
 
 ### Collection
@@ -845,6 +927,7 @@ Stores tenant-owned violation workflow records regardless of source.
 - `title`
 - `summaryText`
 - `displayText`
+- `creatorComments`
 - `clauseReference`
 - `sectionLabel`
 - `questionLabel`
@@ -890,6 +973,9 @@ Stores tenant-owned violation workflow records regardless of source.
 
 - this collection is top-level under the tenant because cross-site filtering is important
 - duplicate site display fields here to support list and dashboard screens efficiently
+- the violation document should support a simple issue-summary read model for list and header screens
+- richer source-context fields should remain available so the detail screen can explain why the violation was created
+- manually created violations should support lightweight issue capture at creation time, including creator comments and optional evidence
 
 ## 16. Violation Responses
 
@@ -1019,12 +1105,31 @@ Stores status transitions and important lifecycle events.
 
 - `fromStatus`
 - `toStatus`
+- `eventType`
 - `reason`
+- `summary`
 - `changedAt`
 - `changedBy`
 - `responseId`
 - `reviewDecisionId`
 - `createdAt`
+
+### Suggested `eventType` values
+
+- `created`
+- `assigned`
+- `status_changed`
+- `submitted_for_review`
+- `closed`
+- `reopened`
+- `rejected`
+- `needs_more_work`
+
+### Notes
+
+- keep the current working status on the main violation document for fast reads
+- keep the full lifecycle history in this subcollection for auditability and reporting
+- important lifecycle events may also appear as `system_note` thread entries for user readability
 
 ## 20. Activity Feed
 

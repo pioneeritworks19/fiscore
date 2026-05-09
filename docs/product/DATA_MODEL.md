@@ -611,7 +611,9 @@ Notes:
 - `status` and `lifecycleStage` may collapse into one field in implementation
 - Violations should not be hard deleted in normal workflows
 - `title`, `summaryText`, or `displayText` should provide a readable violation representation even when no deeper source structure exists
+- the primary UI should present a simple issue summary first and then a compact source-context view underneath
 - Structured source fields such as clause, section, question, and response should be preserved when available so the UI can render richer context
+- status history should be preserved even when the main violation document stores only the current working status
 
 ## 19. Violation Source Detail
 
@@ -649,6 +651,7 @@ Suggested fields:
 - `responseId`
 - `responseLabelSnapshot`
 - `wasAutoCreated`
+- `creatorComments`
 
 ## 19A. Violation Thread Entry
 
@@ -719,6 +722,7 @@ Notes:
 
 - There may be multiple responses over the life of one violation
 - The latest approved response may be used for closure support
+- manual violations should support lightweight issue capture at creation time before the structured response is completed
 
 ## 21A. Structured Violation Response
 
@@ -787,6 +791,17 @@ Suggested fields:
 - `reviewDecisionId`
 
 This history is important for traceability and sync-safe auditing.
+
+Recommended status-history events include:
+
+- created
+- assigned
+- moved to `in_progress`
+- submitted for review
+- closed
+- reopened
+- rejected
+- needs more work
 
 ## Attachment Model
 

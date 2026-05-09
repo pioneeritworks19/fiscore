@@ -317,10 +317,19 @@ These are created directly against a site and should preserve:
 - manually created source
 - site context
 - creation user and timestamp
+- creator comments or issue description
+- optional evidence captured at creation time
 
 ### Violation Display and Representation
 
 Violations should support different display formats depending on their source and level of detail. Not every violation will have the same structure, and the UI should be able to present both simple and richly contextualized records without forcing them into one rigid format.
+
+Recommended visualization pattern:
+
+- a simple issue summary at the top for fast understanding
+- a compact source-context section underneath for supporting detail
+
+This keeps the violation easy to scan without losing the evidence and origin details users need to respond and close it confidently.
 
 Common display patterns include:
 
@@ -339,9 +348,20 @@ Best-practice expectations:
 
 - The system should always store a readable violation summary for list views and notifications
 - The system should also preserve structured source context when available
+- The summary should answer "what is the issue?" in one quick read
+- The source-context section should answer "why was this created?" without forcing users to read a large text block
 - Users should be able to see both the normalized violation record and the source details behind it
 - Health department violations should preserve official language where available
 - Internal audit violations should preserve checklist context such as section, question, and triggering response where available
+
+Recommended source-context examples:
+
+- public inspection:
+  inspection date, clause or code, problem text, and auditor comments
+- internal audit trigger:
+  audit name, section, question, recorded answer, auditor comments, and linked photos when available
+- manual violation:
+  creator comments, creation context, and optional photo evidence
 
 ### Functional Expectations
 
@@ -350,6 +370,7 @@ The Violations module should support the following user outcomes:
 - View violations from health department inspections, internal audits, and manual site entry in one system
 - Filter violations by source, site, status, assignee, severity, and due date
 - Create violations manually against a site
+- Capture creator comments and lightweight evidence when manually creating a violation
 - Auto-create violations from audit responses
 - Add and update a structured violation response
 - Attach lightweight photos, short videos, and documents
