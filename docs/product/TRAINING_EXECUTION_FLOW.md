@@ -157,6 +157,13 @@ Allow a tenant to create its own training content.
 - `active`
 - `archived`
 
+### Versioning recommendation
+
+- tenant training should include a version number
+- draft training may be edited more freely
+- if training has already been assigned, meaningful content changes should create a new version for future assignments
+- the app should avoid silently changing the content for users who already have an assignment in progress
+
 ## 3. Edit Tenant Training Flow
 
 ### Goal
@@ -174,6 +181,15 @@ Allow permitted tenant users to improve or update tenant-owned training.
 
 Version 1 should keep training editing practical and avoid deep versioning complexity unless future compliance needs require it.
 
+If the training is already assigned and the content change is meaningful, FiScore should guide the user toward creating a new version instead of overwriting the assigned version in place.
+
+### Recommended behavior when assignments already exist
+
+- users already assigned the training remain on their assigned version
+- users already in progress remain on their assigned version
+- completed assignments remain tied to their completed version
+- new assignments use the newest active version
+
 ## 4. Publish or Activate Training Flow
 
 ### Goal
@@ -190,6 +206,8 @@ Make training available for assignment.
 
 - `draft` training should not appear in normal assignment lists
 - `active` training should be assignable
+- if a newer version is published, new assignments should use that newer version
+- existing assignments should remain linked to the earlier assigned version
 
 ## 5. Quick Check Setup Flow
 
@@ -301,6 +319,7 @@ Assignments should support linkage to:
 - `auditId`
 - `siteId`
 - `assignedTo`
+- `trainingVersion`
 
 Optional broader context may also include:
 
@@ -355,6 +374,7 @@ Keep completion operational and easy to understand.
 - completed at
 - progress percent
 - quick check result when present
+- assigned training version
 
 ### Important recommendation
 

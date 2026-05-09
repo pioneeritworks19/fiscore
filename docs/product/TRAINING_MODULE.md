@@ -36,6 +36,30 @@ FiScore should also support two training content sources:
 - `tenant training`
   tenant-created training available only within that tenant
 
+## Training Versioning
+
+Training should support version stability, but with lighter governance than audit checklists.
+
+### Why it matters
+
+If training content changes after users have already been assigned or have started it, FiScore should avoid silently changing what those users are expected to complete.
+
+### Recommended version 1 rules
+
+- training should include a `version` field
+- draft or not-yet-assigned training may be edited more freely
+- once training is active and has assignments, meaningful content changes should create a new version for future assignments
+- existing assignments should remain tied to the version they were assigned
+- in-progress users should finish the version they started
+- completed history should remain tied to the version that was completed
+
+### Version 1 positioning
+
+This is lighter than checklist versioning:
+
+- no need for heavy compliance-grade version control at first
+- but assignment-to-version stability should still be preserved
+
 ### 1. Full Courses
 
 Used for:

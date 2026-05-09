@@ -142,9 +142,31 @@ Without versioning, historical audits become unreliable because:
 ### Recommended Versioning Rules
 
 - every published checklist should have a version number
+- checklist content may be edited freely while the current version is still in `draft`
+- once a checklist version is published, that version should become immutable for normal editing
 - audits should snapshot the checklist version used at execution time
 - older audit records should never be recalculated against a newer template version
 - new edits to a published checklist should create a new version rather than silently modifying history
+- when a new version is published, it should become the active published version for future audits
+- new audits and new audit schedules should use the currently published version, not an unpublished draft version
+
+### Authoring and Publish Model
+
+Recommended authoring flow:
+
+1. create checklist in `draft`
+2. edit sections, questions, scoring, and rules while in `draft`
+3. publish the draft version
+4. treat that version as locked for normal editing
+5. when changes are needed later, create a new draft version from the published version
+6. publish the new draft version when ready
+7. use the newly published version for future audits
+
+Important behavior:
+
+- a published checklist version should remain historically stable
+- a new version should not overwrite the old version's audit history
+- the product should always make it clear which version is currently published and active for future audit creation
 
 ### Cross-Version Question Linkage
 

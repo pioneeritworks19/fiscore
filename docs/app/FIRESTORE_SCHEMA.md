@@ -427,6 +427,10 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - some teams keep templates in Firestore
 - some teams keep template definitions elsewhere and project read models into Firestore
 - this doc assumes Firestore-hosted tenant-facing templates are acceptable for version 1
+- checklist versions should normally be editable while in `draft`
+- once a checklist version is published, that version should be treated as immutable for normal editing
+- later changes should create a new draft version rather than modifying the published version in place
+- one published version should be treated as the active version for future audit creation
 - `assignedSiteIds` should be treated as a tenant-side availability control
 - if `assignedSiteIds` is empty or omitted, the template is available to all sites in that tenant
 - if `assignedSiteIds` is populated, the template is restricted to those sites
@@ -565,6 +569,7 @@ Represents a specific audit execution for a site.
 - `scheduleInstanceId`
 - `auditOrigin`
 - `checklistTemplateId`
+- `stableChecklistTemplateId`
 - `checklistTemplateNameSnapshot`
 - `checklistVersion`
 - `scoringConfigVersion`
@@ -606,6 +611,12 @@ Represents a specific audit execution for a site.
 - `ad_hoc`
 - `scheduled`
 - `recurring_schedule_instance`
+
+### Notes
+
+- audit sessions should always be created against a published checklist version
+- `checklistVersion` should represent the exact published version used when the audit was created
+- historical audit sessions should remain tied to that version even after newer checklist versions are published
 
 ## 11A. Audit Schedules
 
@@ -1173,6 +1184,7 @@ Stores training content metadata available to the tenant.
 - `title`
 - `description`
 - `trainingSource`
+- `version`
 - `trainingType`
 - `durationMinutes`
 - `topicIds`
@@ -1226,6 +1238,7 @@ Stores assignments of training to users for operational remediation or improveme
 - `tenantId`
 - `siteId`
 - `trainingId`
+- `trainingVersion`
 - `assignedTo`
 - `assignedBy`
 - `dueDate`
@@ -1250,6 +1263,8 @@ Stores assignments of training to users for operational remediation or improveme
 - `linkedViolationId` should be the main issue-level link for version 1
 - `linkedAuditId` should be used when training is assigned from audit context
 - `linkedRiskArea` should usually come from the training item or be derived from source context rather than typed manually during assignment
+- `trainingVersion` should preserve which version the user was assigned
+- existing assignments should remain tied to their assigned version even if a newer training version becomes active later
 
 ## 20D. Training Progress
 

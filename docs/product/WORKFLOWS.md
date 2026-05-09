@@ -376,7 +376,7 @@ Allow a manager or auditor to create a scheduled audit for a restaurant on a spe
 ### Preconditions
 
 - user is in a restaurant context or has selected a restaurant
-- checklist template exists
+- published checklist template version exists
 
 ### Steps
 
@@ -384,10 +384,11 @@ Allow a manager or auditor to create a scheduled audit for a restaurant on a spe
 2. user chooses to schedule an audit
 3. user selects the restaurant or site
 4. user selects the checklist template
-5. user sets the scheduled date
-6. user optionally adds assignment details or notes
-7. FiScore creates a scheduled audit record
-8. the scheduled audit appears in upcoming audit views for that restaurant
+5. FiScore binds the scheduled audit to the currently published version of that checklist
+6. user sets the scheduled date
+7. user optionally adds assignment details or notes
+8. FiScore creates a scheduled audit record
+9. the scheduled audit appears in upcoming audit views for that restaurant
 
 ### Result
 
@@ -407,7 +408,7 @@ Allow a manager or auditor to define a recurring internal inspection cadence for
 
 ### Preconditions
 
-- checklist template exists
+- published checklist template version exists
 - target restaurant or site is known
 
 ### Steps
@@ -416,10 +417,11 @@ Allow a manager or auditor to define a recurring internal inspection cadence for
 2. user selects `Create Recurring Schedule`
 3. user chooses the restaurant or site
 4. user selects the checklist template
-5. user defines the recurrence pattern
-6. user optionally sets start date, end date, assignee, and schedule notes
-7. FiScore stores the recurring schedule definition
-8. FiScore generates scheduled audit instances according to that cadence
+5. FiScore binds the recurring schedule to the currently published version of that checklist
+6. user defines the recurrence pattern
+7. user optionally sets start date, end date, assignee, and schedule notes
+8. FiScore stores the recurring schedule definition
+9. FiScore generates scheduled audit instances according to that cadence
 
 ### Result
 
@@ -475,7 +477,7 @@ Allow a manager or auditor to start an internal audit for a restaurant, either a
 ### Preconditions
 
 - user is in a restaurant context
-- checklist template exists
+- published checklist template version exists
 
 ### Steps
 
@@ -484,10 +486,11 @@ Allow a manager or auditor to start an internal audit for a restaurant, either a
    - starts from a scheduled audit
    - starts an ad hoc audit
 3. user selects the checklist template if not already preselected by the schedule
-4. FiScore creates an audit session in `draft` or `in_progress` state
-5. if the audit came from a schedule, the linked schedule instance moves to `in_progress`
-6. checklist content is loaded onto the device
-7. user begins responding to questions
+4. FiScore uses the currently published version of that checklist for ad hoc audit creation
+5. FiScore creates an audit session in `draft` or `in_progress` state
+6. if the audit came from a schedule, the linked schedule instance moves to `in_progress`
+7. checklist content is loaded onto the device
+8. user begins responding to questions
 
 ### Offline Behavior
 
@@ -834,10 +837,19 @@ This keeps the workflow simpler while still preserving history.
 ## Audit Schedule Rule
 
 - audits may be created ad hoc or from scheduled audit instances
+- schedules should bind to a published checklist version rather than an editable draft
 - scheduled audits should support one-time dates and recurring cadence
 - schedule states should distinguish `scheduled`, `in_progress`, `completed`, `overdue`, and `missed`
 - overdue audits remain actionable
 - missed audits remain historically reportable
+
+## Checklist Publish Rule
+
+- checklist versions may be edited while in `draft`
+- once published, a checklist version should be locked for normal editing
+- changes to a published checklist should create a new draft version
+- when that new version is published, it becomes the active published version for future audits
+- new audits should be created against a published checklist version only
 
 ## Audit Auto-Violation Rule
 
