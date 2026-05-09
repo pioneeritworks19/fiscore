@@ -42,6 +42,8 @@ Specialized reference doc:
   [VIOLATION_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\VIOLATION_EXECUTION_FLOW.md)
 - training module:
   [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
+- training execution flow:
+  [TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
 - onboarding flow:
   [ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
 - team invite flow:
@@ -111,6 +113,7 @@ The core product design documents in this folder include:
 - [AUDIT_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\AUDIT_EXECUTION_FLOW.md)
 - [VIOLATION_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\VIOLATION_EXECUTION_FLOW.md)
 - [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
+- [TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
 - [ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
 - [TEAM_INVITE_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TEAM_INVITE_FLOW.md)
 

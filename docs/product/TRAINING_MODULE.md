@@ -29,6 +29,13 @@ This loop should remain visible in product design, workflows, and reporting.
 
 FiScore should support two main training types.
 
+FiScore should also support two training content sources:
+
+- `system training`
+  FiScore-provided training available across tenants
+- `tenant training`
+  tenant-created training available only within that tenant
+
 ### 1. Full Courses
 
 Used for:
@@ -67,8 +74,8 @@ The Training module should support:
 
 - manager-assigned training
 - training linked to violations
-- training linked to structured violation responses when relevant
-- training linked to audit risk areas
+- training linked to audits when relevant
+- training categorized by risk area
 - assignment due dates
 - overdue assignment states
 - completion tracking
@@ -96,13 +103,19 @@ Training may be assigned from:
 Training should be linkable to:
 
 - violation id
-- violation response id when appropriate
 - audit id
 - checklist question or risk area when appropriate
 - site id
 - assigned user id
 
 This linkage is important so FiScore can connect training activity back to compliance outcomes.
+
+Version 1 recommendation:
+
+- `violationId` should be the main issue-level training link
+- `auditId` should be kept when the assignment comes from audit context
+- `riskArea` should primarily come from training metadata or be system-derived from the source context
+- users should not normally be asked to type a risk area during assignment
 
 ## Assignment States
 
@@ -138,12 +151,21 @@ Recommended version 1 position:
 - short
 - operationally relevant
 - tied to the training topic rather than formal exam infrastructure
+- simple to configure
 
 Examples:
 
 - one or two confirmation questions
 - quick procedural verification
 - acknowledgment that the user reviewed the content
+
+Recommended setup model:
+
+- toggle quick check on or off
+- allow 1 to 3 simple questions
+- support `true_false` or `single_choice`
+- allow one correct answer per question
+- allow optional explanation text
 
 ## Reporting Expectations
 

@@ -473,6 +473,11 @@ FiScore should support two main training types:
 - full courses
 - micro-learning topics
 
+The module should also support two training content sources:
+
+- FiScore-provided system training
+- tenant-created training
+
 Full courses are suited for onboarding, certifications, and broader compliance refreshers.
 
 Micro-learning topics are suited for:
@@ -488,8 +493,8 @@ The Training module should support:
 
 - manager-assigned training
 - training linked to violations
-- training linked to structured violation responses when relevant
-- training linked to audit risk areas
+- training linked to audits when relevant
+- training categorized by risk area
 - assignment due dates
 - overdue states
 - completion tracking
@@ -502,6 +507,7 @@ The Training module should support:
 - FiScore should avoid heavy LMS-style complexity in version 1
 - the system may recommend training from audit and violation context
 - hard auto-assignment should wait unless explicitly enabled later
+- risk area should usually come from training metadata or system-derived context rather than manual entry during assignment
 
 ## Audit Checklist Module
 

@@ -46,6 +46,8 @@ Use these documents as canonical unless a later doc explicitly replaces them:
   [product/ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
 - Team invitation and membership flow:
   [product/TEAM_INVITE_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TEAM_INVITE_FLOW.md)
+- Training setup and execution flow:
+  [product/TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
 - Master-data platform architecture:
   [backend/MASTER_DATA_ARCHITECTURE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\backend\MASTER_DATA_ARCHITECTURE.md)
 - Master-data relational schema:

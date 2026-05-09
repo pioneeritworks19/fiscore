@@ -1172,6 +1172,7 @@ Stores training content metadata available to the tenant.
 
 - `title`
 - `description`
+- `trainingSource`
 - `trainingType`
 - `durationMinutes`
 - `topicIds`
@@ -1180,6 +1181,11 @@ Stores training content metadata available to the tenant.
 - `hasQuickCheck`
 - `createdAt`
 - `updatedAt`
+
+### Suggested `trainingSource` values
+
+- `fiscore_system`
+- `tenant_custom`
 
 ### Suggested `trainingType` values
 
@@ -1225,7 +1231,6 @@ Stores assignments of training to users for operational remediation or improveme
 - `dueDate`
 - `status`
 - `linkedViolationId`
-- `linkedViolationResponseId`
 - `linkedAuditId`
 - `linkedRiskArea`
 - `completedAt`
@@ -1239,6 +1244,12 @@ Stores assignments of training to users for operational remediation or improveme
 - `completed`
 - `overdue`
 - `cancelled`
+
+### Notes
+
+- `linkedViolationId` should be the main issue-level link for version 1
+- `linkedAuditId` should be used when training is assigned from audit context
+- `linkedRiskArea` should usually come from the training item or be derived from source context rather than typed manually during assignment
 
 ## 20D. Training Progress
 

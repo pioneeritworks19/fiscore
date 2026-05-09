@@ -661,7 +661,7 @@ For important remediation work, the violation should function as a persistent th
 
 ### Goal
 
-Allow a manager to assign targeted training linked to a violation, structured response, audit risk area, or general site need.
+Allow a manager to assign targeted training linked to a violation, audit context, or general site need.
 
 ### Primary Actors
 
@@ -669,7 +669,7 @@ Allow a manager to assign targeted training linked to a violation, structured re
 
 ### Steps
 
-1. manager opens a violation, violation response, audit finding, or training area
+1. manager opens a violation, audit finding, or training area
 2. FiScore may show recommended training options based on context
 3. manager selects the user and training item
 4. manager sets due date and assignment note if needed
@@ -679,6 +679,12 @@ Allow a manager to assign targeted training linked to a violation, structured re
 ### Result
 
 - training becomes an actionable follow-up item linked to the operational issue
+
+### Version 1 Linkage Recommendation
+
+- use `violationId` as the main issue-level link when training is assigned because of a violation
+- keep `auditId` when the assignment comes from audit context
+- treat `riskArea` primarily as training metadata or system-derived context rather than manual entry during routine assignment
 
 ## 19. Complete Training Workflow
 
