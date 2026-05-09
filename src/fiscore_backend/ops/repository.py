@@ -199,6 +199,9 @@ def list_sources_page(
             last_run.run_status as last_run_status,
             last_run.started_at as last_started_at,
             last_run.completed_at as last_completed_at,
+            latest_success.scrape_run_id::text as latest_success_run_id,
+            latest_success.run_mode as latest_success_run_mode,
+            latest_success.run_status as latest_success_run_status,
             latest_success.completed_at as latest_success_at,
             case
                 when latest_success.completed_at is null then null
@@ -214,7 +217,7 @@ def list_sources_page(
             limit 1
         ) last_run on true
         left join lateral (
-            select completed_at
+            select scrape_run_id, run_mode, run_status, completed_at
             from ops.scrape_run r
             where
                 r.source_id = sr.source_id
@@ -930,6 +933,78 @@ def create_rerun_request(request: CreateRerunRequest) -> OpsRerunSummary:
         request_payload=row["request_payload"] if isinstance(row["request_payload"], dict) else _decode_jsonish(row["request_payload"]),
         **{k: v for k, v in row.items() if k != "request_payload"},
     )
+
+
+def mark_run_failed_manually(
+    scrape_run_id: str,
+    *,
+    issue_message: str = "Manually marked failed from ops UI after the run appeared stuck.",
+) -> bool:
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                select
+                    scrape_run_id::text as scrape_run_id,
+                    source_id::text as source_id,
+                    run_status
+                from ops.scrape_run
+                where scrape_run_id = %s::uuid
+                limit 1
+                """,
+                (scrape_run_id,),
+            )
+            run = cur.fetchone()
+            if run is None or run["run_status"] != "running":
+                return False
+
+            cur.execute(
+                """
+                update ops.scrape_run
+                set
+                    run_status = 'failed',
+                    completed_at = now(),
+                    error_count = error_count + 1,
+                    error_summary = coalesce(nullif(error_summary, ''), %s)
+                where scrape_run_id = %s::uuid
+                  and run_status = 'running'
+                returning scrape_run_id::text
+                """,
+                (issue_message, scrape_run_id),
+            )
+            updated = cur.fetchone()
+            if updated is None:
+                return False
+
+            cur.execute(
+                """
+                insert into ops.scrape_run_issue (
+                    scrape_run_id,
+                    source_id,
+                    severity,
+                    category,
+                    issue_code,
+                    issue_message,
+                    component,
+                    stage,
+                    issue_metadata
+                )
+                values (
+                    %s::uuid,
+                    %s::uuid,
+                    'error',
+                    'runtime',
+                    'manual_mark_failed',
+                    %s,
+                    'control-panel',
+                    'run',
+                    '{}'::jsonb
+                )
+                """,
+                (scrape_run_id, run["source_id"], issue_message),
+            )
+        conn.commit()
+    return True
 
 
 def list_lineage(*, limit: int = 200) -> list[MasterInspectionLineageSummary]:

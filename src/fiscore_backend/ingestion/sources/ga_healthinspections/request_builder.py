@@ -21,11 +21,12 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> G
     county_name = source.source_config.get("county_name")
 
     if run_mode == "backfill":
+        backfill_start = today - timedelta(days=730)
         return GeorgiaRunPlan(
             run_mode=run_mode,
-            strategy="county_scoped_full_history_backfill",
-            date_from=None,
-            date_to=None,
+            strategy="county_scoped_recent_history_backfill",
+            date_from=backfill_start,
+            date_to=today,
             request_context={
                 "platform": source.platform_name,
                 "source_name": source.source_name,
@@ -34,9 +35,12 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> G
                 "county_name": county_name,
                 "permit_type_label": "Food Service",
                 "partition_mode": "target_single_county_from_landing_page",
+                "from_date": backfill_start.isoformat(),
+                "to_date": today.isoformat(),
                 "notes": (
                     "Georgia county sources should resolve a single county option from the landing "
-                    "page and run that county without date filters for full-history backfill."
+                    "page and run that county with a bounded rolling two-year window to avoid "
+                    "API failures on unbounded backfill queries."
                 ),
             },
         )

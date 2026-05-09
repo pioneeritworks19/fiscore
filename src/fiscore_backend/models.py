@@ -74,6 +74,9 @@ class OpsSourceSummary(BaseModel):
     last_run_status: str | None = None
     last_started_at: datetime | None = None
     last_completed_at: datetime | None = None
+    latest_success_run_id: str | None = None
+    latest_success_run_mode: str | None = None
+    latest_success_run_status: str | None = None
     latest_success_at: datetime | None = None
     freshness_age_days: int | None = None
 

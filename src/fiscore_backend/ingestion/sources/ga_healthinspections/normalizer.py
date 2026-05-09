@@ -95,13 +95,13 @@ def _source_inspection_key(payload: dict[str, Any]) -> str:
     if inspection_id_raw:
         return f"ga-inspection:{inspection_id_raw}"
 
+    inspection_source_record_key = _clean_text(payload.get("inspection_source_record_key"))
+    if inspection_source_record_key:
+        return f"ga-record:{inspection_source_record_key}"
+
     report_url = _clean_text(payload.get("report_url"))
     if report_url:
         return f"ga-report:{report_url}"
-
-    detail_url = _clean_text(payload.get("detail_url"))
-    if detail_url:
-        return f"ga-detail:{detail_url}"
 
     inspection = payload.get("inspection_summary", {})
     restaurant = payload.get("restaurant", {})
@@ -114,7 +114,14 @@ def _source_inspection_key(payload: dict[str, Any]) -> str:
             _clean_text(inspection.get("inspection_type_raw")),
         ]
     )
-    return sha256(joined.encode("utf-8")).hexdigest()
+    if joined.replace("|", ""):
+        return sha256(joined.encode("utf-8")).hexdigest()
+
+    detail_url = _clean_text(payload.get("detail_url"))
+    if detail_url:
+        return f"ga-detail:{detail_url}"
+
+    return sha256(repr(payload).encode("utf-8")).hexdigest()
 
 
 def _source_finding_key(payload: dict[str, Any]) -> str:
@@ -193,11 +200,12 @@ def _find_existing_inspection(cur, *, platform_id: str, source_inspection_key: s
     return cur.fetchone()
 
 
-def _get_or_create_restaurant(cur, payload: dict[str, Any]) -> tuple[str, int]:
+def _get_or_create_restaurant(cur, *, source_id: str, payload: dict[str, Any]) -> tuple[str, int]:
     restaurant = payload.get("restaurant", {})
     facility_token = _clean_text(payload.get("facility_token")) or _clean_text(
         restaurant.get("facility_token")
     )
+    permit_number = _clean_text(restaurant.get("license_number_raw"))
     location_fingerprint = _location_fingerprint(payload)
     display_name = _clean_text(restaurant.get("restaurant_name_raw")) or "Unknown restaurant"
     address_line1 = _clean_text(restaurant.get("address_raw")) or "Unknown address"
@@ -214,16 +222,34 @@ def _get_or_create_restaurant(cur, payload: dict[str, Any]) -> tuple[str, int]:
             select mri.master_restaurant_id::text as master_restaurant_id
             from master.master_restaurant_identifier mri
             where
+                mri.source_id = %s::uuid
+                and
                 mri.identifier_type = 'facility_token'
                 and mri.identifier_value = %s
             order by mri.created_at
             limit 1
             """,
-            (facility_token,),
+            (source_id, facility_token),
         )
         row = cur.fetchone()
 
-    if row is None:
+    if row is None and permit_number is not None:
+        cur.execute(
+            """
+            select mri.master_restaurant_id::text as master_restaurant_id
+            from master.master_restaurant_identifier mri
+            where
+                mri.source_id = %s::uuid
+                and mri.identifier_type = 'permit_number'
+                and mri.identifier_value = %s
+            order by mri.created_at
+            limit 1
+            """,
+            (source_id, permit_number),
+        )
+        row = cur.fetchone()
+
+    if row is None and facility_token is None and permit_number is None:
         cur.execute(
             """
             select master_restaurant_id::text as master_restaurant_id
@@ -486,7 +512,7 @@ def normalize_inspection_payload(*, source_id: str, payload: dict[str, Any]) -> 
     with get_connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             normalized_count = 0
-            master_restaurant_id, touched = _get_or_create_restaurant(cur, payload)
+            master_restaurant_id, touched = _get_or_create_restaurant(cur, source_id=source_id, payload=payload)
             normalized_count += touched
             normalized_count += _ensure_identifier(
                 cur,

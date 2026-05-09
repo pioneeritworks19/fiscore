@@ -35,6 +35,7 @@ class GeorgiaInspectionDetail:
             "county_name": self.county_name,
             "facility_token": self.facility_token_raw,
             "inspection_id_raw": self.inspection_id_raw,
+            "inspection_source_record_key": self.source_record_key,
             "source_url": source_url,
             "restaurant": {
                 "facility_token": self.facility_token_raw,
@@ -81,6 +82,7 @@ class GeorgiaFinding:
             "inspection_summary": inspection_payload.get("inspection_summary"),
             "facility_token": inspection_payload.get("facility_token"),
             "inspection_id_raw": inspection_payload.get("inspection_id_raw"),
+            "inspection_source_record_key": inspection_payload.get("inspection_source_record_key"),
             "violation_index_raw": self.violation_index_raw,
             "violation_code_raw": self.violation_code_raw,
             "violation_category_raw": self.violation_category_raw,

@@ -70,6 +70,7 @@ from fiscore_backend.ops.repository import (
     list_source_versions_page,
     list_sources,
     list_sources_page,
+    mark_run_failed_manually,
 )
 
 router = APIRouter(prefix="/ops", tags=["ops"])
@@ -1654,7 +1655,9 @@ def _sources_page(
                 f"<td><span class='{_badge_class(source.status)}'>{escape(source.status)}</span></td>"
                 f"<td><span class='{_badge_class(source.last_run_status)}'>{escape(source.last_run_status or 'never run')}</span>"
                 f"{f'<br>{_meta_text(source.last_run_mode)}' if source.last_run_mode else ''}</td>"
-                f"<td>{_display(source.latest_success_at)}</td>"
+                f"<td>{_display(source.latest_success_at)}"
+                f"{f'<br><span class=\"{_badge_class(source.latest_success_run_status)}\">{escape(source.latest_success_run_status)}</span>' if source.latest_success_run_status else ''}"
+                f"{f'<br>{_meta_text(source.latest_success_run_mode)}' if source.latest_success_run_mode else ''}</td>"
                 f"<td>{_display(source.freshness_age_days)}</td>"
                 f"<td class='action-cell'>{run_form}</td></tr>"
             )
@@ -1780,6 +1783,15 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
     )
     run_state_banner = (
         "<div class='badge warn' style='display:inline-flex; margin-top:8px;'>Run is still active. Counts below update from live ingestion writes.</div>"
+        if is_running
+        else ""
+    )
+    mark_failed_form = (
+        f"<form method='post' action='/ops/control-panel/runs/{escape(scrape_run_id)}/mark-failed' class='inline-form' "
+        "onsubmit=\"return confirm('Mark this run as failed? Use this only when the worker is no longer actually running.');\">"
+        "<input type='hidden' name='reason' value='Manually marked failed from ops UI after the run appeared stuck.' />"
+        "<button type='submit' class='button secondary'>Mark Failed</button>"
+        "</form>"
         if is_running
         else ""
     )
@@ -1950,6 +1962,7 @@ def _run_detail_page(scrape_run_id: str, *, tab: str | None = None) -> str:
         {run_state_banner}
       </div>
       <div class="actions">
+        {mark_failed_form}
         <a class="button secondary" href="{_build_url('/ops/control-panel/master-data/inspections', scrape_run_id=detail.run.scrape_run_id)}">Resulting master records</a>
         <a class="button secondary" href="/ops/control-panel/runs">Back to runs</a>
       </div>
@@ -2690,6 +2703,16 @@ def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None 
             entry.findings,
             key=lambda finding: (_severity_sort_key(finding.severity), finding.finding_order or 999999),
         )
+        report_href = inspection.report_url or next(
+            (report.source_file_url for report in entry.reports if report.source_file_url),
+            None,
+        )
+        report_chip = (
+            f"<a class='info-chip' href='{escape(report_href, quote=True)}' target='_blank' rel='noopener noreferrer'>"
+            f"Report {escape(inspection.report_availability_status or 'available')}</a>"
+            if report_href
+            else f"<span class='info-chip'>Report {escape(inspection.report_availability_status or 'missing')}</span>"
+        )
         finding_blocks: list[str] = []
         for finding in sorted_findings:
             severity_slug = (finding.severity or "").strip().lower()
@@ -2752,7 +2775,7 @@ def _admin_restaurant_detail_page(master_restaurant_id: str, *, tab: str | None 
                   {f"<span class='info-chip'>Score {escape(score_text)}</span>" if score_text else ""}
                   {f"<span class='info-chip'>Grade {escape(inspection.grade)}</span>" if inspection.grade else ""}
                   {f"<span class='info-chip'>Status {escape(inspection.official_status)}</span>" if inspection.official_status else ""}
-                  <span class="info-chip">Report {escape(inspection.report_availability_status or 'missing')}</span>
+                  {report_chip}
                 </div>
                 <div class="finding-list">
                   {''.join(finding_blocks) if finding_blocks else "<div class='muted'>No findings linked to this inspection.</div>"}
@@ -3195,6 +3218,18 @@ def control_panel_runs(
 @router.get("/control-panel/runs/{scrape_run_id}", response_class=HTMLResponse, include_in_schema=False)
 def control_panel_run_detail(scrape_run_id: str, tab: str | None = None) -> str:
     return _run_detail_page(scrape_run_id, tab=tab)
+
+
+@router.post("/control-panel/runs/{scrape_run_id}/mark-failed", include_in_schema=False)
+def control_panel_mark_run_failed(
+    scrape_run_id: str,
+    reason: str = Form("Manually marked failed from ops UI after the run appeared stuck."),
+) -> RedirectResponse:
+    detail = get_run_detail(scrape_run_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Run {scrape_run_id} was not found.")
+    mark_run_failed_manually(scrape_run_id, issue_message=reason)
+    return RedirectResponse(url=f"/ops/control-panel/runs/{scrape_run_id}?tab=issues", status_code=303)
 
 
 @router.get("/control-panel/master-data", response_class=HTMLResponse, include_in_schema=False)

@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import date, datetime
 
 from fiscore_backend.config import get_settings
 from fiscore_backend.ingestion.core.artifact_index import create_raw_artifact_index
@@ -26,6 +27,20 @@ from fiscore_backend.models import WorkerRunRequest, WorkerRunResponse
 from fiscore_backend.storage import RawArtifactStorage, hash_bytes, hash_text
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_georgia_inspection_date(raw_value: str | None) -> date | None:
+    if not raw_value:
+        return None
+    cleaned = raw_value.strip()
+    if not cleaned:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%m-%d-%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(cleaned, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 class GeorgiaHealthInspectionsAdapter:
@@ -306,6 +321,25 @@ class GeorgiaHealthInspectionsAdapter:
                             )
                             continue
 
+                        filtered_inspections = detail_parse.inspections
+                        if run_plan.date_from or run_plan.date_to:
+                            filtered_inspections = []
+                            for inspection_record in detail_parse.inspections:
+                                inspection_date = _parse_georgia_inspection_date(
+                                    inspection_record.inspection.inspection_date_raw
+                                )
+                                if inspection_date is None:
+                                    filtered_inspections.append(inspection_record)
+                                    continue
+                                if run_plan.date_from and inspection_date < run_plan.date_from:
+                                    continue
+                                if run_plan.date_to and inspection_date > run_plan.date_to:
+                                    continue
+                                filtered_inspections.append(inspection_record)
+
+                        if not filtered_inspections:
+                            continue
+
                         for history_warning in detail_parse.warnings:
                             record_warning(
                                 category="parse",
@@ -318,7 +352,7 @@ class GeorgiaHealthInspectionsAdapter:
                                 source_url=detail_artifact.source_url,
                             )
 
-                        for inspection_record in detail_parse.inspections:
+                        for inspection_record in filtered_inspections:
                             inspection_payload = inspection_record.inspection.to_payload(
                                 source_url=detail_artifact.source_url
                             )

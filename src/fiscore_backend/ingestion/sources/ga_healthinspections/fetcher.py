@@ -44,6 +44,7 @@ class JsonArtifact:
     content: str
     content_type: str
     county_name: str | None = None
+    page_number: int | None = None
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,21 @@ def _clean_text(value: str | None) -> str | None:
 
 def _encode_api_value(value: str | None) -> str:
     return b64encode((value or "").encode("utf-8")).decode("ascii")
+
+
+def _extract_api_rows(raw_text: str) -> list[dict[str, Any]] | None:
+    try:
+        payload = json.loads(raw_text)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if isinstance(payload, dict):
+        for key in ("data", "results", "items", "facilities"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    return None
 
 
 def _find_select_near_text(soup: BeautifulSoup, text: str):
@@ -302,16 +318,27 @@ class GeorgiaHealthInspectionsFetcher:
             county_name=run_plan.request_context.get("county_name"),
         )
         for partition in partitions:
-            artifacts.append(
-                self.fetch_search_api_partition_result(
+            page_number = 0
+            seen_payloads: set[str] = set()
+            while True:
+                artifact = self.fetch_search_api_partition_result(
                     landing_url=landing_url,
                     search_config=search_config,
                     partition=partition,
                     date_from=run_plan.date_from,
                     date_to=run_plan.date_to,
                     permit_type_value=permit_type_value or "Food Service",
+                    page_number=page_number,
                 )
-            )
+                payload_signature = artifact.content.strip()
+                if payload_signature in seen_payloads:
+                    break
+                seen_payloads.add(payload_signature)
+                rows = _extract_api_rows(artifact.content)
+                if rows is None or not rows:
+                    break
+                artifacts.append(artifact)
+                page_number += 1
         return artifacts
 
     def _resolve_target_partitions(
@@ -340,6 +367,7 @@ class GeorgiaHealthInspectionsFetcher:
         date_from: date | None,
         date_to: date | None,
         permit_type_value: str,
+        page_number: int,
     ) -> JsonArtifact:
         payload: dict[str, Any] = {
             "permitType": _encode_api_value(permit_type_value),
@@ -355,7 +383,7 @@ class GeorgiaHealthInspectionsFetcher:
         encoded_payload = quote(json.dumps(payload, separators=(",", ":")))
         api_url = urljoin(
             landing_url,
-            f"/stateofgeorgia/API/index.cfm/search/{encoded_payload}/0",
+            f"/stateofgeorgia/API/index.cfm/search/{encoded_payload}/{page_number}",
         )
         response = self.client.get(
             api_url,
@@ -369,10 +397,11 @@ class GeorgiaHealthInspectionsFetcher:
         filename_suffix = (partition.county_name or "statewide").lower().replace(" ", "_")
         return JsonArtifact(
             source_url=str(response.url),
-            filename=f"search_results_{filename_suffix}.json",
+            filename=f"search_results_{filename_suffix}_{page_number:03d}.json",
             content=response.text,
             content_type=response.headers.get("content-type", "application/json"),
             county_name=partition.county_name,
+            page_number=page_number,
         )
 
     def fetch_detail_page(self, detail_url: str) -> SearchPageArtifact:

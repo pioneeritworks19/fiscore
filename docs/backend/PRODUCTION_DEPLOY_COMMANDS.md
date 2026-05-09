@@ -16,6 +16,17 @@ For the full rollout and validation checklist, also see:
 
 ## Production Worker Deploy
 
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy_worker.ps1 `
+  -ProjectId "fiscore-prod" `
+  -Region "us-central1" `
+  -Repository "fiscore" `
+  -ServiceName "fiscore-worker" `
+  -ImageName "fiscore-worker" `
+  -CloudSqlConnectionName "fiscore-prod:us-central1:fiscore-prod-pg" `
+  -RuntimeServiceAccount "fiscore-runtime@fiscore-prod.iam.gserviceaccount.com" `
+  -Environment "prod"
+
+
 ```cmd
 powershell -ExecutionPolicy Bypass -File .\scripts\deploy_worker.ps1 ^
   -ProjectId "fiscore-prod" ^
@@ -29,6 +40,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy_worker.ps1 ^
 ```
 
 ## Production API Deploy
+
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy_api.ps1 `
+  -ProjectId "fiscore-prod" `
+  -Region "us-central1" `
+  -Repository "fiscore" `
+  -ServiceName "fiscore-api" `
+  -ImageName "fiscore-api" `
+  -CloudSqlConnectionName "fiscore-prod:us-central1:fiscore-prod-pg" `
+  -RuntimeServiceAccount "fiscore-runtime@fiscore-prod.iam.gserviceaccount.com" `
+  -Environment "prod" `
+  -WorkerUrl "https://fiscore-worker-486523213378.us-central1.run.app"
+
 
 ```cmd
 powershell -ExecutionPolicy Bypass -File .\scripts\deploy_api.ps1 ^
