@@ -64,7 +64,7 @@ Showing prior answers and using smart pre-fill should reduce effort, but the cur
 
 FiScore should support both:
 
-- system templates owned by FiScore and made available across tenants
+- library templates owned by FiScore and made available across tenants
 - custom checklists and forms created by tenant users
 
 Examples of pre-built template categories:
@@ -96,9 +96,9 @@ Each checklist template should include:
 
 Suggested source values:
 
-- `fiscore_prebuilt`
+- `library_synced`
+- `library_copied`
 - `tenant_custom`
-- `tenant_cloned_from_prebuilt`
 
 ### Assigned Scope
 
@@ -106,7 +106,7 @@ Template ownership and availability should be understood separately.
 
 Ownership:
 
-- `system template`
+- `library template`
   owned by FiScore and available across tenants
 - `tenant template`
   owned by a tenant and available only inside that tenant
@@ -115,8 +115,31 @@ Availability:
 
 - a tenant template may be available to all sites in that tenant
 - a tenant template may be restricted to selected sites in that tenant
-- a FiScore system template should not be directly assigned to sites globally at the source definition layer
+- a FiScore library template should not be directly assigned to sites globally at the source definition layer
 - if site assignment is needed for a FiScore template, that assignment should happen in the tenant's adopted copy or tenant-side enablement record
+
+### Library Adoption Model
+
+When a tenant starts from FiScore library content, the product should support two explicit paths:
+
+- `Synced from Library`
+- `Created from Library`
+
+`Synced from Library` means:
+
+- the tenant checklist is tenant-owned
+- it stays linked to a FiScore library template and source version
+- future library versions may be surfaced as `Update available`
+- the tenant chooses when to adopt the new version
+- the tenant may later detach from the library link if it wants to diverge permanently
+
+`Created from Library` means:
+
+- the tenant checklist is tenant-owned
+- it starts from a one-time copy of the library template
+- no future library sync is expected
+
+The product should avoid having tenant audits execute directly against live FiScore library template records.
 
 Templates may therefore be assigned at:
 
@@ -149,6 +172,7 @@ Without versioning, historical audits become unreliable because:
 - new edits to a published checklist should create a new version rather than silently modifying history
 - when a new version is published, it should become the active published version for future audits
 - new audits and new audit schedules should use the currently published version, not an unpublished draft version
+- if a tenant checklist is synced from a library template, library version upgrades should create or activate a newer tenant version rather than mutating the version already used by historical audits
 
 ### Authoring and Publish Model
 

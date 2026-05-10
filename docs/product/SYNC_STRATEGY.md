@@ -68,6 +68,7 @@ The following workflows may have limited offline support in version 1:
 - Pulling newly available restaurants not yet synced to the device
 - Loading large analytics datasets beyond the cached range
 - Media-heavy uploads if files are large and connectivity is poor
+- Library update review and apply flows for checklist and training content
 
 ## Data Model Expectations
 
@@ -92,6 +93,16 @@ For high-value compliance workflows, it is also useful to maintain:
 - `closedAt` / `closedBy`: violation closure traceability
 - `reopenedAt` / `reopenedBy`: reopening traceability
 
+For library-derived tenant content, it is also useful to maintain:
+
+- `libraryTemplateId` or `libraryTrainingId`
+- `libraryVersion`
+- `syncMode`
+- `syncStatus`
+- `lastSyncedAt`
+- `updateAvailable`
+- `detachedFromLibraryAt`
+
 ## Local Storage Strategy
 
 FiScore should maintain a local database on the device for offline access and queued writes.
@@ -105,6 +116,13 @@ Recommended local storage responsibilities:
 - Persist queue state across app restarts and device sleep
 
 For Flutter, this usually means using a local persistence layer in addition to Firebase's built-in capabilities, especially if the app needs explicit sync state, operation queues, and conflict handling beyond default last-write-wins behavior.
+
+Library-derived tenant content should also cache:
+
+- the active tenant-owned version
+- the source library version last adopted
+- whether a newer library version is available
+- whether the tenant item is detached from future library updates
 
 ## Synchronization Model
 
@@ -168,6 +186,8 @@ Conflict detection should happen on records such as:
 - audit results
 - corrective actions
 - assignments
+- tenant checklist templates derived from the library
+- tenant training records derived from the library
 
 ## Conflict Resolution Strategy
 
@@ -203,6 +223,7 @@ These should trigger a conflict review flow when edited concurrently:
 - corrective action completion state
 - audit completion sign-off
 - any record with compliance significance or downstream reporting impact
+- applying a newer library version onto a tenant record that also has meaningful local edits
 
 ## Recommended Business Rules
 
@@ -214,6 +235,9 @@ To keep sync behavior predictable in version 1, the app should adopt explicit ru
 - Notes should append rather than overwrite where possible
 - Checklist responses should be field-based rather than whole-record replacement
 - Analytics should be derived from synced source data, not treated as the source of truth
+- Library-derived tenant templates should upgrade through explicit version adoption, not silent live mirroring
+- Tenant records with `updateAvailable = true` should remain usable until the tenant actively upgrades or detaches
+- Audits and training assignments should remain tied to the exact tenant version they started with, even if a newer library-derived tenant version becomes available later
 
 ## User Experience Requirements
 
@@ -253,6 +277,7 @@ Examples:
 - no connectivity
 - timeouts
 - transient Firebase service issues
+- library version metadata fetched but full upgrade application deferred
 
 Handling:
 
@@ -268,6 +293,7 @@ Examples:
 - restaurant access removed
 - invalid state transition
 - record deleted or archived remotely in a conflicting way
+- library update blocked because the tenant item has conflicting local edits requiring review
 
 Handling:
 
@@ -347,4 +373,3 @@ These decisions should be finalized before deep implementation:
 ## Summary
 
 FiScore should be built as an offline-first system where user trust is protected through immediate local saves, durable queued synchronization, explicit sync status, and careful conflict handling. The design should prioritize predictability and traceability over aggressive automatic merging for compliance-relevant data.
-

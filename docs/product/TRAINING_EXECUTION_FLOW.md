@@ -6,7 +6,7 @@ This document defines the setup and execution flow for the FiScore Training modu
 
 It covers:
 
-- FiScore system training versus tenant training
+- FiScore library training versus tenant training
 - training creation, editing, and publishing
 - training assignment
 - trainee completion flow
@@ -26,9 +26,9 @@ Training should help teams:
 
 FiScore should support two main training sources.
 
-### 1. System Training
+### 1. Library Training
 
-System training is FiScore-provided content that can be used across tenants.
+Library training is FiScore-provided content that can be used across tenants.
 
 Examples:
 
@@ -98,11 +98,28 @@ Recommended user outcomes:
 - filter by type
 - review training details before assignment
 
+When a tenant starts from FiScore Library content, the product should support two explicit creation modes:
+
+- `Synced from Library`
+- `Created from Library`
+
+`Synced from Library` means:
+
+- the tenant gets a tenant-owned training record linked to the source library item
+- newer library versions can surface as `Update available`
+- the tenant chooses when to adopt the newer version
+- the tenant may later detach from the library relationship
+
+`Created from Library` means:
+
+- the tenant gets a one-time tenant-owned copy
+- no future sync is expected
+
 ## 1. Training Setup Flow
 
 ### Goal
 
-Allow FiScore system training to be available across tenants and allow tenants to create and manage their own training content.
+Allow FiScore library training to be available across tenants and allow tenants to create and manage their own training content.
 
 ### Recommended user roles
 
@@ -121,6 +138,20 @@ Users should be able to enter training setup from:
 - training library
 - tenant administration or content area
 - assignment flow when they realize a needed training item does not yet exist
+
+### Recommended setup actions
+
+From the library, users should be able to choose:
+
+- `Assign`
+- `Synced from Library`
+- `Created from Library`
+
+`Assign` is appropriate when the tenant is comfortable using the current tenant-active version immediately.
+
+`Synced from Library` is appropriate when the tenant wants FiScore to keep offering newer library versions over time.
+
+`Created from Library` is appropriate when the tenant wants a starting point with no future update linkage.
 
 ## 2. Create Tenant Training Flow
 
@@ -189,6 +220,7 @@ If the training is already assigned and the content change is meaningful, FiScor
 - users already in progress remain on their assigned version
 - completed assignments remain tied to their completed version
 - new assignments use the newest active version
+- if the training is synced from the library, adopting a newer library version should update future tenant versions only, not existing assignments
 
 ## 4. Publish or Activate Training Flow
 
@@ -208,6 +240,7 @@ Make training available for assignment.
 - `active` training should be assignable
 - if a newer version is published, new assignments should use that newer version
 - existing assignments should remain linked to the earlier assigned version
+- library-linked training should upgrade through an explicit tenant action rather than silent live mirroring
 
 ## 5. Quick Check Setup Flow
 
@@ -438,6 +471,8 @@ Managers should eventually be able to answer:
 - separate FiScore and tenant content clearly
 - make training type and duration easy to scan
 - show assignable status clearly
+- show whether a tenant item is `Synced from Library`, `Created from Library`, or `Tenant Custom`
+- show `Update available` when a newer library version exists for a synced tenant item
 
 ### Training Detail
 
@@ -462,4 +497,4 @@ Managers should eventually be able to answer:
 
 ## Summary
 
-FiScore training in version 1 should support two content sources, two training types, manager-driven assignment, simple completion tracking, optional lightweight quick checks, and reporting tied back to sites, violations, and audits. The experience should stay practical and intuitive rather than growing into a full LMS.
+FiScore training in version 1 should support two content sources, two training types, manager-driven assignment, simple completion tracking, optional lightweight quick checks, and reporting tied back to sites, violations, and audits. Library content should be presented as FiScore Library rather than live system-owned records inside tenant workflows, and tenants should be able to either stay synced to library updates or create detached one-time copies. The experience should stay practical and intuitive rather than growing into a full LMS.

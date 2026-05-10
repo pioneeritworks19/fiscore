@@ -31,10 +31,19 @@ FiScore should support two main training types.
 
 FiScore should also support two training content sources:
 
-- `system training`
-  FiScore-provided training available across tenants
+- `library training`
+  FiScore-provided training available across tenants through the FiScore Library
 - `tenant training`
   tenant-created training available only within that tenant
+
+When a tenant starts from FiScore Library content, version 1 should support two tenant-facing modes:
+
+- `Synced from Library`
+- `Created from Library`
+
+`Synced from Library` means the tenant has a tenant-owned training record linked to the source library item and can later adopt newer library versions.
+
+`Created from Library` means the tenant receives a one-time tenant-owned copy with no future sync behavior.
 
 ## Training Versioning
 
@@ -52,6 +61,7 @@ If training content changes after users have already been assigned or have start
 - existing assignments should remain tied to the version they were assigned
 - in-progress users should finish the version they started
 - completed history should remain tied to the version that was completed
+- library-linked upgrades should create or activate a newer tenant version for future assignments rather than silently modifying in-progress or completed assignments
 
 ### Version 1 positioning
 

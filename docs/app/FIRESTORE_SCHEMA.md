@@ -404,6 +404,13 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - `templateSource`
 - `templateScope`
 - `sourceTemplateId`
+- `libraryTemplateId`
+- `libraryVersion`
+- `syncMode`
+- `syncStatus`
+- `lastSyncedAt`
+- `updateAvailable`
+- `detachedFromLibraryAt`
 - `ownerUserId`
 - `ownerDisplayNameSnapshot`
 - `tagIds`
@@ -434,18 +441,33 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - `assignedSiteIds` should be treated as a tenant-side availability control
 - if `assignedSiteIds` is empty or omitted, the template is available to all sites in that tenant
 - if `assignedSiteIds` is populated, the template is restricted to those sites
-- FiScore-owned system templates should be represented either through tenant-adopted copies or tenant-side enablement records before site assignment is applied
+- FiScore-owned library templates should be represented through tenant-owned copies or tenant-side enablement records before site assignment is applied
+- tenant audits should never execute directly against mutable library records
+- synced library upgrades should create or activate a newer tenant version for future audits rather than mutating the tenant version already tied to historical audits
 
 ### Suggested `templateSource` values
 
-- `fiscore_prebuilt`
+- `library_synced`
+- `library_copied`
 - `tenant_custom`
-- `tenant_cloned_from_prebuilt`
 
 ### Suggested `templateScope` values
 
-- `system`
+- `library`
 - `tenant`
+
+### Suggested `syncMode` values
+
+- `synced_from_library`
+- `created_from_library`
+- `tenant_custom`
+
+### Suggested `syncStatus` values
+
+- `up_to_date`
+- `update_available`
+- `detached`
+- `never_synced`
 
 ## 9. Checklist Sections
 
@@ -1185,6 +1207,13 @@ Stores training content metadata available to the tenant.
 - `description`
 - `trainingSource`
 - `version`
+- `libraryTrainingId`
+- `libraryVersion`
+- `syncMode`
+- `syncStatus`
+- `lastSyncedAt`
+- `updateAvailable`
+- `detachedFromLibraryAt`
 - `trainingType`
 - `durationMinutes`
 - `topicIds`
@@ -1196,13 +1225,27 @@ Stores training content metadata available to the tenant.
 
 ### Suggested `trainingSource` values
 
-- `fiscore_system`
+- `library_synced`
+- `library_copied`
 - `tenant_custom`
 
 ### Suggested `trainingType` values
 
 - `full_course`
 - `micro_learning`
+
+### Suggested `syncMode` values
+
+- `synced_from_library`
+- `created_from_library`
+- `tenant_custom`
+
+### Suggested `syncStatus` values
+
+- `up_to_date`
+- `update_available`
+- `detached`
+- `never_synced`
 
 ## 20B. Training Topics
 
@@ -1265,6 +1308,7 @@ Stores assignments of training to users for operational remediation or improveme
 - `linkedRiskArea` should usually come from the training item or be derived from source context rather than typed manually during assignment
 - `trainingVersion` should preserve which version the user was assigned
 - existing assignments should remain tied to their assigned version even if a newer training version becomes active later
+- library-linked training upgrades should affect future assignments only after the tenant adopts the newer tenant version
 
 ## 20D. Training Progress
 

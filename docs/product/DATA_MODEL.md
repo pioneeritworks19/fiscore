@@ -233,6 +233,15 @@ Suggested fields:
 - `name`
 - `description`
 - `category`
+- `templateSource`
+- `templateScope`
+- `libraryTemplateId`
+- `libraryVersion`
+- `syncMode`
+- `syncStatus`
+- `lastSyncedAt`
+- `updateAvailable`
+- `detachedFromLibraryAt`
 - `status`
 - `version`
 - `isActive`
@@ -252,6 +261,35 @@ Important notes:
 
 - Each checklist template should be versioned
 - Historical audits should reference the exact template version used
+- Tenant audits should execute against tenant-owned checklist records, not live library records
+- Library-derived tenant templates should support two adoption modes:
+  - `synced_from_library`
+  - `created_from_library`
+- Synced library upgrades should create or activate a newer tenant version for future audits rather than mutating the version already tied to historical audits
+
+Suggested `templateSource` values:
+
+- `library_synced`
+- `library_copied`
+- `tenant_custom`
+
+Suggested `templateScope` values:
+
+- `library`
+- `tenant`
+
+Suggested `syncMode` values:
+
+- `synced_from_library`
+- `created_from_library`
+- `tenant_custom`
+
+Suggested `syncStatus` values:
+
+- `up_to_date`
+- `update_available`
+- `detached`
+- `never_synced`
 
 ## 7. Checklist Section
 
@@ -908,7 +946,16 @@ Suggested fields:
 - `tenantId`
 - `title`
 - `description`
+- `trainingSource`
+- `libraryTrainingId`
+- `libraryVersion`
+- `syncMode`
+- `syncStatus`
+- `lastSyncedAt`
+- `updateAvailable`
+- `detachedFromLibraryAt`
 - `trainingType`
+- `version`
 - `durationMinutes`
 - `topicIds`
 - `relatedRiskAreas`
@@ -921,6 +968,30 @@ Suggested `trainingType` values:
 
 - `full_course`
 - `micro_learning`
+
+Suggested `trainingSource` values:
+
+- `library_synced`
+- `library_copied`
+- `tenant_custom`
+
+Suggested `syncMode` values:
+
+- `synced_from_library`
+- `created_from_library`
+- `tenant_custom`
+
+Suggested `syncStatus` values:
+
+- `up_to_date`
+- `update_available`
+- `detached`
+- `never_synced`
+
+Important notes:
+
+- Tenant assignments should always reference a tenant-owned training record and version
+- Library-linked training upgrades should affect future assignments only after the tenant adopts the newer tenant version
 
 ## 26B. Training Topic
 
@@ -945,6 +1016,7 @@ Suggested fields:
 - `tenantId`
 - `siteId`
 - `trainingId`
+- `trainingVersion`
 - `assignedTo`
 - `assignedBy`
 - `dueDate`
@@ -964,6 +1036,11 @@ Suggested `status` values:
 - `completed`
 - `overdue`
 - `cancelled`
+
+Important notes:
+
+- `trainingVersion` should preserve the exact version assigned
+- In-progress and completed assignments should remain tied to that version even if a newer tenant version later becomes active
 
 ## 26D. Training Progress
 
@@ -1126,6 +1203,7 @@ These items still need product and engineering decisions:
 - how much attachment metadata is stored locally versus only in cloud records
 - whether review decisions are separate documents or part of violation history
 - how aggressively to normalize imported government inspection data
+- whether synced library updates should support limited tenant-local overrides in version 1 or require a detach-before-edit rule for materially changed content
 
 ## Summary
 

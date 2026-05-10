@@ -4,6 +4,11 @@ FiScore is a food safety and restaurant inspection management platform designed 
 
 The primary experience is a mobile app for iOS and Android, supported by a lighter companion web app. FiScore is built with Flutter and Firebase.
 
+FiScore also includes two distinct internal product surfaces:
+
+- FiScore Admin App for library content and product governance
+- Ops Console for ingestion and master-data operations
+
 ## How To Use This Folder
 
 This folder mixes product overview material and deeper product design references.
@@ -44,6 +49,18 @@ Specialized reference doc:
   [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
 - training execution flow:
   [TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
+- notification flow:
+  [NOTIFICATION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\NOTIFICATION_FLOW.md)
+- device strategy:
+  [DEVICE_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DEVICE_STRATEGY.md)
+- content management model:
+  [CONTENT_MANAGEMENT_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\CONTENT_MANAGEMENT_MODEL.md)
+- library content sync flow:
+  [LIBRARY_CONTENT_SYNC_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\LIBRARY_CONTENT_SYNC_FLOW.md)
+- FiScore Admin App:
+  [FISCORE_ADMIN_APP.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FISCORE_ADMIN_APP.md)
+- FiScore Admin App authentication:
+  [FISCORE_ADMIN_AUTH.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FISCORE_ADMIN_AUTH.md)
 - onboarding flow:
   [ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
 - team invite flow:
@@ -114,6 +131,12 @@ The core product design documents in this folder include:
 - [VIOLATION_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\VIOLATION_EXECUTION_FLOW.md)
 - [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
 - [TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
+- [NOTIFICATION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\NOTIFICATION_FLOW.md)
+- [DEVICE_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DEVICE_STRATEGY.md)
+- [CONTENT_MANAGEMENT_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\CONTENT_MANAGEMENT_MODEL.md)
+- [LIBRARY_CONTENT_SYNC_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\LIBRARY_CONTENT_SYNC_FLOW.md)
+- [FISCORE_ADMIN_APP.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FISCORE_ADMIN_APP.md)
+- [FISCORE_ADMIN_AUTH.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FISCORE_ADMIN_AUTH.md)
 - [ONBOARDING_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\ONBOARDING_FLOW.md)
 - [TEAM_INVITE_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TEAM_INVITE_FLOW.md)
 
