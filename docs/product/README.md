@@ -53,6 +53,8 @@ Specialized reference doc:
   [NOTIFICATION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\NOTIFICATION_FLOW.md)
 - device strategy:
   [DEVICE_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DEVICE_STRATEGY.md)
+- mobile platform support:
+  [MOBILE_PLATFORM_SUPPORT.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\MOBILE_PLATFORM_SUPPORT.md)
 - content management model:
   [CONTENT_MANAGEMENT_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\CONTENT_MANAGEMENT_MODEL.md)
 - library content sync flow:
@@ -133,6 +135,7 @@ The core product design documents in this folder include:
 - [TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
 - [NOTIFICATION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\NOTIFICATION_FLOW.md)
 - [DEVICE_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DEVICE_STRATEGY.md)
+- [MOBILE_PLATFORM_SUPPORT.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\MOBILE_PLATFORM_SUPPORT.md)
 - [CONTENT_MANAGEMENT_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\CONTENT_MANAGEMENT_MODEL.md)
 - [LIBRARY_CONTENT_SYNC_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\LIBRARY_CONTENT_SYNC_FLOW.md)
 - [FISCORE_ADMIN_APP.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FISCORE_ADMIN_APP.md)
