@@ -126,6 +126,10 @@ def _parse_date(value: str | None) -> date | None:
     cleaned = _clean_text(value)
     if cleaned is None:
         return None
+    if "T" in cleaned:
+        cleaned = cleaned.split("T", 1)[0]
+    elif " " in cleaned:
+        cleaned = cleaned.split(" ", 1)[0]
     return date.fromisoformat(cleaned)
 
 
@@ -176,6 +180,26 @@ def _find_existing_inspection(cur, *, platform_id: str, source_inspection_key: s
         (platform_id, source_inspection_key),
     )
     return cur.fetchone()
+
+
+def find_existing_source_inspection_keys(*, source_id: str, source_inspection_keys: list[str]) -> set[str]:
+    cleaned_keys = [key for key in source_inspection_keys if _clean_text(key)]
+    if not cleaned_keys:
+        return set()
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select source_inspection_key
+                from master.master_inspection
+                where source_id = %s::uuid
+                  and source_inspection_key = any(%s::text[])
+                """,
+                (source_id, cleaned_keys),
+            )
+            rows = cur.fetchall()
+    return {str(row[0]) for row in rows}
 
 
 def _get_or_create_restaurant(cur, payload: dict[str, Any]) -> tuple[str, int]:

@@ -21,7 +21,7 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> G
     county_name = source.source_config.get("county_name")
 
     if run_mode == "backfill":
-        backfill_start = today - timedelta(days=730)
+        backfill_start = date(2025, 1, 1)
         return GeorgiaRunPlan(
             run_mode=run_mode,
             strategy="county_scoped_recent_history_backfill",
@@ -39,7 +39,7 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> G
                 "to_date": today.isoformat(),
                 "notes": (
                     "Georgia county sources should resolve a single county option from the landing "
-                    "page and run that county with a bounded rolling two-year window to avoid "
+                    "page and run that county with a bounded 2025-current window to avoid "
                     "API failures on unbounded backfill queries."
                 ),
             },

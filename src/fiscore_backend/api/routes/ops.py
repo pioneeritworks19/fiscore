@@ -321,21 +321,25 @@ def get_admin_restaurants(
     q: str | None = None,
     page: int = 1,
     page_size: int = 100,
+    platform_slug: str | None = None,
     state_code: str | None = None,
     city: str | None = None,
     status: str | None = None,
     source_slug: str | None = None,
     has_inspections: bool | None = None,
+    has_source_links: bool | None = None,
 ) -> list[OpsMasterRestaurantSummary]:
     return list_admin_restaurants_page(
         page=page,
         page_size=page_size,
         query=q,
+        platform_slug=platform_slug,
         state_code=state_code,
         city=city,
         status=status,
         source_slug=source_slug,
         has_inspections=has_inspections,
+        has_source_links=has_source_links,
     )[0]
 
 
@@ -649,14 +653,24 @@ def _source_status_filter_select(current: str | None) -> str:
     return f"<select name='status'>{''.join(rendered)}</select>"
 
 
-def _source_filter_select(current: str | None) -> str:
-    options = ['<option value="">All sources</option>']
-    for source in list_sources(limit=250):
-        selected = "selected" if source.source_slug == current else ""
-        options.append(
-            f"<option value='{escape(source.source_slug)}' {selected}>{escape(source.source_name)} ({escape(source.source_slug)})</option>"
+def _source_filter_select(current: str | None, *, platform_slug: str | None = None) -> str:
+    sources = list_sources(limit=1000, platform_slug=platform_slug)
+    list_id = "source-slug-options"
+    options = [
+        (
+            f"<option value='{escape(source.source_slug)}' "
+            f"label='{escape(source.source_name)} | {escape(source.platform_name)}'></option>"
         )
-    return f"<select name='source_slug'>{''.join(options)}</select>"
+        for source in sources
+    ]
+    placeholder = "Source slug"
+    if platform_slug:
+        placeholder = "Source slug within selected platform"
+    return (
+        f"<input class='control-grow' type='search' name='source_slug' value='{escape(current or '')}' "
+        f"placeholder='{escape(placeholder)}' list='{list_id}' />"
+        f"<datalist id='{list_id}'>{''.join(options)}</datalist>"
+    )
 
 
 def _checkbox_field(*, name: str, label: str, checked: bool) -> str:
@@ -1639,6 +1653,25 @@ def _sources_page(
     for (group_slug, group_name), group_sources in grouped.items():
         rows = []
         for source in group_sources:
+            borough_scope_field = ""
+            skip_existing_field = ""
+            if source.source_slug == "nyc_dohmh_restaurant_inspections":
+                borough_scope_field = (
+                    "<select name='borough_scope'>"
+                    "<option value='all'>All boroughs</option>"
+                    "<option value='Bronx'>Bronx</option>"
+                    "<option value='Brooklyn'>Brooklyn</option>"
+                    "<option value='Manhattan'>Manhattan</option>"
+                    "<option value='Queens'>Queens</option>"
+                    "<option value='Staten Island'>Staten Island</option>"
+                    "</select>"
+                )
+                skip_existing_field = (
+                    "<label class='inline-checkbox'>"
+                    "<input type='checkbox' name='skip_existing_inspections' value='true' checked />"
+                    "<span>Skip loaded inspections</span>"
+                    "</label>"
+                )
             run_form = (
                 f"<form class='run-form' method='post' action='/ops/control-panel/sources/{escape(source.source_slug)}/run'>"
                 "<select name='run_mode'>"
@@ -1646,6 +1679,8 @@ def _sources_page(
                 "<option value='reconciliation'>reconciliation</option>"
                 "<option value='backfill'>backfill</option>"
                 "</select>"
+                f"{borough_scope_field}"
+                f"{skip_existing_field}"
                 "<button type='submit'>Run</button>"
                 "</form>"
             )
@@ -2568,21 +2603,25 @@ def _admin_restaurants_page(
     q: str | None,
     page: int,
     page_size: int,
+    platform_slug: str | None,
     state_code: str | None,
     city: str | None,
     status: str | None,
     source_slug: str | None,
     has_inspections: bool | None,
+    has_source_links: bool | None,
 ) -> str:
     restaurants, total_count = list_admin_restaurants_page(
         page=page,
         page_size=page_size,
         query=q,
+        platform_slug=platform_slug,
         state_code=state_code,
         city=city,
         status=status,
         source_slug=source_slug,
         has_inspections=has_inspections,
+        has_source_links=has_source_links,
     )
     rows = [
         (
@@ -2601,17 +2640,23 @@ def _admin_restaurants_page(
     for option, label in (("true", "Has inspections"), ("false", "No inspections")):
         selected = "selected" if ((option == "true" and has_inspections is True) or (option == "false" and has_inspections is False)) else ""
         inspection_options.append(f"<option value='{option}' {selected}>{label}</option>")
+    linkage_options = ["<option value=''>All linkage states</option>"]
+    for option, label in (("true", "Linked to source"), ("false", "Unlinked")):
+        selected = "selected" if ((option == "true" and has_source_links is True) or (option == "false" and has_source_links is False)) else ""
+        linkage_options.append(f"<option value='{option}' {selected}>{label}</option>")
     toolbar = _search_form(
         "/ops/control-panel/admin/restaurants",
         q=q,
         page_size=page_size,
         placeholder="Search restaurant name, address, city, zip, or identifier",
         extra_fields=(
+            f"{_platform_filter_select(platform_slug)}"
             f"<input class='control-compact' type='text' name='city' value='{escape(city or '')}' placeholder='City' />"
             f"<input class='control-compact' type='text' name='state_code' value='{escape(state_code or '')}' placeholder='State' />"
-            f"{_source_filter_select(source_slug)}"
+            f"{_source_filter_select(source_slug, platform_slug=platform_slug)}"
             f"<select name='status'>{''.join(status_options)}</select>"
             f"<select name='has_inspections'>{''.join(inspection_options)}</select>"
+            f"<select name='has_source_links'>{''.join(linkage_options)}</select>"
         ),
     )
     pager = _pagination_controls(
@@ -2620,11 +2665,13 @@ def _admin_restaurants_page(
         page_size=page_size,
         total_count=total_count,
         q=q,
+        platform_slug=platform_slug,
         state_code=state_code,
         city=city,
         status=status,
         source_slug=source_slug,
         has_inspections=("true" if has_inspections is True else "false" if has_inspections is False else None),
+        has_source_links=("true" if has_source_links is True else "false" if has_source_links is False else None),
     )
     body = f"""
     <section class="hero">
@@ -3166,12 +3213,20 @@ def control_panel_sources(
 def control_panel_trigger_run(
     source_slug: str,
     run_mode: str = Form("incremental"),
+    borough_scope: str | None = Form(None),
+    skip_existing_inspections: str | None = Form(None),
 ) -> RedirectResponse:
+    request_context = {}
+    if borough_scope and borough_scope.strip():
+        request_context["borough_scope"] = borough_scope.strip()
+    if skip_existing_inspections and skip_existing_inspections.strip().lower() in {"true", "on", "1", "yes"}:
+        request_context["skip_existing_inspections"] = True
     dispatch_run(
         WorkerRunRequest(
             source_slug=source_slug,
             run_mode=run_mode,  # type: ignore[arg-type]
             trigger_type="manual",
+            request_context=request_context,
         )
     )
     return RedirectResponse(url="/ops/control-panel/runs", status_code=303)
@@ -3330,22 +3385,27 @@ def control_panel_admin_restaurants(
     q: str | None = None,
     page: int = 1,
     page_size: int = 50,
+    platform_slug: str | None = None,
     state_code: str | None = None,
     city: str | None = None,
     status: str | None = None,
     source_slug: str | None = None,
     has_inspections: str | None = None,
+    has_source_links: str | None = None,
 ) -> str:
     has_inspections_value = True if has_inspections == "true" else False if has_inspections == "false" else None
+    has_source_links_value = True if has_source_links == "true" else False if has_source_links == "false" else None
     return _admin_restaurants_page(
         q=q,
         page=page,
         page_size=page_size,
+        platform_slug=platform_slug,
         state_code=state_code,
         city=city,
         status=status,
         source_slug=source_slug,
         has_inspections=has_inspections_value,
+        has_source_links=has_source_links_value,
     )
 
 

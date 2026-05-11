@@ -57,3 +57,41 @@ def test_parse_search_results_warns_on_missing_camis() -> None:
 
     assert result.candidates == []
     assert result.warnings == ["Skipped row 1 because CAMIS was missing."]
+
+
+def test_parse_search_results_normalizes_socrata_datetime_strings() -> None:
+    raw_text = json.dumps(
+        [
+            {
+                "camis": "12345678",
+                "dba": "Sample Pizza",
+                "boro": "Manhattan",
+                "building": "10",
+                "street": "W 10 ST",
+                "zipcode": "10011",
+                "inspection_date": "2026-04-20T00:00:00.000",
+                "inspection_type": "Cycle Inspection / Initial Inspection",
+                "action": "Violations were cited in the following area(s).",
+                "score": "12",
+                "grade": "A",
+                "grade_date": "2026-04-20T00:00:00.000",
+                "record_date": "2026-04-29T00:00:00.000",
+                "violation_code": "10F",
+                "violation_description": "Non-food contact surface improperly constructed.",
+                "critical_flag": "Not Critical",
+            }
+        ]
+    )
+
+    result = parse_search_results(
+        raw_text,
+        source_url="https://data.cityofnewyork.us/resource/43nn-pn8j.json?$limit=1",
+        dataset_id="43nn-pn8j",
+    )
+
+    assert result.warnings == []
+    assert len(result.candidates) == 1
+    candidate = result.candidates[0]
+    assert candidate.inspection_date_raw == "2026-04-20"
+    assert candidate.grade_date_raw == "2026-04-20"
+    assert candidate.record_date_raw == "2026-04-29"

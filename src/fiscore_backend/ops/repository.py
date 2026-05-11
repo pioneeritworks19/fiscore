@@ -124,8 +124,8 @@ def list_platforms() -> list[OpsPlatformSummary]:
     return [OpsPlatformSummary(**row) for row in rows]
 
 
-def list_sources(*, limit: int = 250) -> list[OpsSourceSummary]:
-    return list_sources_page(page=1, page_size=limit, status=None)[0]
+def list_sources(*, limit: int = 250, platform_slug: str | None = None) -> list[OpsSourceSummary]:
+    return list_sources_page(page=1, page_size=limit, status=None, platform_slug=platform_slug)[0]
 
 
 def list_sources_page(
@@ -137,7 +137,7 @@ def list_sources_page(
     status: str | None = None,
     never_run_only: bool = False,
 ) -> tuple[list[OpsSourceSummary], int]:
-    safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=250)
+    safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=1000)
     search = _like_pattern(query)
     offset = (safe_page - 1) * safe_size
 
@@ -1898,11 +1898,13 @@ def list_admin_restaurants_page(
     page: int = 1,
     page_size: int = 100,
     query: str | None = None,
+    platform_slug: str | None = None,
     state_code: str | None = None,
     city: str | None = None,
     status: str | None = None,
     source_slug: str | None = None,
     has_inspections: bool | None = None,
+    has_source_links: bool | None = None,
 ) -> tuple[list[OpsMasterRestaurantSummary], int]:
     safe_page, safe_size = _normalize_page(page, page_size, default_size=50, max_size=250)
     search = _like_pattern(query)
@@ -1938,6 +1940,20 @@ def list_admin_restaurants_page(
     if status:
         where_parts.append("mr.status = %s")
         params.append(status)
+    if platform_slug:
+        where_parts.append(
+            """
+            exists (
+                select 1
+                from master.master_restaurant_source_link mrl
+                join ops.source_registry sr on sr.source_id = mrl.source_id
+                join ops.platform_registry pr on pr.platform_id = sr.platform_id
+                where mrl.master_restaurant_id = mr.master_restaurant_id
+                  and pr.platform_slug = %s
+            )
+            """
+        )
+        params.append(platform_slug)
     if source_slug:
         where_parts.append(
             """
@@ -1966,6 +1982,24 @@ def list_admin_restaurants_page(
             not exists (
                 select 1 from master.master_inspection mi
                 where mi.master_restaurant_id = mr.master_restaurant_id
+            )
+            """
+        )
+    if has_source_links is True:
+        where_parts.append(
+            """
+            exists (
+                select 1 from master.master_restaurant_source_link mrl
+                where mrl.master_restaurant_id = mr.master_restaurant_id
+            )
+            """
+        )
+    elif has_source_links is False:
+        where_parts.append(
+            """
+            not exists (
+                select 1 from master.master_restaurant_source_link mrl
+                where mrl.master_restaurant_id = mr.master_restaurant_id
             )
             """
         )
@@ -2046,6 +2080,27 @@ def list_admin_restaurants_page(
             cur.execute(data_sql, [*params, safe_size, offset])
             rows = cur.fetchall()
     return [OpsMasterRestaurantSummary(**row) for row in rows], total_count
+
+
+def get_admin_restaurant_counts() -> tuple[int, int, int]:
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                with linked as (
+                    select distinct master_restaurant_id
+                    from master.master_restaurant_source_link
+                )
+                select
+                    count(*)::int as total_restaurants,
+                    count(*) filter (where linked.master_restaurant_id is not null)::int as linked_restaurants,
+                    count(*) filter (where linked.master_restaurant_id is null)::int as unlinked_restaurants
+                from master.master_restaurant mr
+                left join linked on linked.master_restaurant_id = mr.master_restaurant_id
+                """
+            )
+            row = cur.fetchone()
+    return row["total_restaurants"], row["linked_restaurants"], row["unlinked_restaurants"]
 
 
 def get_admin_restaurant_detail(master_restaurant_id: str) -> AdminRestaurantDetail | None:

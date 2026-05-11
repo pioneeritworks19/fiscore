@@ -18,6 +18,17 @@ def _hash_parts(*values: str | None) -> str:
     return sha256(joined.encode("utf-8")).hexdigest()
 
 
+def _clean_date_text(value: Any) -> str | None:
+    cleaned = _clean_text(value)
+    if cleaned is None:
+        return None
+    if "T" in cleaned:
+        cleaned = cleaned.split("T", 1)[0]
+    elif " " in cleaned:
+        cleaned = cleaned.split(" ", 1)[0]
+    return cleaned or None
+
+
 @dataclass(frozen=True)
 class NYCGroupedInspectionCandidate:
     camis_raw: str
@@ -109,7 +120,7 @@ def parse_search_results(
 
         group_key = (
             camis,
-            _clean_text(row.get("inspection_date")),
+            _clean_date_text(row.get("inspection_date")),
             _clean_text(row.get("inspection_type")),
             _clean_text(row.get("action")),
             _clean_text(row.get("score")),
@@ -131,8 +142,8 @@ def parse_search_results(
                 "action_raw": group_key[3],
                 "score_raw": group_key[4],
                 "grade_raw": group_key[5],
-                "grade_date_raw": _clean_text(row.get("grade_date")),
-                "record_date_raw": _clean_text(row.get("record_date")),
+                "grade_date_raw": _clean_date_text(row.get("grade_date")),
+                "record_date_raw": _clean_date_text(row.get("record_date")),
                 "findings": [],
             },
         )

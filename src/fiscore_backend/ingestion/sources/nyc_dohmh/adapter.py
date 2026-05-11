@@ -13,6 +13,7 @@ from fiscore_backend.ingestion.core.run_logger import (
 from fiscore_backend.ingestion.core.source_registry import create_scrape_run, get_source_by_slug
 from fiscore_backend.ingestion.sources.nyc_dohmh.fetcher import NYCDOHMHFetcher
 from fiscore_backend.ingestion.sources.nyc_dohmh.normalizer import (
+    find_existing_source_inspection_keys,
     normalize_finding_payload,
     normalize_inspection_payload,
 )
@@ -60,6 +61,7 @@ class NYCDOHMHAdapter:
         artifact_count = 0
         parse_result_count = 0
         normalized_record_count = 0
+        skipped_existing_inspection_count = 0
 
         def record_issue(
             *,
@@ -191,6 +193,14 @@ class NYCDOHMHAdapter:
                     source_url=row_artifact.source_url,
                     dataset_id=str(run_plan.request_context["dataset_id"]),
                 )
+                existing_source_inspection_keys: set[str] = set()
+                if bool(run_plan.request_context.get("skip_existing_inspections")):
+                    existing_source_inspection_keys = find_existing_source_inspection_keys(
+                        source_id=source.source_id,
+                        source_inspection_keys=[
+                            candidate.source_inspection_key for candidate in parsed.candidates
+                        ],
+                    )
 
                 for parser_warning in parsed.warnings:
                     warnings.append(parser_warning)
@@ -205,6 +215,10 @@ class NYCDOHMHAdapter:
                     )
 
                 for candidate in parsed.candidates:
+                    if candidate.source_inspection_key in existing_source_inspection_keys:
+                        skipped_existing_inspection_count += 1
+                        continue
+
                     inspection_payload = candidate.to_payload(
                         source_url=row_artifact.source_url,
                         dataset_id=str(run_plan.request_context["dataset_id"]),
@@ -312,7 +326,10 @@ class NYCDOHMHAdapter:
                 artifact_count=artifact_count,
                 parse_result_count=parse_result_count,
                 normalized_record_count=normalized_record_count,
-                request_context=run_plan.request_context,
+                request_context={
+                    **run_plan.request_context,
+                    "skipped_existing_inspection_count": skipped_existing_inspection_count,
+                },
             )
 
         return WorkerRunResponse(
@@ -330,6 +347,7 @@ class NYCDOHMHAdapter:
             request_context={
                 **run_plan.request_context,
                 "row_page_count": artifact_count - 2 if artifact_count >= 2 else 0,
+                "skipped_existing_inspection_count": skipped_existing_inspection_count,
             },
             warnings=[*warnings, *operational_warnings],
         )
