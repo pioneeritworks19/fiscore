@@ -17,6 +17,7 @@ class NYCDOHMHRunPlan:
     date_to: date | None
     borough_partitions: tuple[str, ...]
     request_context: dict[str, str | bool | int | None]
+    target_source_restaurant_keys: tuple[str, ...] | None = None
 
 
 def _resolve_borough_partitions(source: SourceRegistryRecord, request: WorkerRunRequest) -> tuple[str, ...]:
@@ -37,10 +38,19 @@ def _resolve_borough_partitions(source: SourceRegistryRecord, request: WorkerRun
     )
 
 
+def _resolve_target_source_restaurant_keys(request: WorkerRunRequest) -> tuple[str, ...] | None:
+    configured = request.request_context.get("target_source_restaurant_keys")
+    if not isinstance(configured, list):
+        return None
+    cleaned = tuple(str(value).strip() for value in configured if str(value).strip())
+    return cleaned or None
+
+
 def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> NYCDOHMHRunPlan:
     run_mode = request.run_mode
     today = datetime.now(UTC).date()
     borough_partitions = _resolve_borough_partitions(source, request)
+    target_source_restaurant_keys = _resolve_target_source_restaurant_keys(request)
     dataset_id = str(source.source_config.get("dataset_id") or "43nn-pn8j")
     resource_url = str(
         source.source_config.get("resource_url")
@@ -54,6 +64,32 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> N
         source.source_config.get("columns_url")
         or f"https://data.cityofnewyork.us/api/views/{dataset_id}/columns.json"
     )
+
+    if target_source_restaurant_keys:
+        return NYCDOHMHRunPlan(
+            run_mode=run_mode,
+            strategy="targeted_source_restaurant_refresh",
+            date_from=None,
+            date_to=None,
+            borough_partitions=borough_partitions,
+            request_context={
+                "platform": source.platform_name,
+                "source_name": source.source_name,
+                "jurisdiction_name": source.jurisdiction_name,
+                "dataset_id": dataset_id,
+                "resource_url": resource_url,
+                "metadata_url": metadata_url,
+                "columns_url": columns_url,
+                "page_size": 5000,
+                "borough_scope": "All",
+                "targeted_refresh": True,
+                "notes": (
+                    "Targeted refresh is scoped to explicit source restaurant keys and "
+                    "reloads the restaurant's full available inspection history."
+                ),
+            },
+            target_source_restaurant_keys=target_source_restaurant_keys,
+        )
 
     if run_mode == "backfill":
         return NYCDOHMHRunPlan(
@@ -78,14 +114,13 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> N
                 "borough_scope": (
                     borough_partitions[0] if len(borough_partitions) == 1 else "All"
                 ),
-                "skip_existing_inspections": bool(
-                    request.request_context.get("skip_existing_inspections", False)
-                ),
+                "skip_existing_inspections": True,
                 "notes": (
                     "Backfill should establish a baseline from the current NYC dataset while "
                     "using boroughs only as runtime retrieval partitions."
                 ),
             },
+            target_source_restaurant_keys=None,
         )
 
     lookback_days = resolve_lookback_days(
@@ -114,9 +149,7 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> N
             "columns_url": columns_url,
             "page_size": 5000,
             "borough_scope": borough_partitions[0] if len(borough_partitions) == 1 else "All",
-            "skip_existing_inspections": bool(
-                request.request_context.get("skip_existing_inspections", False)
-            ),
+            "skip_existing_inspections": run_mode != "reconciliation",
             "lookback_days": lookback_days,
             "from_date": date_from.isoformat(),
             "to_date": today.isoformat(),
@@ -125,4 +158,5 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> N
                 "fetch scope while letting FiScore comparison logic determine final changes."
             ),
         },
+        target_source_restaurant_keys=None,
     )

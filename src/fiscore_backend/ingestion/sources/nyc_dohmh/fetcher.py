@@ -101,3 +101,43 @@ class NYCDOHMHFetcher:
                 page_number += 1
 
         return artifacts
+
+    def fetch_row_pages_for_camis(self, run_plan: NYCDOHMHRunPlan, *, camis: str) -> list[JsonArtifact]:
+        artifacts: list[JsonArtifact] = []
+        page_size = int(run_plan.request_context.get("page_size") or 5000)
+        resource_url = str(run_plan.request_context["resource_url"])
+        escaped_camis = camis.replace("'", "''")
+        offset = 0
+        page_number = 1
+
+        while True:
+            params = {
+                "$limit": str(page_size),
+                "$offset": str(offset),
+                "$order": "camis,inspection_date,inspection_type,violation_code",
+                "$where": f"camis = '{escaped_camis}'",
+            }
+
+            response = self.client.get(resource_url, params=params)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, list) or not payload:
+                break
+
+            artifacts.append(
+                JsonArtifact(
+                    source_url=f"{resource_url}?{urlencode(params)}",
+                    filename=f"rows_camis_{camis}_page_{page_number:03d}.json",
+                    content=json.dumps(payload),
+                    content_type=response.headers.get("content-type", "application/json"),
+                    partition_key=f"camis:{camis}",
+                    page_number=page_number,
+                )
+            )
+
+            if len(payload) < page_size:
+                break
+            offset += page_size
+            page_number += 1
+
+        return artifacts

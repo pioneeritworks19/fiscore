@@ -14,6 +14,8 @@ from fiscore_backend.ingestion.core.source_registry import create_scrape_run, ge
 from fiscore_backend.ingestion.sources.sword.detail_parser import parse_detail_results
 from fiscore_backend.ingestion.sources.sword.fetcher import SwordFetcher
 from fiscore_backend.ingestion.sources.sword.normalizer import (
+    build_source_inspection_key,
+    find_existing_source_inspection_keys,
     normalize_finding_payload,
     normalize_inspection_payload,
 )
@@ -61,6 +63,10 @@ class SwordSourceAdapter:
         normalized_record_count = 0
         fetcher = SwordFetcher()
         target_master_restaurant_id = request.request_context.get("target_master_restaurant_id")
+        skip_existing_broad_inspections = (
+            run_plan.run_mode in {"backfill", "incremental"}
+            and not run_plan.target_source_restaurant_keys
+        )
 
         def build_inspection_payload(candidate, source_url: str) -> dict:
             payload = candidate.to_payload(
@@ -222,8 +228,23 @@ class SwordSourceAdapter:
                             (candidate, candidate_raw_artifact_id, candidate_warnings, candidate_source_url)
                         )
 
+                    existing_source_inspection_keys: set[str] = set()
+                    if skip_existing_broad_inspections:
+                        existing_source_inspection_keys = find_existing_source_inspection_keys(
+                            source_id=source.source_id,
+                            source_inspection_keys=[
+                                build_source_inspection_key(
+                                    build_inspection_payload(candidate, candidate_source_url)
+                                )
+                                for candidate, _, _, candidate_source_url in unique_candidates
+                            ],
+                        )
+
                     for candidate, candidate_raw_artifact_id, candidate_warnings, candidate_source_url in unique_candidates:
                         inspection_payload = build_inspection_payload(candidate, candidate_source_url)
+                        source_inspection_key = build_source_inspection_key(inspection_payload)
+                        if source_inspection_key in existing_source_inspection_keys:
+                            continue
                         parse_result_id = create_parse_result(
                             source_id=source.source_id,
                             scrape_run_id=scrape_run_id,

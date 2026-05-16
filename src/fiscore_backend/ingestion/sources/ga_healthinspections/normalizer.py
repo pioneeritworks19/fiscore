@@ -200,6 +200,31 @@ def _find_existing_inspection(cur, *, platform_id: str, source_inspection_key: s
     return cur.fetchone()
 
 
+def build_source_inspection_key(payload: dict[str, Any]) -> str:
+    return _source_inspection_key(payload)
+
+
+def find_existing_source_inspection_keys(*, source_id: str, source_inspection_keys: list[str]) -> set[str]:
+    cleaned_keys = [key for key in source_inspection_keys if _clean_text(key)]
+    if not cleaned_keys:
+        return set()
+
+    platform_id, _ = _get_source_metadata(source_id)
+    with get_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                select source_inspection_key
+                from master.master_inspection
+                where
+                    platform_id = %s::uuid
+                    and source_inspection_key = any(%s::text[])
+                """,
+                (platform_id, cleaned_keys),
+            )
+            return {str(row["source_inspection_key"]) for row in cur.fetchall()}
+
+
 def _get_or_create_restaurant(cur, *, source_id: str, payload: dict[str, Any]) -> tuple[str, int]:
     restaurant = payload.get("restaurant", {})
     facility_token = _clean_text(payload.get("facility_token")) or _clean_text(

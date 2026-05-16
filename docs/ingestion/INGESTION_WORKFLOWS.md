@@ -9,6 +9,7 @@ This document complements:
 - `MASTER_DATA_ARCHITECTURE.md`
 - `RESTAURANT_MATCHING.md`
 - `DATA_MODEL.md`
+- `RUN_MODE_BEHAVIOR.md`
 
 The goal is to turn the master data platform into an implementation-ready ingestion system that can scale from a small number of state-wide sources to a much larger network of state, county, and city scrapers.
 
@@ -543,4 +544,3 @@ These items still need final implementation decisions:
 FiScore should implement public inspection ingestion as a staged workflow with durable raw artifact storage, source-aware parsing, normalization into a shared master schema, cautious restaurant matching, validation before publication, and strong operational monitoring.
 
 This approach gives the platform a practical path to scaling from a handful of government sources to a much broader and more operationally demanding ingestion network.
-

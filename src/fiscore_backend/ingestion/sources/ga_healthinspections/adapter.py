@@ -18,6 +18,8 @@ from fiscore_backend.ingestion.sources.ga_healthinspections.detail_parser import
 from fiscore_backend.ingestion.sources.ga_healthinspections.fetcher import GeorgiaHealthInspectionsFetcher
 from fiscore_backend.ingestion.sources.ga_healthinspections.normalizer import (
     attach_report_artifact,
+    build_source_inspection_key,
+    find_existing_source_inspection_keys,
     normalize_finding_payload,
     normalize_inspection_payload,
 )
@@ -79,6 +81,13 @@ class GeorgiaHealthInspectionsAdapter:
         parse_result_count = 0
         normalized_record_count = 0
         fetcher = GeorgiaHealthInspectionsFetcher()
+        storage = RawArtifactStorage()
+        seen_facility_tokens: set[str] = set()
+        target_master_restaurant_id = request.request_context.get("target_master_restaurant_id")
+        skip_existing_broad_inspections = (
+            run_plan.run_mode in {"backfill", "incremental"}
+            and not run_plan.target_source_restaurant_keys
+        )
 
         def record_issue(
             *,
@@ -155,19 +164,316 @@ class GeorgiaHealthInspectionsAdapter:
                     stage="start",
                 )
 
-        try:
-            landing_artifact, search_config = fetcher.fetch_landing_page(run_plan)
-            search_artifacts = fetcher.fetch_search_api_results(
-                landing_html=landing_artifact.content,
-                landing_url=landing_artifact.source_url,
-                search_config=search_config,
-                run_plan=run_plan,
+        def process_facility_detail(
+            *,
+            facility_token: str,
+            source_record_key: str,
+            fallback_restaurant: dict,
+            detail_source_url: str | None = None,
+            full_history: bool = False,
+        ) -> None:
+            nonlocal artifact_count, parse_result_count, normalized_record_count
+
+            try:
+                detail_artifact = fetcher.fetch_inspections_json(facility_token)
+                detail_path = storage.build_raw_path(
+                    source_slug=request.source_slug,
+                    scrape_run_id=scrape_run_id,
+                    filename=detail_artifact.filename,
+                    content_family="json",
+                )
+                detail_storage_uri = storage.upload_text(
+                    artifact=detail_path,
+                    content=detail_artifact.content,
+                    content_type=detail_artifact.content_type,
+                )
+                detail_raw_artifact_id = create_raw_artifact_index(
+                    source_id=source.source_id,
+                    scrape_run_id=scrape_run_id,
+                    artifact_type="json",
+                    source_url=detail_artifact.source_url,
+                    storage_path=detail_storage_uri,
+                    content_hash=hash_text(detail_artifact.content),
+                )
+                artifact_count += 1
+            except Exception as exc:  # pragma: no cover - environment-specific connectivity
+                record_warning(
+                    category="fetch",
+                    code="detail_fetch_failed",
+                    message=f"Detail fetch failed for facility {facility_token}: {exc}",
+                    component="fetcher",
+                    stage="detail",
+                    source_record_key=source_record_key,
+                    source_url=detail_source_url,
+                )
+                return
+
+            detail_parse = parse_detail_history_results(
+                detail_artifact.content,
+                source_url=detail_artifact.source_url,
+                county_name=fallback_restaurant.get("county_name"),
+                fallback_restaurant=fallback_restaurant,
             )
+            if not detail_parse.inspections:
+                record_warning(
+                    category="parse",
+                    code="inspection_payload_missing",
+                    message=f"No inspection payload parsed for {detail_source_url or detail_artifact.source_url}",
+                    component="detail_parser",
+                    stage="detail",
+                    raw_artifact_id=detail_raw_artifact_id,
+                    source_record_key=source_record_key,
+                    source_url=detail_source_url or detail_artifact.source_url,
+                )
+                return
 
-            storage = RawArtifactStorage()
-            seen_facility_tokens: set[str] = set()
+            filtered_inspections = detail_parse.inspections
+            if not full_history and (run_plan.date_from or run_plan.date_to):
+                filtered_inspections = []
+                for inspection_record in detail_parse.inspections:
+                    inspection_date = _parse_georgia_inspection_date(
+                        inspection_record.inspection.inspection_date_raw
+                    )
+                    if inspection_date is None:
+                        filtered_inspections.append(inspection_record)
+                        continue
+                    if run_plan.date_from and inspection_date < run_plan.date_from:
+                        continue
+                    if run_plan.date_to and inspection_date > run_plan.date_to:
+                        continue
+                    filtered_inspections.append(inspection_record)
 
-            if scrape_run_id is not None:
+            if not filtered_inspections:
+                return
+
+            existing_source_inspection_keys: set[str] = set()
+            if skip_existing_broad_inspections and not full_history:
+                existing_source_inspection_keys = find_existing_source_inspection_keys(
+                    source_id=source.source_id,
+                    source_inspection_keys=[
+                        build_source_inspection_key(
+                            inspection_record.inspection.to_payload(
+                                source_url=detail_artifact.source_url
+                            )
+                        )
+                        for inspection_record in filtered_inspections
+                    ],
+                )
+
+            for history_warning in detail_parse.warnings:
+                record_warning(
+                    category="parse",
+                    code="ga_detail_parse_warning",
+                    message=history_warning,
+                    component="detail_parser",
+                    stage="detail",
+                    raw_artifact_id=detail_raw_artifact_id,
+                    source_record_key=source_record_key,
+                    source_url=detail_artifact.source_url,
+                )
+
+            for inspection_record in filtered_inspections:
+                inspection_payload = inspection_record.inspection.to_payload(
+                    source_url=detail_artifact.source_url
+                )
+                source_inspection_key = build_source_inspection_key(inspection_payload)
+                if source_inspection_key in existing_source_inspection_keys:
+                    continue
+                if target_master_restaurant_id:
+                    inspection_payload["target_master_restaurant_id"] = target_master_restaurant_id
+                inspection_parse_result_id = create_parse_result(
+                    source_id=source.source_id,
+                    scrape_run_id=scrape_run_id,
+                    raw_artifact_id=detail_raw_artifact_id,
+                    parser_version=source.parser_version,
+                    record_type="inspection",
+                    source_record_key=inspection_record.inspection.source_record_key,
+                    parse_status=(
+                        "parsed_with_warnings" if inspection_record.warnings else "parsed"
+                    ),
+                    payload=json.dumps(inspection_payload),
+                    warning_count=len(inspection_record.warnings),
+                )
+                parse_result_count += 1
+
+                try:
+                    normalized_inspection = normalize_inspection_payload(
+                        source_id=source.source_id,
+                        payload=inspection_payload,
+                    )
+                    normalized_record_count += normalized_inspection.normalized_count
+                except Exception as exc:  # pragma: no cover - environment-specific connectivity
+                    record_warning(
+                        category="normalize",
+                        code="inspection_normalization_failed",
+                        message=(
+                            "Inspection normalization failed for "
+                            f"{detail_source_url or detail_artifact.source_url}: {exc}"
+                        ),
+                        component="normalizer",
+                        stage="normalize",
+                        parse_result_id=inspection_parse_result_id,
+                        raw_artifact_id=detail_raw_artifact_id,
+                        source_record_key=inspection_record.inspection.source_record_key,
+                        source_url=detail_source_url or detail_artifact.source_url,
+                    )
+                    continue
+
+                for detail_warning in inspection_record.warnings:
+                    create_parser_warning(
+                        parse_result_id=inspection_parse_result_id,
+                        warning_code="ga_detail_parse_warning",
+                        warning_message=detail_warning,
+                    )
+                    record_warning(
+                        category="parse",
+                        code="ga_detail_parse_warning",
+                        message=detail_warning,
+                        component="detail_parser",
+                        stage="detail",
+                        parse_result_id=inspection_parse_result_id,
+                        raw_artifact_id=detail_raw_artifact_id,
+                        source_record_key=inspection_record.inspection.source_record_key,
+                        source_url=detail_artifact.source_url,
+                    )
+
+                report_url = inspection_payload.get("report_url")
+                if report_url:
+                    try:
+                        filename_stem = (
+                            f"inspection_report_{inspection_record.inspection.source_record_key[:16]}"
+                        )
+                        report_artifact = fetcher.fetch_report_artifact(
+                            str(report_url),
+                            filename_stem=filename_stem,
+                        )
+                        report_family = (
+                            "pdf" if "pdf" in report_artifact.content_type.lower() else "html"
+                        )
+                        report_path = storage.build_raw_path(
+                            source_slug=request.source_slug,
+                            scrape_run_id=scrape_run_id,
+                            filename=report_artifact.filename,
+                            content_family=report_family,
+                        )
+                        report_storage_uri = storage.upload_bytes(
+                            artifact=report_path,
+                            content=report_artifact.content,
+                            content_type=report_artifact.content_type,
+                        )
+                        create_raw_artifact_index(
+                            source_id=source.source_id,
+                            scrape_run_id=scrape_run_id,
+                            artifact_type=report_family,
+                            source_url=report_artifact.source_url,
+                            storage_path=report_storage_uri,
+                            content_hash=hash_bytes(report_artifact.content),
+                        )
+                        artifact_count += 1
+                        normalized_record_count += attach_report_artifact(
+                            source_id=source.source_id,
+                            inspection_payload=inspection_payload,
+                            storage_path=report_storage_uri,
+                            report_format=report_family,
+                        )
+                    except Exception as exc:  # pragma: no cover - environment-specific connectivity
+                        record_warning(
+                            category="fetch",
+                            code="report_artifact_fetch_failed",
+                            message=f"Report artifact fetch failed for {report_url}: {exc}",
+                            component="fetcher",
+                            stage="report",
+                            parse_result_id=inspection_parse_result_id,
+                            raw_artifact_id=detail_raw_artifact_id,
+                            source_record_key=inspection_record.inspection.source_record_key,
+                            source_url=str(report_url),
+                        )
+
+                for finding in inspection_record.findings:
+                    finding_payload = finding.to_payload(
+                        inspection_payload=inspection_payload,
+                        source_url=detail_artifact.source_url,
+                    )
+                    finding_parse_result_id = create_parse_result(
+                        source_id=source.source_id,
+                        scrape_run_id=scrape_run_id,
+                        raw_artifact_id=detail_raw_artifact_id,
+                        parser_version=source.parser_version,
+                        record_type="finding",
+                        source_record_key=finding.source_record_key,
+                        parse_status=(
+                            "parsed_with_warnings" if inspection_record.warnings else "parsed"
+                        ),
+                        payload=json.dumps(finding_payload),
+                        warning_count=len(inspection_record.warnings),
+                    )
+                    parse_result_count += 1
+                    try:
+                        normalized_record_count += normalize_finding_payload(
+                            source_id=source.source_id,
+                            payload=finding_payload,
+                        )
+                    except Exception as exc:  # pragma: no cover - environment-specific connectivity
+                        record_warning(
+                            category="normalize",
+                            code="finding_normalization_failed",
+                            message=f"Finding normalization failed for {finding.source_record_key}: {exc}",
+                            component="normalizer",
+                            stage="normalize",
+                            parse_result_id=finding_parse_result_id,
+                            raw_artifact_id=detail_raw_artifact_id,
+                            source_record_key=finding.source_record_key,
+                            source_url=detail_artifact.source_url,
+                        )
+
+        try:
+            landing_artifact = None
+            search_artifacts = []
+            if run_plan.target_source_restaurant_keys:
+                for source_restaurant_key in run_plan.target_source_restaurant_keys:
+                    if not source_restaurant_key.startswith("ga-facility:"):
+                        record_warning(
+                            category="fetch",
+                            code="unsupported_target_source_restaurant_key",
+                            message=(
+                                "Georgia targeted refresh requires a facility-based source key; "
+                                f"skipped {source_restaurant_key}."
+                            ),
+                            component="adapter",
+                            stage="detail",
+                            source_record_key=source_restaurant_key,
+                        )
+                        continue
+
+                    facility_token = source_restaurant_key.removeprefix("ga-facility:").strip()
+                    if not facility_token or facility_token in seen_facility_tokens:
+                        continue
+                    seen_facility_tokens.add(facility_token)
+                    process_facility_detail(
+                        facility_token=facility_token,
+                        source_record_key=source_restaurant_key,
+                        fallback_restaurant={
+                            "county_name": source.source_config.get("county_name"),
+                            "facility_token": facility_token,
+                            "restaurant_name_raw": None,
+                            "license_number_raw": None,
+                            "address_raw": None,
+                            "city_raw": None,
+                            "state_raw": "GA",
+                            "zip_code_raw": None,
+                        },
+                        full_history=True,
+                    )
+            else:
+                landing_artifact, search_config = fetcher.fetch_landing_page(run_plan)
+                search_artifacts = fetcher.fetch_search_api_results(
+                    landing_html=landing_artifact.content,
+                    landing_url=landing_artifact.source_url,
+                    search_config=search_config,
+                    run_plan=run_plan,
+                )
+
+            if scrape_run_id is not None and landing_artifact is not None:
                 try:
                     landing_path = storage.build_html_path(
                         source_slug=request.source_slug,
@@ -265,6 +571,19 @@ class GeorgiaHealthInspectionsAdapter:
                         if facility_token in seen_facility_tokens:
                             continue
                         seen_facility_tokens.add(facility_token)
+                        process_facility_detail(
+                            facility_token=facility_token,
+                            source_record_key=candidate.source_record_key,
+                            fallback_restaurant={
+                                **candidate.to_payload(source_url=search_artifact.source_url)[
+                                    "restaurant"
+                                ],
+                                "county_name": candidate.county_name,
+                            },
+                            detail_source_url=candidate.detail_url,
+                            full_history=False,
+                        )
+                        continue
 
                         try:
                             detail_artifact = fetcher.fetch_inspections_json(facility_token)

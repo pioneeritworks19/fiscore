@@ -111,7 +111,7 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> S
 
     lookback_days = resolve_lookback_days(
         request=request,
-        incremental_default=45,
+        incremental_default=30,
         reconciliation_default=180,
     )
     date_from = today - timedelta(days=lookback_days)

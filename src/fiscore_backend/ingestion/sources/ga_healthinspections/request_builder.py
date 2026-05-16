@@ -13,12 +13,45 @@ class GeorgiaRunPlan:
     date_from: date | None
     date_to: date | None
     request_context: dict[str, str | bool | None]
+    target_source_restaurant_keys: tuple[str, ...] | None = None
+
+
+def _resolve_target_source_restaurant_keys(request: WorkerRunRequest) -> tuple[str, ...] | None:
+    configured = request.request_context.get("target_source_restaurant_keys")
+    if not isinstance(configured, list):
+        return None
+    cleaned = tuple(str(value).strip() for value in configured if str(value).strip())
+    return cleaned or None
 
 
 def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> GeorgiaRunPlan:
     run_mode = request.run_mode
     today = datetime.now(UTC).date()
     county_name = source.source_config.get("county_name")
+    target_source_restaurant_keys = _resolve_target_source_restaurant_keys(request)
+
+    if target_source_restaurant_keys:
+        return GeorgiaRunPlan(
+            run_mode=run_mode,
+            strategy="targeted_source_restaurant_refresh",
+            date_from=None,
+            date_to=None,
+            request_context={
+                "platform": source.platform_name,
+                "source_name": source.source_name,
+                "jurisdiction_name": source.jurisdiction_name,
+                "base_url": source.base_url.rstrip("/") + "/",
+                "county_name": county_name,
+                "permit_type_label": "Food Service",
+                "partition_mode": "target_explicit_source_restaurant_keys",
+                "targeted_refresh": True,
+                "notes": (
+                    "Targeted refresh is scoped to explicit source restaurant keys and "
+                    "reloads the facility's full available inspection history."
+                ),
+            },
+            target_source_restaurant_keys=target_source_restaurant_keys,
+        )
 
     if run_mode == "backfill":
         backfill_start = date(2025, 1, 1)
@@ -43,6 +76,7 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> G
                     "API failures on unbounded backfill queries."
                 ),
             },
+            target_source_restaurant_keys=None,
         )
 
     lookback_days = resolve_lookback_days(
@@ -76,4 +110,5 @@ def build_run_plan(source: SourceRegistryRecord, request: WorkerRunRequest) -> G
                 "execution bounded and operationally simple."
             ),
         },
+        target_source_restaurant_keys=None,
     )

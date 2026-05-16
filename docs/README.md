@@ -60,6 +60,8 @@ Use these documents as canonical unless a later doc explicitly replaces them:
   [backend/MASTER_DATA_SCHEMA.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\backend\MASTER_DATA_SCHEMA.md)
 - Ingestion operating model:
   [ingestion/INGESTION_WORKFLOWS.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\ingestion\INGESTION_WORKFLOWS.md)
+- Ingestion run-mode contract:
+  [ingestion/RUN_MODE_BEHAVIOR.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\ingestion\RUN_MODE_BEHAVIOR.md)
 - Source-specific Sword integration:
   [source-integrations/sword/SWORD_SOLUTIONS_INGESTION_PLAN.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\source-integrations\sword\SWORD_SOLUTIONS_INGESTION_PLAN.md)
 

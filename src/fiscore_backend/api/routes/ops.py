@@ -555,7 +555,7 @@ def _compact_message(value: str, *, max_length: int = 140) -> str:
 
 
 def _supports_restaurant_refresh(source_slug: str) -> bool:
-    return source_slug.startswith("sword_")
+    return source_slug.startswith(("sword_", "ga_", "nyc"))
 
 
 def _admin_restaurant_refresh_action(master_restaurant_id: str, source_link) -> str:
@@ -566,7 +566,7 @@ def _admin_restaurant_refresh_action(master_restaurant_id: str, source_link) -> 
         f"<input type='hidden' name='source_slug' value='{escape(source_link.source_slug)}' />"
         f"<input type='hidden' name='source_restaurant_key' value='{escape(source_link.source_restaurant_key)}' />"
         "<input type='hidden' name='run_mode' value='backfill' />"
-        "<button type='submit' class='button secondary'>Refresh</button>"
+        "<button type='submit' class='button secondary'>Refresh Restaurant</button>"
         "</form>"
     )
 

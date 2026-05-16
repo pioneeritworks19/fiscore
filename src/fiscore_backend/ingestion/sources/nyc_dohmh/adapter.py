@@ -62,6 +62,7 @@ class NYCDOHMHAdapter:
         parse_result_count = 0
         normalized_record_count = 0
         skipped_existing_inspection_count = 0
+        target_source_restaurant_keys = run_plan.target_source_restaurant_keys or ()
 
         def record_issue(
             *,
@@ -138,7 +139,30 @@ class NYCDOHMHAdapter:
         try:
             metadata_artifact = fetcher.fetch_metadata(run_plan)
             columns_artifact = fetcher.fetch_columns(run_plan)
-            row_artifacts = fetcher.fetch_row_pages(run_plan)
+            if target_source_restaurant_keys:
+                row_artifacts = []
+                seen_camis: set[str] = set()
+                for source_restaurant_key in target_source_restaurant_keys:
+                    if not source_restaurant_key.startswith("nyc-camis:"):
+                        record_warning(
+                            category="fetch",
+                            code="unsupported_target_source_restaurant_key",
+                            message=(
+                                "NYC targeted refresh requires a CAMIS-based source key; "
+                                f"skipped {source_restaurant_key}."
+                            ),
+                            component="adapter",
+                            stage="search",
+                            source_record_key=source_restaurant_key,
+                        )
+                        continue
+                    camis = source_restaurant_key.removeprefix("nyc-camis:").strip()
+                    if not camis or camis in seen_camis:
+                        continue
+                    seen_camis.add(camis)
+                    row_artifacts.extend(fetcher.fetch_row_pages_for_camis(run_plan, camis=camis))
+            else:
+                row_artifacts = fetcher.fetch_row_pages(run_plan)
 
             storage = RawArtifactStorage()
 
