@@ -399,6 +399,7 @@ Only these roles can edit tenant-level settings such as:
 
 - company profile
 - subscription settings
+- billing and annual plan management
 - integrations
 - defaults
 

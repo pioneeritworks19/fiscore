@@ -48,6 +48,10 @@ Use these documents as canonical unless a later doc explicitly replaces them:
   [product/TEAM_INVITE_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TEAM_INVITE_FLOW.md)
 - Training setup and execution flow:
   [product/TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
+- Pricing and subscription model:
+  [product/PRICING_AND_SUBSCRIPTION_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\PRICING_AND_SUBSCRIPTION_MODEL.md)
+- Billing and subscription flow:
+  [product/BILLING_AND_SUBSCRIPTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\BILLING_AND_SUBSCRIPTION_FLOW.md)
 - Notification triggers and behavior:
   [product/NOTIFICATION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\NOTIFICATION_FLOW.md)
 - Device and platform support strategy:

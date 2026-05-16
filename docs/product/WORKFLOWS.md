@@ -807,6 +807,55 @@ Reopening a violation should move it back to open rather than creating a complet
 
 This keeps the workflow simpler while still preserving history.
 
+## 24. Subscription Prompt Workflow
+
+### Goal
+
+Introduce pricing only after the tenant has seen initial product value.
+
+### Primary Actor
+
+- tenant owner
+- admin
+
+### Steps
+
+1. user completes tenant setup
+2. user adds first site
+3. if the site is linked, FiScore imports public inspection history
+4. user reaches second or third meaningful login or similar early-value milestone
+5. FiScore shows a soft subscription prompt for the annual Starter plan
+6. user may subscribe immediately or dismiss the prompt initially
+
+### Version 1 Rule
+
+The first pricing prompt should happen after value is visible, not before tenant setup or first-site setup is complete.
+
+## 25. Add Site Upgrade Workflow
+
+### Goal
+
+Allow small operators to expand smoothly from one site to multiple sites using site-based annual pricing.
+
+### Primary Actor
+
+- tenant owner
+- admin
+
+### Steps
+
+1. user selects `Add Site`
+2. FiScore checks the tenant's included site count and current active site count
+3. if the tenant still has included site capacity, site creation continues normally
+4. if the user is adding a site beyond the included count, FiScore shows the additional annual site price
+5. if founding-customer pricing is active, FiScore shows the discounted first-term annual site price
+6. user confirms the upgrade and continues site creation
+7. if the tenant is attempting to exceed self-serve threshold, FiScore routes the user to enterprise contact flow instead of self-serve purchase
+
+### Version 1 Rule
+
+The second-site and later-site upgrade flow should feel incremental and site-based rather than forcing a confusing bundle jump.
+
 ## Cross-Workflow Rules
 
 ## Public Findings Import Rule
@@ -874,6 +923,15 @@ This keeps the workflow simpler while still preserving history.
 ## Notification Rule
 
 - operational notifications should support assigned violations, assigned training, overdue audits, overdue training, and manager review requests
+
+## Subscription Rule
+
+- version 1 self-serve pricing should be annual-first
+- Starter should include `1 site`
+- additional self-serve sites should use a clear annual per-site price
+- larger operators above self-serve threshold should be routed to enterprise contact flow
+- FiScore may support a clearly labeled founding-customer discount for the initial cohort
+- pricing prompts should appear after users see initial product value rather than before setup is complete
 
 ## Closure Rule
 

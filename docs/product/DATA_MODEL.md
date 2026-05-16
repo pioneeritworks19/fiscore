@@ -76,6 +76,7 @@ The current product scope can be grouped into these model areas:
 - scoring and grading
 - violations and remediation
 - training and improvement
+- pricing and subscription
 - evidence attachments
 - external inspection ingestion
 - sync and audit trail support
@@ -93,13 +94,26 @@ Suggested fields:
 - `status`
 - `primaryOwnerUserId`
 - `settings`
-- `subscriptionPlan` if needed later
+- `subscriptionPlan`
+- `subscriptionStatus`
+- `includedSiteCount`
+- `activeSiteCount`
+- `enterpriseManaged`
+- `foundingCohortEligible`
+- `foundingCohortLabel`
 
 Relationships:
 
 - one tenant has many tenant sites
 - one tenant has many users through memberships
 - one tenant has many checklist templates
+- one tenant has one current subscription state in version 1
+
+Notes:
+
+- version 1 pricing should be site-based and annual-first
+- the tenant record should make it easy to determine whether the tenant is in trial, active, past due, or enterprise-managed state
+- site-entitlement checks should be simple and fast for app and backend enforcement
 
 ## 2. User
 

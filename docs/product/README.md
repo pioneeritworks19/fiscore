@@ -49,6 +49,10 @@ Specialized reference doc:
   [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
 - training execution flow:
   [TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
+- pricing and subscription model:
+  [PRICING_AND_SUBSCRIPTION_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\PRICING_AND_SUBSCRIPTION_MODEL.md)
+- billing and subscription flow:
+  [BILLING_AND_SUBSCRIPTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\BILLING_AND_SUBSCRIPTION_FLOW.md)
 - notification flow:
   [NOTIFICATION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\NOTIFICATION_FLOW.md)
 - device strategy:
@@ -133,6 +137,8 @@ The core product design documents in this folder include:
 - [VIOLATION_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\VIOLATION_EXECUTION_FLOW.md)
 - [TRAINING_MODULE.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_MODULE.md)
 - [TRAINING_EXECUTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\TRAINING_EXECUTION_FLOW.md)
+- [PRICING_AND_SUBSCRIPTION_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\PRICING_AND_SUBSCRIPTION_MODEL.md)
+- [BILLING_AND_SUBSCRIPTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\BILLING_AND_SUBSCRIPTION_FLOW.md)
 - [NOTIFICATION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\NOTIFICATION_FLOW.md)
 - [DEVICE_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DEVICE_STRATEGY.md)
 - [MOBILE_PLATFORM_SUPPORT.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\MOBILE_PLATFORM_SUPPORT.md)

@@ -112,6 +112,16 @@ Represents a restaurant organization or customer account.
 - `status`
 - `primaryOwnerUserId`
 - `settings`
+- `subscriptionPlan`
+- `subscriptionStatus`
+- `billingProvider`
+- `includedSiteCount`
+- `activeSiteCount`
+- `enterpriseManaged`
+- `currentPeriodStartsAt`
+- `currentPeriodEndsAt`
+- `foundingCohortEligible`
+- `foundingCohortLabel`
 - `createdAt`
 - `updatedAt`
 
@@ -122,7 +132,32 @@ Represents a restaurant organization or customer account.
 - `audits`
 - `violations`
 - `publicInspections`
+- `billingPurchases`
+- `billingEvents`
 - `activity`
+
+### Suggested `subscriptionStatus` values
+
+- `trial`
+- `active`
+- `past_due`
+- `cancelled`
+- `expired`
+- `enterprise_managed`
+
+### Suggested `billingProvider` values
+
+- `app_store`
+- `play_store`
+- `enterprise`
+- `none`
+
+### Notes
+
+- FiScore should treat billing as tenant-level entitlement rather than user-level access
+- `includedSiteCount` should represent how many active sites the tenant has paid for
+- `activeSiteCount` should reflect how many non-archived sites currently count against entitlement
+- `enterpriseManaged` should disable self-serve paywall behavior in normal app flows
 
 ## 3. Tenant Members
 
@@ -154,6 +189,87 @@ Stores tenant-level access and role information for a user.
 - `manager`
 - `auditor`
 - `staff`
+
+## 3A. Tenant Billing Purchases
+
+### Collection
+
+`tenants/{tenantId}/billingPurchases/{purchaseId}`
+
+### Purpose
+
+Stores verified purchase records and entitlement-affecting billing transactions for a tenant.
+
+### Suggested fields
+
+- `tenantId`
+- `billingProvider`
+- `productType`
+- `productId`
+- `purchaseToken`
+- `originalTransactionId`
+- `purchasedByUserId`
+- `purchasedAt`
+- `effectiveStartsAt`
+- `effectiveEndsAt`
+- `status`
+- `siteIncrementCount`
+- `isFoundingOffer`
+- `createdAt`
+- `updatedAt`
+
+### Suggested `productType` values
+
+- `starter_annual_1_site`
+- `additional_site_annual`
+- `enterprise_override`
+
+### Suggested `status` values
+
+- `pending_verification`
+- `active`
+- `renewed`
+- `expired`
+- `cancelled`
+- `refunded`
+- `failed`
+
+### Notes
+
+- one purchase should not be assumed to equal one user entitlement
+- purchase records should be mapped to the tenant so multiple tenant members can benefit from the subscription
+- store-specific identifiers such as `purchaseToken` or `originalTransactionId` should support backend verification and support workflows
+
+## 3B. Tenant Billing Events
+
+### Collection
+
+`tenants/{tenantId}/billingEvents/{billingEventId}`
+
+### Purpose
+
+Stores normalized billing lifecycle events for auditability and support.
+
+### Suggested fields
+
+- `tenantId`
+- `eventType`
+- `billingProvider`
+- `purchaseId`
+- `summary`
+- `effectiveAt`
+- `performedByUserId`
+- `createdAt`
+
+### Suggested `eventType` values
+
+- `subscription_started`
+- `subscription_renewed`
+- `subscription_past_due`
+- `subscription_cancelled`
+- `subscription_expired`
+- `site_entitlement_increased`
+- `enterprise_override_applied`
 
 ## 4. Tenant Sites
 
@@ -1385,6 +1501,7 @@ The schema should support these common queries efficiently:
 - sites for a tenant
 - manual unlinked sites for a tenant
 - sites pending master-match review
+- tenant billing purchases by status or provider
 - audit schedules for a tenant filtered by site and status
 - upcoming or overdue audit schedule instances
 - audits for a tenant filtered by site and status
@@ -1400,6 +1517,8 @@ The exact index set will depend on app screens, but likely needs include:
 
 - `sites` by `masterLinkStatus`
 - `sites` by `masterLinkStatus + zipCode`
+- `billingPurchases` by `status + purchasedAt`
+- `billingPurchases` by `billingProvider + status`
 - `auditSchedules` by `siteId + status`
 - `auditSchedules` by `nextDueAt`
 - `auditSchedules/{scheduleId}/instances` by `status + dueAt`

@@ -509,6 +509,66 @@ The Training module should support:
 - hard auto-assignment should wait unless explicitly enabled later
 - risk area should usually come from training metadata or system-derived context rather than manual entry during assignment
 
+## Pricing And Subscription Model
+
+### Feature Summary
+
+FiScore should support a simple annual-first subscription model designed for self-signup restaurant operators, especially single-site and small multi-site businesses.
+
+Version 1 pricing should be based primarily on:
+
+- tenant subscription status
+- included site count
+- additional active sites
+
+The product should avoid usage-based pricing tied to:
+
+- audits completed
+- violations created
+- users invited
+- media uploaded
+
+### Business Value
+
+- keeps pricing understandable for small restaurant operators
+- aligns monetization with the product's site-centric operating model
+- supports low-friction self-signup for one-site restaurants
+- gives small multi-site customers a smoother growth path
+- leaves room for enterprise pricing for larger operators
+
+### Recommended Version 1 Position
+
+FiScore should use an annual-first site-based pricing structure.
+
+Recommended default public structure:
+
+- Starter annual plan with `1 included site`
+- annual price for each additional site
+- enterprise contact path once self-serve site threshold is exceeded
+
+FiScore should also support a limited founding or initial cohort discount for early adopters.
+
+### Product Expectations
+
+The app should:
+
+- allow tenant setup and first-site setup before forcing payment
+- allow users to see initial product value before subscription is required
+- present a soft subscription prompt after meaningful early use
+- use clean billing checkpoints such as site expansion or deeper operational use for harder enforcement
+- keep upgrade messaging clear and tied to site count
+
+### Best-Practice Expectations
+
+- annual pricing should be primary in version 1
+- pricing should feel serious enough for a business tool without being enterprise-heavy for mom-and-pop restaurants
+- the second-site upgrade should feel incremental rather than like a large plan jump
+- founding-customer discounts should be explicit and time-bounded rather than vague or hidden
+
+### Related Design Reference
+
+See [PRICING_AND_SUBSCRIPTION_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\PRICING_AND_SUBSCRIPTION_MODEL.md) for the detailed annual pricing structure, founding-customer discount model, in-app upgrade triggers, and enterprise threshold guidance.
+
 ## Audit Checklist Module
 
 ### Feature Summary
