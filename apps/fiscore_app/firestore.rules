@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function memberDoc(tenantId) {
+      return get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid));
+    }
+
+    function isActiveTenantMember(tenantId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid)) &&
+        memberDoc(tenantId).data.status == 'active';
+    }
+
+    match /users/{userId} {
+      allow create: if isSelf(userId);
+      allow read, update: if isSelf(userId);
+      allow delete: if false;
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if isActiveTenantMember(tenantId);
+      allow create, update, delete: if false;
+
+      match /members/{userId} {
+        allow read: if isActiveTenantMember(tenantId);
+        allow create, update, delete: if false;
+      }
+
+      match /invites/{inviteId} {
+        allow read: if isActiveTenantMember(tenantId) ||
+          (signedIn() &&
+            resource.data.status == 'pending' &&
+            resource.data.email == request.auth.token.email.lower());
+        allow create, update, delete: if false;
+      }
+
+      match /{document=**} {
+        allow read, write: if isActiveTenantMember(tenantId);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

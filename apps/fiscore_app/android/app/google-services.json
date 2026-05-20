@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "558552038453",
+    "project_id": "fiscore-dev",
+    "storage_bucket": "fiscore-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:558552038453:android:31327039e013b3bd72c57c",
+        "android_client_info": {
+          "package_name": "com.pioneeritworks.fiscore.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "558552038453-jmhvpg36lfnlmr6ea8164n2qn3h17mlt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pioneeritworks.fiscore.dev",
+            "certificate_hash": "96c51ad3e92be2cad3082838d5600ca5c0a3d817"
+          }
+        },
+        {
+          "client_id": "558552038453-bidk1oamo8fne72vs6bjifvp8ft07fcf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQrAo1gcishgW9aODClUP6m2b-1eOlRuE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "558552038453-bidk1oamo8fne72vs6bjifvp8ft07fcf.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "558552038453-b4rdo5mh65apq4imi3blo2itd64bb28g.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.pioneeritworks.fiscore.dev"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
