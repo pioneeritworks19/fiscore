@@ -215,6 +215,20 @@ Only the latest public inspection findings should auto-create tenant violations 
 
 Older findings should remain visible historically without becoming active by default.
 
+### Security Hardening TODO
+
+Before production launch, the master restaurant search endpoint used by onboarding must be hardened against enumeration and scraping:
+
+- require Firebase Auth and active tenant membership
+- require Firebase App Check from supported app clients
+- log every search with user ID, tenant ID, search text, result count, and timestamp
+- rate-limit by user, tenant, and request origin
+- require meaningful search text and avoid broad unbounded searches
+- cap result count and do not expose pagination for onboarding search
+- return only tenant-safe fields needed for matching
+- monitor repeated searches that look like master-data enumeration
+- keep raw master data access server-side only
+
 ## 4B. Manual Site Path
 
 ### Goal

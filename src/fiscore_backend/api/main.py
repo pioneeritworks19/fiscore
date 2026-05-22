@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from fiscore_backend.api.routes.app_api import router as app_router
 from fiscore_backend.api.routes.health import router as health_router
 from fiscore_backend.api.routes.ops import router as ops_router
 from fiscore_backend.config import get_settings
@@ -15,6 +16,7 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(app_router)
 app.include_router(ops_router)
 
 
