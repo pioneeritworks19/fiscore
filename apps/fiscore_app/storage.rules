@@ -16,9 +16,26 @@ service firebase.storage {
         firestore.get(tenantMemberPath(tenantId)).data.status == 'active';
     }
 
+    function hasAllSiteAccess(tenantId) {
+      return isActiveTenantMember(tenantId) &&
+        (
+          firestore.get(tenantMemberPath(tenantId)).data.role in ['tenant_owner', 'admin'] ||
+          firestore.get(tenantMemberPath(tenantId)).data.siteAccessMode == 'all'
+        );
+    }
+
+    function hasSiteAccess(tenantId, siteId) {
+      return hasAllSiteAccess(tenantId) ||
+        (
+          isActiveTenantMember(tenantId) &&
+          firestore.get(tenantMemberPath(tenantId)).data.siteIds is list &&
+          firestore.get(tenantMemberPath(tenantId)).data.siteIds.hasAny([siteId])
+        );
+    }
+
     match /tenants/{tenantId}/sites/{siteId}/violations/{violationId}/attachments/{attachmentId}/{fileName} {
-      allow read: if isActiveTenantMember(tenantId);
-      allow create: if isActiveTenantMember(tenantId) &&
+      allow read: if hasSiteAccess(tenantId, siteId);
+      allow create: if hasSiteAccess(tenantId, siteId) &&
         (
           (
             request.resource.contentType.matches('image/.*') &&
@@ -29,7 +46,29 @@ service firebase.storage {
             request.resource.size < 25 * 1024 * 1024
           )
         );
-      allow delete: if isActiveTenantMember(tenantId);
+      allow delete: if hasSiteAccess(tenantId, siteId);
+      allow update: if false;
+    }
+
+    match /tenants/{tenantId}/sites/{siteId}/inspections/{inspectionId}/attachments/{attachmentId}/{fileName} {
+      allow read: if hasSiteAccess(tenantId, siteId);
+      allow create: if hasSiteAccess(tenantId, siteId) &&
+        (
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType == 'text/html' ||
+          request.resource.contentType.matches('image/.*')
+        ) &&
+        request.resource.size < 15 * 1024 * 1024;
+      allow delete: if hasSiteAccess(tenantId, siteId);
+      allow update: if false;
+    }
+
+    match /tenants/{tenantId}/sites/{siteId}/audits/{auditId}/attachments/{attachmentId}/{fileName} {
+      allow read: if hasSiteAccess(tenantId, siteId);
+      allow create: if hasSiteAccess(tenantId, siteId) &&
+        request.resource.contentType.matches('image/.*') &&
+        request.resource.size < 10 * 1024 * 1024;
+      allow delete: if hasSiteAccess(tenantId, siteId);
       allow update: if false;
     }
 

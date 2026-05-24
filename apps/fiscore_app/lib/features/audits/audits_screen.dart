@@ -1,22 +1,204 @@
 part of '../../main.dart';
 
-class _AuditsContent extends StatefulWidget {
-  const _AuditsContent({
+class _PublicInspectionsContent extends StatefulWidget {
+  const _PublicInspectionsContent({
     required this.tenantId,
     required this.siteId,
+    required this.currentRole,
+    this.showHeader = true,
+    this.onSubflowChanged,
   });
 
   final String tenantId;
   final String siteId;
+  final String currentRole;
+  final bool showHeader;
+  final ValueChanged<bool>? onSubflowChanged;
 
   @override
-  State<_AuditsContent> createState() => _AuditsContentState();
+  State<_PublicInspectionsContent> createState() =>
+      _PublicInspectionsContentState();
 }
 
-class _AuditsContentState extends State<_AuditsContent> {
+class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
   final InspectionRepository _inspectionRepository = InspectionRepository();
   final ViolationRepository _violationRepository = ViolationRepository();
   String? _selectedInspectionId;
+  String? _selectedViolationId;
+  String? _loadedViolationId;
+  bool _isSavingViolation = false;
+  String? _violationMessage;
+  String? _violationError;
+
+  final _generalController = TextEditingController();
+  final _containmentController = TextEditingController();
+  final _rootCauseController = TextEditingController();
+  final _correctiveController = TextEditingController();
+  final _preventiveController = TextEditingController();
+
+  @override
+  void dispose() {
+    _generalController.dispose();
+    _containmentController.dispose();
+    _rootCauseController.dispose();
+    _correctiveController.dispose();
+    _preventiveController.dispose();
+    super.dispose();
+  }
+
+  void _loadViolationResponse(
+    String violationId,
+    Map<String, dynamic> violation,
+  ) {
+    if (_loadedViolationId == violationId) {
+      return;
+    }
+    _loadedViolationId = violationId;
+    _generalController.text = violation['responseGeneral'] as String? ?? '';
+    _containmentController.text =
+        violation['responseContainment'] as String? ?? '';
+    _rootCauseController.text = violation['responseRootCause'] as String? ?? '';
+    _correctiveController.text =
+        violation['responseCorrectiveAction'] as String? ?? '';
+    _preventiveController.text =
+        violation['responsePreventiveAction'] as String? ?? '';
+  }
+
+  Future<void> _saveViolationResponse(
+    String violationId,
+    String currentStatus,
+  ) async {
+    setState(() {
+      _isSavingViolation = true;
+      _violationError = null;
+    });
+
+    try {
+      await _violationRepository.saveStructuredResponse(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        violationId: violationId,
+        startWork: currentStatus == 'open',
+        response: _currentViolationResponse(),
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Saved for later.')));
+    } catch (_) {
+      setState(() {
+        _violationError = 'Could not save the response. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingViolation = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _submitViolationForReview(String violationId) async {
+    if (_correctiveController.text.trim().isEmpty) {
+      setState(() {
+        _violationMessage = null;
+        _violationError = 'Enter what was fixed before submitting for review.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSavingViolation = true;
+      _violationMessage = null;
+      _violationError = null;
+    });
+
+    try {
+      await _violationRepository.saveStructuredResponse(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        violationId: violationId,
+        response: _currentViolationResponse(),
+      );
+      await _violationRepository.updateStatus(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        violationId: violationId,
+        status: 'pending_review',
+        reviewStatus: 'submitted',
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Submitted for review.')));
+      setState(() {
+        _selectedViolationId = null;
+        _loadedViolationId = null;
+      });
+    } catch (_) {
+      setState(() {
+        _violationError = 'Could not submit the response. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingViolation = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _updateAuditViolationStatus(
+    String violationId,
+    String status, {
+    String? reviewStatus,
+    String? closureReason,
+  }) async {
+    setState(() {
+      _isSavingViolation = true;
+      _violationMessage = null;
+      _violationError = null;
+    });
+
+    try {
+      await _violationRepository.updateStatus(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        violationId: violationId,
+        status: status,
+        reviewStatus: reviewStatus,
+        closureReason: closureReason,
+      );
+      setState(() {
+        _violationMessage =
+            'Violation moved to ${_violationStatusLabel(status)}.';
+      });
+    } catch (_) {
+      setState(() {
+        _violationError = 'Could not update the violation. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingViolation = false;
+        });
+      }
+    }
+  }
+
+  Map<String, String> _currentViolationResponse() {
+    return {
+      'responseGeneral': _generalController.text.trim(),
+      'responseContainment': _containmentController.text.trim(),
+      'responseRootCause': _rootCauseController.text.trim(),
+      'responseCorrectiveAction': _correctiveController.text.trim(),
+      'responsePreventiveAction': _preventiveController.text.trim(),
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,9 +248,7 @@ class _AuditsContentState extends State<_AuditsContent> {
             builder: (context, violationSnapshot) {
               final violations = (violationSnapshot.data?.docs ?? [])
                   .where(
-                    (doc) =>
-                        doc.data()['masterInspectionId'] ==
-                        selectedDoc.id,
+                    (doc) => doc.data()['masterInspectionId'] == selectedDoc.id,
                   )
                   .toList();
               violations.sort((a, b) {
@@ -86,7 +266,63 @@ class _AuditsContentState extends State<_AuditsContent> {
                 return aOrder.compareTo(bOrder);
               });
 
+              if (_selectedViolationId != null) {
+                QueryDocumentSnapshot<Map<String, dynamic>>? selectedViolation;
+                for (final doc in violations) {
+                  if (doc.id == _selectedViolationId) {
+                    selectedViolation = doc;
+                    break;
+                  }
+                }
+                if (selectedViolation != null) {
+                  final selectedViolationDoc = selectedViolation;
+                  _loadViolationResponse(
+                    selectedViolationDoc.id,
+                    selectedViolationDoc.data(),
+                  );
+                  return _ViolationDetailView(
+                    tenantId: widget.tenantId,
+                    violationId: selectedViolationDoc.id,
+                    violation: selectedViolationDoc.data(),
+                    currentRole: widget.currentRole,
+                    generalController: _generalController,
+                    containmentController: _containmentController,
+                    rootCauseController: _rootCauseController,
+                    correctiveController: _correctiveController,
+                    preventiveController: _preventiveController,
+                    isSaving: _isSavingViolation,
+                    message: _violationMessage,
+                    error: _violationError,
+                    backLabel: 'Back to inspection',
+                    onBack: () {
+                      setState(() {
+                        _selectedViolationId = null;
+                        _loadedViolationId = null;
+                        _violationMessage = null;
+                        _violationError = null;
+                      });
+                    },
+                    onSaveResponse: () => _saveViolationResponse(
+                      selectedViolationDoc.id,
+                      selectedViolationDoc.data()['status'] as String? ??
+                          'open',
+                    ),
+                    onSubmitForReview: () =>
+                        _submitViolationForReview(selectedViolationDoc.id),
+                    onUpdateStatus: (status, {reviewStatus, closureReason}) =>
+                        _updateAuditViolationStatus(
+                          selectedViolationDoc.id,
+                          status,
+                          reviewStatus: reviewStatus,
+                          closureReason: closureReason,
+                        ),
+                  );
+                }
+              }
+
               return _InspectionDetailView(
+                tenantId: widget.tenantId,
+                siteId: widget.siteId,
                 inspectionId: selectedDoc.id,
                 inspection: selectedDoc.data(),
                 violations: violations,
@@ -96,6 +332,16 @@ class _AuditsContentState extends State<_AuditsContent> {
                 onBack: () {
                   setState(() {
                     _selectedInspectionId = null;
+                    _selectedViolationId = null;
+                  });
+                  widget.onSubflowChanged?.call(false);
+                },
+                onOpenViolation: (violationId) {
+                  setState(() {
+                    _selectedViolationId = violationId;
+                    _loadedViolationId = null;
+                    _violationMessage = null;
+                    _violationError = null;
                   });
                 },
               );
@@ -106,14 +352,16 @@ class _AuditsContentState extends State<_AuditsContent> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Audits',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: _ink,
+            if (widget.showHeader) ...[
+              Text(
+                'Audits',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: _ink,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
+              const SizedBox(height: 6),
+            ],
             Text(
               _inspectionSummaryText(inspections),
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -129,6 +377,7 @@ class _AuditsContentState extends State<_AuditsContent> {
                   setState(() {
                     _selectedInspectionId = inspection.id;
                   });
+                  widget.onSubflowChanged?.call(true);
                 },
               ),
           ],
@@ -151,8 +400,8 @@ class _InspectionListCard extends StatelessWidget {
     final score = _inspectionScoreText(inspection);
     final findingCount = (inspection['findingCount'] as num?)?.toInt() ?? 0;
     final reportReady =
-        _displayText(inspection['reportStoragePath']).isNotEmpty ||
-        _displayText(inspection['reportAvailabilityStatus']) == 'available';
+        _displayText(inspection['tenantReportStoragePath']).isNotEmpty ||
+        _displayText(inspection['tenantReportStatus']) == 'available';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -250,18 +499,24 @@ class _InspectionListCard extends StatelessWidget {
 
 class _InspectionDetailView extends StatelessWidget {
   const _InspectionDetailView({
+    required this.tenantId,
+    required this.siteId,
     required this.inspectionId,
     required this.inspection,
     required this.violations,
     required this.isLoadingViolations,
     required this.onBack,
+    required this.onOpenViolation,
   });
 
+  final String tenantId;
+  final String siteId;
   final String inspectionId;
   final Map<String, dynamic> inspection;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> violations;
   final bool isLoadingViolations;
   final VoidCallback onBack;
+  final ValueChanged<String> onOpenViolation;
 
   @override
   Widget build(BuildContext context) {
@@ -275,12 +530,17 @@ class _InspectionDetailView extends StatelessWidget {
         TextButton.icon(
           onPressed: onBack,
           icon: const Icon(Icons.arrow_back_ios_new, size: 16),
-          label: const Text('Back to audits'),
+          label: const Text('Back to public inspections'),
         ),
         const SizedBox(height: 8),
         _InspectionHeroCard(inspection: inspection),
         const SizedBox(height: 14),
-        _InspectionSourceCard(inspection: inspection),
+        _InspectionSourceCard(
+          tenantId: tenantId,
+          siteId: siteId,
+          inspectionId: inspectionId,
+          inspection: inspection,
+        ),
         const SizedBox(height: 14),
         if (isLoadingViolations)
           const Center(child: CircularProgressIndicator())
@@ -307,12 +567,11 @@ class _InspectionDetailView extends StatelessWidget {
           const SizedBox(height: 14),
           _InspectionViolationGroup(
             title: 'Needs action',
-            violations: violations
-                .where((doc) {
-                  final status = doc.data()['status'] as String? ?? 'open';
-                  return status == 'open' || status == 'in_progress';
-                })
-                .toList(),
+            violations: violations.where((doc) {
+              final status = doc.data()['status'] as String? ?? 'open';
+              return status == 'open' || status == 'in_progress';
+            }).toList(),
+            onOpenViolation: onOpenViolation,
           ),
           const SizedBox(height: 14),
           _InspectionViolationGroup(
@@ -324,6 +583,7 @@ class _InspectionDetailView extends StatelessWidget {
                       'pending_review',
                 )
                 .toList(),
+            onOpenViolation: onOpenViolation,
           ),
           const SizedBox(height: 14),
           _InspectionViolationGroup(
@@ -334,6 +594,7 @@ class _InspectionDetailView extends StatelessWidget {
                       (doc.data()['status'] as String? ?? 'open') == 'closed',
                 )
                 .toList(),
+            onOpenViolation: onOpenViolation,
           ),
         ],
         const SizedBox(height: 10),
@@ -420,42 +681,219 @@ class _InspectionHeroCard extends StatelessWidget {
 }
 
 class _InspectionSourceCard extends StatelessWidget {
-  const _InspectionSourceCard({required this.inspection});
+  const _InspectionSourceCard({
+    required this.tenantId,
+    required this.siteId,
+    required this.inspectionId,
+    required this.inspection,
+  });
 
+  final String tenantId;
+  final String siteId;
+  final String inspectionId;
   final Map<String, dynamic> inspection;
 
   @override
   Widget build(BuildContext context) {
+    final findingCount = (inspection['findingCount'] as num?)?.toInt() ?? 0;
     final facts = [
       _DetailFact('Inspection date', _dateText(inspection['inspectionDate'])),
       _DetailFact('Inspection type', inspection['inspectionType']),
       _DetailFact('Score', _inspectionScoreText(inspection)),
       _DetailFact('Grade', _inspectionGradeText(inspection)),
       _DetailFact('Official status', inspection['officialStatus']),
-      _DetailFact('Findings', inspection['findingCount']),
+      _DetailFact('Findings', findingCount),
       _DetailFact('Report status', inspection['reportAvailabilityStatus']),
       _DetailFact('Report format', inspection['reportFormat']),
-      _DetailFact(
-        'Report',
-        _displayText(inspection['reportStoragePath']).isEmpty
-            ? ''
-            : 'Stored in FiScore',
-      ),
     ];
 
-    return _DetailFactCard(
-      title: 'Inspection details',
-      icon: Icons.fact_check_outlined,
-      facts: facts,
-      emptyText: 'Inspection details will appear here after master-data sync.',
-      collapsedSummary: _joinNonEmpty([
-        _displayText(inspection['inspectionType']),
-        _dateText(inspection['inspectionDate']),
-        _inspectionGradeText(inspection).isEmpty
-            ? ''
-            : 'Grade ${_inspectionGradeText(inspection)}',
-      ]),
-      initiallyExpanded: true,
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: InspectionRepository().streamReportAttachments(
+        tenantId: tenantId,
+        siteId: siteId,
+        inspectionId: inspectionId,
+      ),
+      builder: (context, snapshot) {
+        final reports = (snapshot.data?.docs ?? [])
+            .where((doc) => doc.data()['type'] == 'inspection_report')
+            .toList();
+        final report = reports.isEmpty ? null : reports.first;
+        final reportStatus = report == null
+            ? 'Report missing'
+            : _reportAttachmentStatus(report.data());
+        return _DetailFactCard(
+          title: 'Inspection details',
+          icon: Icons.fact_check_outlined,
+          facts: facts,
+          emptyText:
+              'Inspection details will appear here after master-data sync.',
+          collapsedSummary: _joinNonEmpty([
+            _displayText(inspection['inspectionType']),
+            _dateText(inspection['inspectionDate']),
+            _inspectionGradeText(inspection).isEmpty
+                ? ''
+                : 'Grade ${_inspectionGradeText(inspection)}',
+            _inspectionScoreText(inspection).isEmpty
+                ? ''
+                : 'Score ${_inspectionScoreText(inspection)}',
+            '$findingCount findings',
+            reportStatus,
+          ]),
+          initiallyExpanded: false,
+          footer: _InspectionReportAction(
+            tenantId: tenantId,
+            siteId: siteId,
+            inspectionId: inspectionId,
+            report: report == null
+                ? null
+                : {
+                    '_id': report.id,
+                    'attachmentType': 'document',
+                    ...report.data(),
+                  },
+            isLoading: snapshot.connectionState == ConnectionState.waiting,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _InspectionReportAction extends StatefulWidget {
+  const _InspectionReportAction({
+    required this.tenantId,
+    required this.siteId,
+    required this.inspectionId,
+    required this.report,
+    required this.isLoading,
+  });
+
+  final String tenantId;
+  final String siteId;
+  final String inspectionId;
+  final Map<String, dynamic>? report;
+  final bool isLoading;
+
+  @override
+  State<_InspectionReportAction> createState() =>
+      _InspectionReportActionState();
+}
+
+class _InspectionReportActionState extends State<_InspectionReportAction> {
+  bool _isWorking = false;
+
+  Future<void> _viewReport() async {
+    final report = widget.report;
+    if (report == null) {
+      return;
+    }
+    final storagePath = _firstAvailableText([
+      report['viewablePath'],
+      report['storagePath'],
+    ]);
+    if (storagePath.isEmpty) {
+      return;
+    }
+    final contentType = _firstAvailableText([
+      report['viewableContentType'],
+      report['contentType'],
+    ]).toLowerCase();
+    if (contentType.startsWith('image/')) {
+      _showAttachmentPreview(context, {
+        ...report,
+        'type': 'image',
+        'storagePath': storagePath,
+        'compressedPath': storagePath,
+        'thumbnailPath': storagePath,
+      });
+      return;
+    }
+    setState(() {
+      _isWorking = true;
+    });
+    try {
+      final url = await FirebaseStorage.instance
+          .ref(storagePath)
+          .getDownloadURL();
+      final launched = await launchUrl(
+        Uri.parse(url),
+        mode: kIsWeb
+            ? LaunchMode.platformDefault
+            : LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+      if (!launched && mounted) {
+        _showMediaSnack(context, 'Could not open the report.');
+      }
+    } catch (error) {
+      debugPrint('Could not open inspection report $storagePath: $error');
+      if (mounted) {
+        _showMediaSnack(context, 'Could not open the report.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isWorking = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _uploadReport() async {
+    setState(() {
+      _isWorking = true;
+    });
+    try {
+      await InspectionRepository().uploadReportAttachment(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        inspectionId: widget.inspectionId,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Report uploaded.')));
+      }
+    } on AppException catch (error) {
+      if (mounted) {
+        _showMediaSnack(context, error.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showMediaSnack(context, 'Could not upload the report.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isWorking = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.isLoading) {
+      return Text(
+        'Checking report...',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: _muted),
+      );
+    }
+
+    final report = widget.report;
+    final canView =
+        report != null &&
+        _firstAvailableText([
+          report['viewablePath'],
+          report['storagePath'],
+        ]).isNotEmpty;
+    final label = canView ? 'Open report' : 'Upload report';
+    final icon = canView ? Icons.open_in_new : Icons.upload_file_outlined;
+
+    return _InlineSectionAction(
+      icon: icon,
+      label: label,
+      onPressed: _isWorking ? null : (canView ? _viewReport : _uploadReport),
     );
   }
 }
@@ -510,10 +948,12 @@ class _InspectionViolationGroup extends StatelessWidget {
   const _InspectionViolationGroup({
     required this.title,
     required this.violations,
+    required this.onOpenViolation,
   });
 
   final String title;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> violations;
+  final ValueChanged<String> onOpenViolation;
 
   @override
   Widget build(BuildContext context) {
@@ -521,9 +961,7 @@ class _InspectionViolationGroup extends StatelessWidget {
       return _DashboardSection(
         title: title,
         trailing: '0',
-        children: const [
-          _InspectionEmptyRow(),
-        ],
+        children: const [_InspectionEmptyRow()],
       );
     }
 
@@ -532,71 +970,110 @@ class _InspectionViolationGroup extends StatelessWidget {
       trailing: violations.length.toString(),
       children: [
         for (final doc in violations)
-          _InspectionFindingRow(violation: doc.data()),
+          _InspectionFindingRow(
+            violation: doc.data(),
+            onOpen: () => onOpenViolation(doc.id),
+          ),
       ],
     );
   }
 }
 
 class _InspectionFindingRow extends StatelessWidget {
-  const _InspectionFindingRow({required this.violation});
+  const _InspectionFindingRow({required this.violation, required this.onOpen});
 
   final Map<String, dynamic> violation;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final status = violation['status'] as String? ?? 'open';
-    final color = _statusColor(status);
+    final title =
+        violation['title'] as String? ??
+        violation['summaryText'] as String? ??
+        'Violation finding';
+    final comment = _firstAvailableText([
+      violation['auditorComments'],
+      violation['description'],
+      violation['clauseReference'],
+    ]);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: _line.withValues(alpha: 0.7))),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(Icons.report_problem_outlined, color: color, size: 20),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: _line),
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  violation['title'] as String? ??
-                      violation['summaryText'] as String? ??
-                      'Violation finding',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: _ink,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: _statusColor(status),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _joinNonEmpty([
-                    _violationStatusLabel(status),
-                    _severityLabel(violation['severity'] as String?),
-                  ]),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: _muted,
-                    height: 1.35,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: _ink,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _SmallStatusBadge(status: status),
+                        ],
+                      ),
+                      if (comment.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          comment,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: _muted,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Text(
+                        _severityLabel(violation['severity'] as String?),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: _muted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right, color: _navy, size: 22),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -611,9 +1088,7 @@ class _InspectionEmptyRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         'Nothing here right now.',
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: _muted,
-            ),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: _muted),
       ),
     );
   }
@@ -636,9 +1111,9 @@ class _AuditPill extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w900,
-            ),
+          color: color,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -698,4 +1173,16 @@ Color _inspectionStateColor(String? state) {
     default:
       return _navy;
   }
+}
+
+String _reportAttachmentStatus(Map<String, dynamic> report) {
+  final status = _displayText(report['status']);
+  if (status == 'ready') {
+    final source = _displayText(report['source']);
+    return source == 'user_upload' ? 'Report uploaded' : 'Report available';
+  }
+  if (status.isNotEmpty) {
+    return 'Report $status';
+  }
+  return 'Report available';
 }

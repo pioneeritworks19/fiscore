@@ -18,6 +18,7 @@ This document focuses on tenant-side product roles used by restaurant organizati
 For version 1:
 
 - email should be the primary invitation identifier
+- passwordless email-link sign-in should allow invited users to authenticate without a Google account
 - phone number may be stored on the user profile
 - phone should be treated as contact information rather than the primary invite key
 
@@ -98,16 +99,16 @@ The table below summarizes the intended version 1 permissions.
 | Manually add site to tenant | Yes | Yes | No | No | No |
 | Link manual site to master restaurant | Yes | Yes | No | No | No |
 | Remove site from tenant | Yes | Yes | No | No | No |
-| Invite team members | No | Yes | Yes | No | No |
-| Change user roles | No | Yes | Yes | No | No |
-| Deactivate users | No | Yes | Yes | No | No |
+| Invite team members | Yes | Yes | No | No | No |
+| Change user roles | Yes | Yes | No | No | No |
+| Deactivate users | Yes | Yes | No | No | No |
 | Edit tenant settings | Yes | Yes | No | No | No |
 | View analytics and reports | Yes | Yes | Yes | Yes | No |
 | Upload onsite health inspection report | Yes | Yes | Yes | Yes | No |
 | Schedule one-time audits | No | No | Yes | Yes | No |
 | Create recurring audit schedules | No | No | Yes | Yes | No |
-| Create internal audits | No | No | Yes | Yes | No |
-| Complete internal audits | No | No | Yes | Yes | No |
+| Create internal audits | Yes | Yes | Yes | Yes | No |
+| Complete internal audits | Yes | Yes | Yes | Yes | No |
 | Create or edit checklist templates | No | Yes | Yes | Yes | No |
 | Create or edit scoring rules | No | Yes | Yes | Yes | No |
 | Assign training | No | No | Yes | No | No |
@@ -136,6 +137,9 @@ The tenant owner is the original account owner for the tenant and has the highes
 - edit tenant-level settings
 - view analytics and reports
 - upload onsite health inspection reports
+- invite team members
+- change roles and site access, including admin access
+- deactivate users
 
 ### Notes
 
@@ -156,7 +160,7 @@ The admin role is the main tenant administration role for managing sites, team m
 - manually add sites
 - link manual sites to master restaurant records
 - invite team members
-- change roles
+- change roles and site access for manager, auditor, and staff users
 - deactivate users
 - edit tenant settings
 - view analytics and reports
@@ -178,9 +182,6 @@ Managers are operational leaders who oversee audit completion, remediation work,
 
 - create and complete internal audits
 - assign training
-- invite team members
-- change roles
-- deactivate users
 - create or edit checklist templates and scoring rules
 - respond to violations
 - approve violation responses
@@ -259,25 +260,19 @@ Staff members support corrective action work and day-to-day operational follow-u
 For version 1:
 
 - admin can invite users
-- manager can invite users
+- tenant owner can invite users
+- tenant owner can create or edit admin access
 - admin can change roles
-- manager can change roles
+- admin can change role or site access for managers, auditors, and staff
+- tenant owner can deactivate users, including admins
 - admin can deactivate users
-- manager can deactivate users
-
-### Important Product Question for Later
-
-Because managers can change roles in version 1, the team should later define guardrails such as:
-
-- whether a manager can promote another user to admin
-- whether a manager can deactivate another manager
-- whether a manager can change the role of the tenant owner
 
 Recommended version 1 product guardrails:
 
 - no one can change the tenant owner role through normal UI
-- managers should not be able to modify tenant owner access
-- role escalation to admin may require admin confirmation if needed later
+- no user can change their own role or site access
+- only the tenant owner can assign, modify, or deactivate admin access
+- managers do not administer team roles or access
 
 ## Restaurant Portfolio Management
 
@@ -303,8 +298,14 @@ This keeps portfolio integrity and master-data linkage under higher-trust roles.
 
 ### Roles Allowed to Create and Complete Internal Audits
 
+- tenant owner
+- admin
 - manager
 - auditor
+
+Tenant owners and admins are included in the first implementation so a small
+operator can conduct checks directly while setting up and testing the
+workflow. Staff remain focused on remediation rather than audit execution.
 
 ### Roles Allowed to Schedule Audits
 
@@ -338,6 +339,8 @@ Violations may come from:
 
 ### Roles Allowed to Assign Training
 
+- tenant owner
+- admin
 - manager
 
 ### Roles Allowed to Complete Assigned Training

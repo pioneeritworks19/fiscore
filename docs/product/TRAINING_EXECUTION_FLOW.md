@@ -329,27 +329,28 @@ Allow managers to assign relevant training to specific users.
 Training may be assigned from:
 
 - a violation
-- an audit finding or audit summary
+- a violation created after an internal-audit issue is submitted
 - the training library
 - a general team-management need
 
 ### Steps
 
-1. manager opens a violation, audit, or training area
-2. FiScore shows available training options
+1. manager opens a violation or selects `Assign Training` from the training area
+2. FiScore opens a searchable training-library assignment flow
 3. FiScore may recommend training based on linked context
 4. manager selects a training item
-5. manager selects one or more users
+5. manager selects one or more active users with access to the site from a searchable teammate picker
 6. manager sets due date
 7. manager optionally adds an assignment note
-8. FiScore creates the assignment
+8. FiScore creates one independently trackable assignment per selected user
+
+Assignments are site-scoped: a user may only be assigned training for a site they can access.
 
 ### Recommended linkage model
 
 Assignments should support linkage to:
 
 - `violationId`
-- `auditId`
 - `siteId`
 - `assignedTo`
 - `trainingVersion`
@@ -360,9 +361,9 @@ Optional broader context may also include:
 
 ### Important simplification
 
-Version 1 should not require a separate `violationResponseId` link.
+Version 1 should not require a separate `violationResponseId` or `auditId` link.
 
-Linking to the violation itself is usually enough and keeps the model simpler.
+Linking to the violation itself is enough for corrective training and keeps the model simpler, including when that violation originated in an internal audit.
 
 ## 8. Assigned User Completion Flow
 
@@ -376,15 +377,19 @@ The assigned user should see training in:
 
 - `My Training`
 - `My Tasks`
-- violation- or audit-linked work queues where appropriate
+- the dashboard `Training assigned to me` queue
+- violation-linked context where appropriate
 
 ### Steps
 
 1. user opens assigned training
-2. user reviews the content
-3. user moves through topics if more than one exists
-4. user completes the optional quick check if configured
-5. FiScore records completion state
+2. user sees a short overview and starts the lesson
+3. user moves through practical topic pages one at a time
+4. user completes the quick check configured on the assigned lesson
+5. FiScore reveals whether the answer is correct, highlights the correct response, and shows a concise explanation
+6. FiScore records completion state and shows a simple completion summary
+
+For FiScore starter micro-learning, lesson sections and quick-check questions are maintained in the Training library configuration. When assigned, that content is snapshotted onto the assignment so later library updates do not change training already assigned or completed.
 
 ### Recommended assignment states
 
@@ -408,10 +413,22 @@ Keep completion operational and easy to understand.
 - progress percent
 - quick check result when present
 - assigned training version
+- snapshotted lesson sections and quick-check questions
+- incorrect answer count for the quick check
+- completion summary snapshot
 
 ### Important recommendation
 
 Version 1 should focus on completion and accountability, not advanced certification logic.
+
+A printable certificate is not part of version 1. A clean in-app completion summary is appropriate for short operational coaching.
+
+### Assignment cancellation
+
+- tenant owners, admins, and managers may cancel an active training assignment
+- cancellation preserves the assignment record and stores who cancelled it and when
+- cancelled training no longer appears in the assigned user's active worklist or overdue counts
+- managers can review cancelled assignments as history
 
 ## 10. Training Reporting Flow
 
@@ -483,13 +500,20 @@ Managers should eventually be able to answer:
 ### Assignment Screen
 
 - keep manager decisions simple:
-  select training, user, due date
-- show linked violation or audit context when relevant
+  select training, one or more users, due date
+- open as a dedicated searchable library flow so the catalog can scale
+- show linked violation context when relevant
 
 ### My Training
 
+- make this the default Training landing view
 - emphasize assigned, in-progress, overdue, and completed sections
 - allow quick resume
+
+### Team Progress
+
+- provide a separate manager view for open, overdue, completed, and all assignments
+- make overdue training reachable from the dashboard
 
 ### Reporting
 

@@ -108,7 +108,7 @@ The Training module should support:
 
 - manager-assigned training
 - training linked to violations
-- training linked to audits when relevant
+- training linked to violations when corrective follow-up is needed
 - training categorized by risk area
 - assignment due dates
 - overdue assignment states
@@ -129,7 +129,7 @@ Training may be assigned from:
 
 - a manager manually choosing training for a user
 - a violation thread recommending a training topic
-- an audit finding recommending a training topic
+- a violation created from an internal-audit issue
 - a repeat issue or risk pattern surfacing suggested training
 
 ## Training Linkage
@@ -147,7 +147,7 @@ This linkage is important so FiScore can connect training activity back to compl
 Version 1 recommendation:
 
 - `violationId` should be the main issue-level training link
-- `auditId` should be kept when the assignment comes from audit context
+- version 1 should not duplicate audit or audit-question linkage on training assignments; an internal-audit issue already preserves that context through its violation
 - `riskArea` should primarily come from training metadata or be system-derived from the source context
 - users should not normally be asked to type a risk area during assignment
 
@@ -181,7 +181,8 @@ FiScore may support lightweight knowledge checks.
 
 Recommended version 1 position:
 
-- optional
+- included on FiScore starter micro-learning lessons
+- optional for future tenant-authored training
 - short
 - operationally relevant
 - tied to the training topic rather than formal exam infrastructure
@@ -200,6 +201,17 @@ Recommended setup model:
 - support `true_false` or `single_choice`
 - allow one correct answer per question
 - allow optional explanation text
+
+### Starter lesson completion experience
+
+FiScore starter micro-learning should use a simple staff flow:
+
+1. open the assigned lesson and see why it matters
+2. move through a small number of practical topic pages
+3. answer one or two quick-check questions
+4. see a completion summary confirming what was recorded
+
+The completion summary is an operational training record, not a printable certificate or formal certification credential.
 
 ## Reporting Expectations
 

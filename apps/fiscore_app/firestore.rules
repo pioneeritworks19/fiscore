@@ -20,6 +20,46 @@ service cloud.firestore {
         memberDoc(tenantId).data.status == 'active';
     }
 
+    function hasAllSiteAccess(tenantId) {
+      return isActiveTenantMember(tenantId) &&
+        (
+          memberDoc(tenantId).data.role in ['tenant_owner', 'admin'] ||
+          memberDoc(tenantId).data.siteAccessMode == 'all'
+        );
+    }
+
+    function hasSiteAccess(tenantId, siteId) {
+      return hasAllSiteAccess(tenantId) ||
+        (
+          isActiveTenantMember(tenantId) &&
+          memberDoc(tenantId).data.siteIds is list &&
+          memberDoc(tenantId).data.siteIds.hasAny([siteId])
+        );
+    }
+
+    function isTenantAdmin(tenantId) {
+      return isActiveTenantMember(tenantId) &&
+        memberDoc(tenantId).data.role in ['tenant_owner', 'admin'];
+    }
+
+    function canAssignTraining(tenantId) {
+      return isActiveTenantMember(tenantId) &&
+        memberDoc(tenantId).data.role in ['tenant_owner', 'admin', 'manager'];
+    }
+
+    function assignedMemberHasSiteAccess(tenantId, siteId, userId) {
+      return exists(/databases/$(database)/documents/tenants/$(tenantId)/members/$(userId)) &&
+        get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(userId)).data.status == 'active' &&
+        (
+          get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(userId)).data.role in ['tenant_owner', 'admin'] ||
+          get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(userId)).data.siteAccessMode != 'selected' ||
+          (
+            get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(userId)).data.siteIds is list &&
+            get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(userId)).data.siteIds.hasAny([siteId])
+          )
+        );
+    }
+
     match /users/{userId} {
       allow create: if isSelf(userId);
       allow read, update: if isSelf(userId);
@@ -43,8 +83,68 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      match /teamActivity/{activityId} {
+        allow read: if isTenantAdmin(tenantId);
+        allow create, update, delete: if false;
+      }
+
+      match /trainings/{trainingId} {
+        allow read: if isActiveTenantMember(tenantId);
+        allow create, update, delete: if false;
+      }
+
+      match /checklistTemplates/{templateId} {
+        allow read: if isActiveTenantMember(tenantId);
+        allow create, update, delete: if false;
+      }
+
+      match /trainingAssignments/{assignmentId} {
+        allow read: if isActiveTenantMember(tenantId) &&
+          (
+            resource.data.assignedTo == request.auth.uid ||
+            (
+              canAssignTraining(tenantId) &&
+              hasSiteAccess(tenantId, resource.data.siteId)
+            )
+          );
+        allow create: if canAssignTraining(tenantId) &&
+          request.resource.data.assignedBy == request.auth.uid &&
+          hasSiteAccess(tenantId, request.resource.data.siteId) &&
+          assignedMemberHasSiteAccess(
+            tenantId,
+            request.resource.data.siteId,
+            request.resource.data.assignedTo
+          );
+        allow update: if
+          (
+            canAssignTraining(tenantId) &&
+            hasSiteAccess(tenantId, resource.data.siteId)
+          ) ||
+          (
+            isActiveTenantMember(tenantId) &&
+            resource.data.assignedTo == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status',
+              'progressPercent',
+              'startedAt',
+              'incorrectAnswerCount',
+              'quickCheckCompletedAt',
+              'completedTopicCount',
+              'completionSummarySnapshot',
+              'completedAt',
+              'updatedAt'
+            ]) &&
+            request.resource.data.status in ['in_progress', 'completed']
+          );
+        allow delete: if false;
+      }
+
+      match /sites/{siteId}/{document=**} {
+        allow read, write: if hasSiteAccess(tenantId, siteId);
+      }
+
       match /{document=**} {
-        allow read, write: if isActiveTenantMember(tenantId);
+        allow read, write: if false;
       }
     }
 

@@ -33,8 +33,66 @@ Simple mental model:
 
 Version 1 primary roles:
 
+- `tenant_owner`
+- `admin`
 - `manager`
 - `auditor`
+
+For the initial implementation, tenant owners and admins may also conduct
+internal checks. This lets small restaurant operators set up and use the
+workflow directly without creating a second operational account.
+
+## Internal Audit MVP
+
+The first implementation should focus on ad hoc internal checks rather than
+scheduling or checklist authoring.
+
+### Included
+
+- two FiScore starter templates copied into the tenant checklist library:
+  - `Food Safety Walkthrough`
+  - `Opening Readiness Check`
+- searchable tenant-owned checklist selection from a site
+- in-progress check execution and same-user resume
+- `Pass`, `Needs attention`, and `N/A` responses
+- inline observation capture when an item needs attention
+- photo proof attached to an audit response
+- review and submission
+- tenant violations created from configured failed responses on submission
+- completed check summary
+
+### Deferred
+
+- one-time and recurring scheduling
+- tenant checklist authoring and template editing
+- manual violation creation during a check
+- video proof
+- final audit report generation and mobile-friendly `View report` experience
+- durable offline operation queue and conflict handling
+
+The MVP should preserve the long-term model by creating audits only from a
+tenant-owned checklist template and snapshotting that template version into
+each audit session. Starter content may originate in FiScore, but the running
+audit does not execute directly against a live shared library definition.
+
+### TODO: Checklist Library Growth
+
+After the starter template and audit execution flow is stable:
+
+- add tenant-created company checklists and a checklist editor
+- add categories and filters such as Opening, Closing, Food safety, Equipment,
+  and Cleaning
+- surface recently used and suggested checks for faster shift workflows
+- add library update, detach, and version-management controls for administrators
+- support site-level template availability where operations require it
+
+### TODO: Internal Audit Report
+
+After internal check execution, violations, and remediation are stable,
+generate a tenant-owned report when a check is submitted. The completed audit
+view should open that stored report directly and eventually support sharing or
+export. The report should include checklist answers, observations, evidence,
+created violations, and later review or closure history.
 
 ## Screen Flow Overview
 

@@ -340,6 +340,39 @@ Version 1 does **not** need:
 - deep three-way merge tooling
 - complex field-level sync conflict resolution for content authoring
 
+## Current Product Slice
+
+The first implemented library experience should use the same pattern for
+checklists and training:
+
+- `My Library` is the operational collection owned by the tenant
+- `Explore FiScore Library` exposes FiScore-published starter content
+- a manager adds one published item at a time into `My Library`
+- checklists can be started only after they are in `My Library`
+- training can be assigned only after it is in `My Library`
+- selecting `Update` adopts the latest FiScore version for future audits or
+  future assignments only
+
+The initial FiScore published catalog is bootstrapped from server-side curated
+definitions while the content set is small, then served through central
+published Firestore records. It should later be managed through a governed
+publishing workflow without changing the tenant-owned adoption model.
+
+### TODO: Tenant-Created Content
+
+- add `Create checklist` and `Create training` actions within `My Library`
+- support draft, preview, publish, archive, and new-version workflows
+- show tenant-authored content as `Created by your team`
+- support `Customize for my team` by making an independent tenant-owned copy
+  of FiScore content
+
+### TODO: Library Administration And Discovery
+
+- add a FiScore publishing console and published-version records
+- add preview/detail screens before adopting content
+- add categories, filters, recently used items, and suggested content
+- add update summaries, detach controls, and site availability controls
+
 ## Summary
 
 FiScore Library content should behave like a governed template source, not like live mutable shared records inside tenant operations. Tenants should always work against tenant-owned checklist and training records. Some tenant records may remain synced to the library and adopt updates deliberately; others may be one-time copies. In all cases, completed audits, in-progress audits, assigned training, and completed training history must remain tied to the exact tenant version originally used.

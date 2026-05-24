@@ -98,7 +98,7 @@ class _ActiveSiteHeader extends StatelessWidget {
                       ),
                       const SizedBox(width: 3),
                       Text(
-                        'Linked to master',
+                        'Linked',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: const Color(0xFFBDF3CF),
                           fontWeight: FontWeight.w800,

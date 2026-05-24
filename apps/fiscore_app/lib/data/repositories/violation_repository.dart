@@ -138,7 +138,7 @@ class ViolationRepository {
       data['requiresReview'] = false;
       data['reviewStatus'] = 'closed';
     }
-    if (status == 'open') {
+    if (status == 'open' || status == 'in_progress') {
       data['closedAt'] = null;
       data['closedBy'] = null;
       data['requiresReview'] = false;

@@ -500,6 +500,28 @@ Stores tenant-readable copies of public inspection findings for historical sourc
 - tenant-owned workflow records live separately in the tenant violation model
 - the tenant app should treat violations, not public findings, as the actionable operational records
 
+## 7A. FiScore Library Published Content
+
+### Collections
+
+`fiscoreLibrary/checklist/items/{libraryItemId}`
+
+`fiscoreLibrary/training/items/{libraryItemId}`
+
+### Purpose
+
+Stores FiScore-authored published content available for tenants to discover
+and selectively adopt into `My Library`.
+
+### Notes
+
+- the early implementation bootstraps starter published records from
+  server-owned curated definitions
+- tenants do not execute audits or assignments from these central records
+- adopting content creates or updates a tenant-owned operational record
+- a future FiScore administration workflow should publish new versions here
+  instead of relying on code-maintained starter content
+
 ## 8. Audit Checklist Templates
 
 If tenant-visible checklist templates are stored in Firestore:
@@ -511,6 +533,17 @@ If tenant-visible checklist templates are stored in Firestore:
 ### Purpose
 
 Stores tenant-usable checklist templates and versions for internal audits.
+
+For the current internal-audit MVP, `Food Safety Walkthrough` and
+`Opening Readiness Check` are available from FiScore Library and become
+tenant-owned documents in this collection when explicitly adopted. New audit
+sessions are started only from these tenant records and store the selected
+template snapshot on the audit document.
+
+In the library browsing experience, managers select individual FiScore
+checklists from `Explore FiScore Library` and adopt them into `My Library`.
+Future tenant-authored checklists use this same collection with
+`templateSource = tenant_custom`.
 
 ### Suggested fields
 
@@ -560,6 +593,9 @@ Stores tenant-usable checklist templates and versions for internal audits.
 - FiScore-owned library templates should be represented through tenant-owned copies or tenant-side enablement records before site assignment is applied
 - tenant audits should never execute directly against mutable library records
 - synced library upgrades should create or activate a newer tenant version for future audits rather than mutating the tenant version already tied to historical audits
+- TODO: add a tenant checklist editor, category/filter metadata, recently used
+  and suggested checklist discovery, and library sync/detach management after
+  the starter workflow is validated
 
 ### Suggested `templateSource` values
 
@@ -1336,6 +1372,9 @@ Stores training content metadata available to the tenant.
 - `relatedRiskAreas`
 - `status`
 - `hasQuickCheck`
+- `topicSummaries`
+- `sections`
+- `quickCheckQuestions`
 - `createdAt`
 - `updatedAt`
 
@@ -1362,6 +1401,17 @@ Stores training content metadata available to the tenant.
 - `update_available`
 - `detached`
 - `never_synced`
+
+### Version 1 starter-library note
+
+- starter FiScore training is adopted into tenant-owned `trainings` documents through an authorized library action
+- managers select individual FiScore lessons from `Explore FiScore Library`
+  and adopt them into tenant-owned `trainings` documents
+- the app assigns from those tenant-owned documents rather than bundling runtime training content inside the mobile client
+- `topicSummaries` is a small listing read model for short micro-learning
+- starter micro-learning may store compact `sections` and `quickCheckQuestions` directly on the training document
+- future tenant-authored training uses the same collection with
+  `trainingSource = tenant_custom`
 
 ## 20B. Training Topics
 
@@ -1403,8 +1453,18 @@ Stores assignments of training to users for operational remediation or improveme
 - `dueDate`
 - `status`
 - `linkedViolationId`
-- `linkedAuditId`
 - `linkedRiskArea`
+- `trainingTopicsSnapshot`
+- `trainingSectionsSnapshot`
+- `quickCheckQuestionsSnapshot`
+- `hasQuickCheckSnapshot`
+- `incorrectAnswerCount`
+- `quickCheckCompletedAt`
+- `completedTopicCount`
+- `completionSummarySnapshot`
+- `cancelledAt`
+- `cancelledBy`
+- `cancelledByNameSnapshot`
 - `completedAt`
 - `createdAt`
 - `updatedAt`
@@ -1420,9 +1480,11 @@ Stores assignments of training to users for operational remediation or improveme
 ### Notes
 
 - `linkedViolationId` should be the main issue-level link for version 1
-- `linkedAuditId` should be used when training is assigned from audit context
+- version 1 should not store audit or audit-question linkage on assignments; when an internal audit requires follow-up training, its created violation is the training link
 - `linkedRiskArea` should usually come from the training item or be derived from source context rather than typed manually during assignment
 - `trainingVersion` should preserve which version the user was assigned
+- content snapshot fields preserve exactly what the assigned user reviewed and completed
+- assignment creation should require the assignee to be an active tenant member with access to the assignment site
 - existing assignments should remain tied to their assigned version even if a newer training version becomes active later
 - library-linked training upgrades should affect future assignments only after the tenant adopts the newer tenant version
 

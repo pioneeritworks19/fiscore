@@ -12,6 +12,7 @@ class SignedInHomeScreen extends StatefulWidget {
 class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
   final AuthService _authService = AuthService();
   final TenantRepository _tenantRepository = TenantRepository();
+  final TeamRepository _teamRepository = TeamRepository();
   final SiteRepository _siteRepository = SiteRepository();
   final MasterRestaurantRepository _masterRestaurantRepository =
       MasterRestaurantRepository();
@@ -21,9 +22,12 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
   bool _isCreatingTenant = false;
   bool _isSearchingRestaurants = false;
   bool _isLinkingRestaurant = false;
-  bool _isSyncingMasterData = false;
   bool _isAddingSite = false;
+  bool _isManagingTeam = false;
   int _selectedTabIndex = 1;
+  String _violationInitialFilter = 'active';
+  String? _violationInitialId;
+  String _trainingInitialView = 'home';
   bool _hasAppliedInitialLanding = false;
   String? _activeSiteId;
   String? _linkingRestaurantId;
@@ -32,8 +36,6 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
   String? _tenantError;
   String? _restaurantMessage;
   String? _restaurantError;
-  String? _syncMessage;
-  String? _syncError;
 
   @override
   void dispose() {
@@ -180,43 +182,10 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
     }
   }
 
-  Future<void> _syncMasterData(String tenantId, String siteId) async {
-    setState(() {
-      _isSyncingMasterData = true;
-      _syncMessage = null;
-      _syncError = null;
-    });
-
-    try {
-      final result =
-          await _masterRestaurantRepository.syncLinkedSiteMasterData(
-        tenantId: tenantId,
-        siteId: siteId,
-      );
-      setState(() {
-        _syncMessage =
-            'Synced ${result.importedInspectionCount} inspections and ${result.importedFindingCount} findings. ${result.openViolationCount} latest findings are open.';
-      });
-    } on AppException catch (error) {
-      setState(() {
-        _syncError = error.message;
-      });
-    } catch (_) {
-      setState(() {
-        _syncError = 'Master data sync failed. Please try again.';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSyncingMasterData = false;
-        });
-      }
-    }
-  }
-
   Widget _buildMainApp(
     String tenantId,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> sites,
+    Map<String, dynamic> currentMember,
   ) {
     if (sites.length == 1 && _selectedTabIndex == 0) {
       _selectedTabIndex = 1;
@@ -266,51 +235,88 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
       case 1:
         if (activeSiteDoc == null) {
           content = _SiteSetupContent(
-                tenantId: tenantId,
-                searchController: _restaurantSearchController,
-                isSearching: _isSearchingRestaurants,
-                isLinking: _isLinkingRestaurant,
-                linkingRestaurantId: _linkingRestaurantId,
-                results: _restaurantResults,
-                message: _restaurantMessage,
-                error: _restaurantError,
-                onSearch: () => _searchRestaurants(tenantId),
-                onCancel: sites.isEmpty
-                    ? null
-                    : () {
-                        setState(() {
-                          _isAddingSite = false;
-                          _restaurantError = null;
-                          _restaurantMessage = null;
-                          _restaurantResults = [];
-                        });
-                      },
-                onLinkRestaurant: (masterRestaurantId, restaurantName) =>
-                    _linkRestaurant(
-                  tenantId,
-                  masterRestaurantId,
-                  restaurantName,
-                ),
-              );
+            tenantId: tenantId,
+            searchController: _restaurantSearchController,
+            isSearching: _isSearchingRestaurants,
+            isLinking: _isLinkingRestaurant,
+            linkingRestaurantId: _linkingRestaurantId,
+            results: _restaurantResults,
+            message: _restaurantMessage,
+            error: _restaurantError,
+            onSearch: () => _searchRestaurants(tenantId),
+            onCancel: sites.isEmpty
+                ? null
+                : () {
+                    setState(() {
+                      _isAddingSite = false;
+                      _restaurantError = null;
+                      _restaurantMessage = null;
+                      _restaurantResults = [];
+                    });
+                  },
+            onLinkRestaurant: (masterRestaurantId, restaurantName) =>
+                _linkRestaurant(tenantId, masterRestaurantId, restaurantName),
+          );
         } else {
           final activeSiteId = activeSiteDoc.id;
           content = _SiteDashboardContent(
-                siteId: activeSiteId,
-                site: activeSiteDoc.data(),
-                siteCount: sites.length,
-                isSyncingMasterData: _isSyncingMasterData,
-                syncMessage: _syncMessage,
-                syncError: _syncError,
-                onSyncMasterData: () => _syncMasterData(tenantId, activeSiteId),
-                onAddSite: () {
-                  setState(() {
-                    _isAddingSite = true;
-                    _restaurantError = null;
-                    _restaurantMessage = null;
-                    _restaurantResults = [];
-                  });
-                },
-              );
+            tenantId: tenantId,
+            siteId: activeSiteId,
+            site: activeSiteDoc.data(),
+            currentUserId: widget.user.uid,
+            canManageTraining:
+                _canAssignTraining(currentMember['role'] as String?),
+            onOpenViolations: () {
+              setState(() {
+                _violationInitialFilter = 'active';
+                _violationInitialId = null;
+                _selectedTabIndex = 2;
+              });
+            },
+            onOpenMyTraining: () {
+              setState(() {
+                _trainingInitialView = 'home';
+                _selectedTabIndex = 4;
+              });
+            },
+            onOpenOverdueTraining: () {
+              setState(() {
+                _trainingInitialView = 'overdue';
+                _selectedTabIndex = 4;
+              });
+            },
+            onOpenReviews: (violationId) {
+              setState(() {
+                _violationInitialFilter = 'pending_review';
+                _violationInitialId = violationId;
+                _selectedTabIndex = 2;
+              });
+            },
+            onOpenAudits: () {
+              setState(() {
+                _selectedTabIndex = 3;
+              });
+            },
+            canStartAudit: const [
+              'tenant_owner',
+              'admin',
+              'manager',
+              'auditor',
+            ].contains(currentMember['role']),
+            onStartAudit: () {
+              setState(() {
+                _selectedTabIndex = 3;
+              });
+            },
+            onAddSite: () {
+              setState(() {
+                _isAddingSite = true;
+                _restaurantError = null;
+                _restaurantMessage = null;
+                _restaurantResults = [];
+              });
+            },
+          );
         }
         break;
       case 2:
@@ -325,6 +331,9 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                 tenantId: tenantId,
                 siteId: activeSiteDoc.id,
                 site: activeSiteDoc.data(),
+                currentRole: currentMember['role'] as String? ?? 'staff',
+                initialStatusFilter: _violationInitialFilter,
+                initialViolationId: _violationInitialId,
               );
         break;
       case 3:
@@ -338,27 +347,55 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
             : _AuditsContent(
                 tenantId: tenantId,
                 siteId: activeSiteDoc.id,
+                currentRole: currentMember['role'] as String? ?? 'staff',
               );
         break;
       case 4:
-        content = const _ModulePlaceholderContent(
-          title: 'Training',
-          subtitle:
-              'Assign and complete training connected to this restaurant, its violations, and recurring risk areas.',
-          icon: Icons.school_outlined,
-        );
+        content = activeSiteDoc == null
+            ? const _ModulePlaceholderContent(
+                title: 'Training',
+                subtitle: 'Open a restaurant site before viewing training.',
+                icon: Icons.school_outlined,
+              )
+            : _TrainingContent(
+                tenantId: tenantId,
+                siteId: activeSiteDoc.id,
+                currentMember: currentMember,
+                initialView: _trainingInitialView,
+              );
         break;
       default:
-        content = _MoreContent(
-          onAddSite: () {
-            setState(() {
-              _isAddingSite = true;
-              _restaurantError = null;
-              _restaurantMessage = null;
-              _restaurantResults = [];
-            });
-          },
-        );
+        content = _isManagingTeam
+            ? _TeamManagementContent(
+                tenantId: tenantId,
+                sites: sites,
+                currentMember: currentMember,
+                onBack: () {
+                  setState(() {
+                    _isManagingTeam = false;
+                  });
+                },
+              )
+            : _MoreContent(
+                onAddSite: () {
+                  setState(() {
+                    _isAddingSite = true;
+                    _isManagingTeam = false;
+                    _restaurantError = null;
+                    _restaurantMessage = null;
+                    _restaurantResults = [];
+                  });
+                },
+                onManageTeam:
+                    currentMember['role'] == 'tenant_owner' ||
+                        currentMember['role'] == 'admin'
+                    ? () {
+                        setState(() {
+                          _isManagingTeam = true;
+                        });
+                      }
+                    : null,
+              );
     }
 
     return _FiScoreAppScaffold(
@@ -377,6 +414,16 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
       onSelectedIndexChanged: (index) {
         setState(() {
           _selectedTabIndex = index;
+          if (index == 2) {
+            _violationInitialFilter = 'active';
+            _violationInitialId = null;
+          }
+          if (index == 4) {
+            _trainingInitialView = 'home';
+          }
+          if (index != 5) {
+            _isManagingTeam = false;
+          }
         });
       },
       onSignOut: _signOut,
@@ -393,11 +440,15 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
       stream: _siteRepository.userProfileStream(widget.user.uid),
       builder: (context, snapshot) {
         final userData = snapshot.data?.data();
+        // TODO: If users need membership in multiple independent tenants,
+        // add an explicit workspace switcher rather than creating another
+        // workspace from an invitation-acceptance screen.
         final tenantId = userData?['activeTenantId'] as String?;
         final isLoading = snapshot.connectionState == ConnectionState.waiting;
 
         if (isLoading) {
           return _FiScoreSetupScaffold(
+            user: widget.user,
             onSignOut: _signOut,
             child: const Center(child: CircularProgressIndicator()),
           );
@@ -405,67 +456,104 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
 
         if (tenantId == null) {
           return _FiScoreSetupScaffold(
+            user: widget.user,
             onSignOut: _signOut,
-            child: _WorkspaceSetupContent(
+            child: _InviteAcceptanceContent(
               displayName: displayName,
-              tenantNameController: _tenantNameController,
-              isCreatingTenant: _isCreatingTenant,
-              tenantMessage: _tenantMessage,
-              tenantError: _tenantError,
-              onCreateTenant: _createTenant,
+              onCreateWorkspace: (context) => _WorkspaceSetupContent(
+                displayName: displayName,
+                tenantNameController: _tenantNameController,
+                isCreatingTenant: _isCreatingTenant,
+                tenantMessage: _tenantMessage,
+                tenantError: _tenantError,
+                onCreateTenant: _createTenant,
+              ),
             ),
           );
         }
 
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _siteRepository.activeSitesStream(tenantId),
-          builder: (context, siteSnapshot) {
-            if (siteSnapshot.connectionState == ConnectionState.waiting) {
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: _teamRepository.memberStream(
+            tenantId: tenantId,
+            userId: widget.user.uid,
+          ),
+          builder: (context, memberSnapshot) {
+            if (memberSnapshot.connectionState == ConnectionState.waiting) {
               return _FiScoreSetupScaffold(
+                user: widget.user,
                 onSignOut: _signOut,
                 child: const Center(child: CircularProgressIndicator()),
               );
             }
 
-            final sites = siteSnapshot.data?.docs ?? [];
-            if (sites.isEmpty || _isAddingSite) {
+            final currentMember = memberSnapshot.data?.data();
+            if (currentMember == null || currentMember['status'] != 'active') {
               return _FiScoreSetupScaffold(
+                user: widget.user,
                 onSignOut: _signOut,
-                child: _SiteSetupContent(
-                  tenantId: tenantId,
-                  searchController: _restaurantSearchController,
-                  isSearching: _isSearchingRestaurants,
-                  isLinking: _isLinkingRestaurant,
-                  linkingRestaurantId: _linkingRestaurantId,
-                results: _restaurantResults,
-                message: _restaurantMessage,
-                error: _restaurantError,
-                onSearch: () => _searchRestaurants(tenantId),
-                onCancel: sites.isEmpty
-                    ? null
-                    : () {
-                        setState(() {
-                          _isAddingSite = false;
-                          _restaurantError = null;
-                          _restaurantMessage = null;
-                          _restaurantResults = [];
-                        });
-                      },
-                onLinkRestaurant: (masterRestaurantId, restaurantName) =>
-                      _linkRestaurant(
-                    tenantId,
-                    masterRestaurantId,
-                    restaurantName,
-                  ),
+                child: _InviteAcceptanceContent(
+                  displayName: displayName,
+                  reactivationTenantId: tenantId,
+                  onCreateWorkspace: (context) => const SizedBox.shrink(),
                 ),
               );
             }
 
-            return _buildMainApp(tenantId, sites);
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _siteRepository.activeSitesStream(
+                tenantId,
+                member: currentMember,
+              ),
+              builder: (context, siteSnapshot) {
+                if (siteSnapshot.connectionState == ConnectionState.waiting) {
+                  return _FiScoreSetupScaffold(
+                    user: widget.user,
+                    onSignOut: _signOut,
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                final sites = siteSnapshot.data?.docs ?? [];
+                if (sites.isEmpty || _isAddingSite) {
+                  return _FiScoreSetupScaffold(
+                    user: widget.user,
+                    onSignOut: _signOut,
+                    child: _SiteSetupContent(
+                      tenantId: tenantId,
+                      searchController: _restaurantSearchController,
+                      isSearching: _isSearchingRestaurants,
+                      isLinking: _isLinkingRestaurant,
+                      linkingRestaurantId: _linkingRestaurantId,
+                      results: _restaurantResults,
+                      message: _restaurantMessage,
+                      error: _restaurantError,
+                      onSearch: () => _searchRestaurants(tenantId),
+                      onCancel: sites.isEmpty
+                          ? null
+                          : () {
+                              setState(() {
+                                _isAddingSite = false;
+                                _restaurantError = null;
+                                _restaurantMessage = null;
+                                _restaurantResults = [];
+                              });
+                            },
+                      onLinkRestaurant: (masterRestaurantId, restaurantName) =>
+                          _linkRestaurant(
+                            tenantId,
+                            masterRestaurantId,
+                            restaurantName,
+                          ),
+                    ),
+                  );
+                }
+
+                return _buildMainApp(tenantId, sites, currentMember);
+              },
+            );
           },
         );
       },
     );
   }
 }
-

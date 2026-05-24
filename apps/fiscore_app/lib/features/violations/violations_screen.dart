@@ -5,11 +5,17 @@ class _ViolationsContent extends StatefulWidget {
     required this.tenantId,
     required this.siteId,
     required this.site,
+    required this.currentRole,
+    this.initialStatusFilter = 'active',
+    this.initialViolationId,
   });
 
   final String tenantId;
   final String siteId;
   final Map<String, dynamic> site;
+  final String currentRole;
+  final String initialStatusFilter;
+  final String? initialViolationId;
 
   @override
   State<_ViolationsContent> createState() => _ViolationsContentState();
@@ -18,7 +24,7 @@ class _ViolationsContent extends StatefulWidget {
 class _ViolationsContentState extends State<_ViolationsContent> {
   final ViolationRepository _violationRepository = ViolationRepository();
   String _viewMode = 'queue';
-  String _statusFilter = 'active';
+  late String _statusFilter;
   String? _selectedViolationId;
   String? _loadedViolationId;
   bool _isSaving = false;
@@ -30,6 +36,13 @@ class _ViolationsContentState extends State<_ViolationsContent> {
   final _rootCauseController = TextEditingController();
   final _correctiveController = TextEditingController();
   final _preventiveController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _statusFilter = widget.initialStatusFilter;
+    _selectedViolationId = widget.initialViolationId;
+  }
 
   @override
   void dispose() {
@@ -118,9 +131,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
       }
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Saved for later.')),
-        );
+        ..showSnackBar(const SnackBar(content: Text('Saved for later.')));
     } catch (_) {
       setState(() {
         _error = 'Could not save the response. Please try again.';
@@ -172,9 +183,9 @@ class _ViolationsContentState extends State<_ViolationsContent> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Submitted for review.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Submitted for review.')));
       setState(() {
         _selectedViolationId = null;
         _loadedViolationId = null;
@@ -193,6 +204,57 @@ class _ViolationsContentState extends State<_ViolationsContent> {
     }
   }
 
+  Future<void> _sendBackForChanges(String violationId) async {
+    final feedback = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => const _SendBackSheet(),
+    );
+    if (!mounted || feedback == null) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _message = null;
+      _error = null;
+    });
+
+    try {
+      await _violationRepository.addThreadComment(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        violationId: violationId,
+        body: 'Review feedback: $feedback',
+      );
+      await _violationRepository.updateStatus(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        violationId: violationId,
+        status: 'in_progress',
+        reviewStatus: 'needs_work',
+      );
+      if (mounted) {
+        setState(() {
+          _message = 'Sent back for changes.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not send this violation back. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _filteredViolations(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
@@ -202,7 +264,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
     if (_statusFilter == 'active') {
       return siteDocs.where((doc) {
         final status = doc.data()['status'] as String? ?? 'open';
-        return status != 'closed';
+        return status != 'closed' && status != 'pending_review';
       }).toList();
     }
     if (_statusFilter == 'all') {
@@ -275,6 +337,11 @@ class _ViolationsContentState extends State<_ViolationsContent> {
                   Expanded(
                     child: _ViolationFilterChips(
                       value: _statusFilter,
+                      reviewCount: allViolations
+                          .where(
+                            (doc) => doc.data()['status'] == 'pending_review',
+                          )
+                          .length,
                       onChanged: (value) {
                         setState(() {
                           _statusFilter = value;
@@ -336,6 +403,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
                     tenantId: widget.tenantId,
                     violationId: selectedViolationId,
                     violation: selectedViolation,
+                    currentRole: widget.currentRole,
                     generalController: _generalController,
                     containmentController: _containmentController,
                     rootCauseController: _rootCauseController,
@@ -358,6 +426,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
                     ),
                     onSubmitForReview: () =>
                         _submitResponseForReview(selectedViolationId),
+                    onSendBack: () => _sendBackForChanges(selectedViolationId),
                     onUpdateStatus: (status, {reviewStatus, closureReason}) =>
                         _updateViolationStatus(
                           selectedViolationId,
@@ -405,16 +474,21 @@ class _ViolationSummaryStrip extends StatelessWidget {
 }
 
 class _ViolationFilterChips extends StatelessWidget {
-  const _ViolationFilterChips({required this.value, required this.onChanged});
+  const _ViolationFilterChips({
+    required this.value,
+    required this.reviewCount,
+    required this.onChanged,
+  });
 
   final String value;
+  final int reviewCount;
   final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    const filters = [
+    final filters = [
       ('active', 'Active'),
-      ('pending_review', 'Review'),
+      ('pending_review', reviewCount > 0 ? 'Review ($reviewCount)' : 'Review'),
       ('closed', 'Closed'),
       ('all', 'All'),
     ];
@@ -629,6 +703,7 @@ class _ViolationDetailView extends StatelessWidget {
     required this.tenantId,
     required this.violationId,
     required this.violation,
+    required this.currentRole,
     required this.generalController,
     required this.containmentController,
     required this.rootCauseController,
@@ -640,12 +715,15 @@ class _ViolationDetailView extends StatelessWidget {
     required this.onBack,
     required this.onSaveResponse,
     required this.onSubmitForReview,
+    this.onSendBack,
     required this.onUpdateStatus,
+    this.backLabel = 'Back to violations',
   });
 
   final String tenantId;
   final String violationId;
   final Map<String, dynamic> violation;
+  final String currentRole;
   final TextEditingController generalController;
   final TextEditingController containmentController;
   final TextEditingController rootCauseController;
@@ -657,6 +735,8 @@ class _ViolationDetailView extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onSaveResponse;
   final VoidCallback onSubmitForReview;
+  final VoidCallback? onSendBack;
+  final String backLabel;
   final void Function(
     String status, {
     String? reviewStatus,
@@ -678,7 +758,7 @@ class _ViolationDetailView extends StatelessWidget {
         TextButton.icon(
           onPressed: onBack,
           icon: const Icon(Icons.arrow_back_ios_new, size: 16),
-          label: const Text('Back to violations'),
+          label: Text(backLabel),
         ),
         const SizedBox(height: 8),
         _ViolationDetailHero(
@@ -686,6 +766,10 @@ class _ViolationDetailView extends StatelessWidget {
           status: status,
           severity: violation['severity'] as String?,
         ),
+        if (status == 'pending_review') ...[
+          const SizedBox(height: 14),
+          const _ReadyForReviewBanner(),
+        ],
         const SizedBox(height: 14),
         _ViolationFactsSection(tenantId: tenantId, violation: violation),
         const SizedBox(height: 14),
@@ -693,6 +777,7 @@ class _ViolationDetailView extends StatelessWidget {
           tenantId: tenantId,
           violationId: violationId,
           violation: violation,
+          currentRole: currentRole,
           generalController: generalController,
           containmentController: containmentController,
           rootCauseController: rootCauseController,
@@ -719,6 +804,9 @@ class _ViolationDetailView extends StatelessWidget {
         _ViolationActions(
           status: status,
           isSaving: isSaving,
+          onSendBack:
+              onSendBack ??
+              () => onUpdateStatus('in_progress', reviewStatus: 'needs_work'),
           onUpdateStatus: onUpdateStatus,
         ),
       ],
@@ -780,6 +868,49 @@ class _ViolationDetailHero extends StatelessWidget {
               color: _ink,
               fontWeight: FontWeight.w900,
               height: 1.08,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadyForReviewBanner extends StatelessWidget {
+  const _ReadyForReviewBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+      decoration: BoxDecoration(
+        color: _softGreen,
+        border: Border.all(color: const Color(0xFFCFEBDD)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.verified_outlined, color: _green, size: 21),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ready for review',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: _ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Resolution submitted and waiting for approval.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: _muted),
+                ),
+              ],
             ),
           ),
         ],
@@ -897,6 +1028,20 @@ class _SourceDetailsCard extends StatelessWidget {
       return _buildCard(violation);
     }
 
+    if (sourceType == 'internal_audit') {
+      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirestorePaths.internalAudit(
+          tenantId,
+          siteId,
+          inspectionId,
+        ).snapshots(),
+        builder: (context, snapshot) {
+          final merged = {...violation, ...?snapshot.data?.data()};
+          return _buildCard(merged);
+        },
+      );
+    }
+
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirestorePaths.siteInspection(
         tenantId,
@@ -913,8 +1058,20 @@ class _SourceDetailsCard extends StatelessWidget {
   Widget _buildCard(Map<String, dynamic> source) {
     final facts = [
       _DetailFact('Source', _sourceLabel(sourceType)),
-      _DetailFact('Inspection date', _dateText(source['inspectionDate'])),
-      _DetailFact('Inspection type', source['inspectionType']),
+      _DetailFact(
+        sourceType == 'internal_audit' ? 'Completed' : 'Inspection date',
+        _dateText(
+          sourceType == 'internal_audit'
+              ? source['completedAt']
+              : source['inspectionDate'],
+        ),
+      ),
+      _DetailFact(
+        sourceType == 'internal_audit' ? 'Check' : 'Inspection type',
+        sourceType == 'internal_audit'
+            ? source['templateNameSnapshot']
+            : source['inspectionType'],
+      ),
       _DetailFact(
         'Inspection score',
         _firstAvailableText([source['inspectionScore'], source['score']]),
@@ -931,7 +1088,12 @@ class _SourceDetailsCard extends StatelessWidget {
           source['reportPath'],
         ]),
       ),
-      _DetailFact('Question response', source['sourceQuestionResponseId']),
+      _DetailFact(
+        sourceType == 'internal_audit' ? 'Checklist item' : 'Question response',
+        sourceType == 'internal_audit'
+            ? source['questionLabel']
+            : source['sourceQuestionResponseId'],
+      ),
     ];
 
     return _DetailFactCard(
@@ -953,6 +1115,7 @@ class _DetailFactCard extends StatelessWidget {
     required this.emptyText,
     required this.collapsedSummary,
     required this.initiallyExpanded,
+    this.footer,
   });
 
   final String title;
@@ -961,6 +1124,7 @@ class _DetailFactCard extends StatelessWidget {
   final String emptyText;
   final String collapsedSummary;
   final bool initiallyExpanded;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -1022,6 +1186,7 @@ class _DetailFactCard extends StatelessWidget {
             else
               for (final fact in visibleFacts)
                 _DetailFactRow(label: fact.label, value: fact.value as String),
+            if (footer != null) ...[const SizedBox(height: 2), footer!],
           ],
         ),
       ),
@@ -1075,6 +1240,7 @@ class _ViolationWorkArea extends StatefulWidget {
     required this.tenantId,
     required this.violationId,
     required this.violation,
+    required this.currentRole,
     required this.generalController,
     required this.containmentController,
     required this.rootCauseController,
@@ -1088,6 +1254,7 @@ class _ViolationWorkArea extends StatefulWidget {
   final String tenantId;
   final String violationId;
   final Map<String, dynamic> violation;
+  final String currentRole;
   final TextEditingController generalController;
   final TextEditingController containmentController;
   final TextEditingController rootCauseController;
@@ -1161,6 +1328,14 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
             ),
           ),
           const SizedBox(height: 12),
+          _ViolationTrainingSection(
+            tenantId: widget.tenantId,
+            siteId: widget.violation['siteId'] as String? ?? '',
+            violationId: widget.violationId,
+            violation: widget.violation,
+            currentRole: widget.currentRole,
+          ),
+          const SizedBox(height: 12),
           _WorkSectionCard(
             child: _DiscussionPanel(
               tenantId: widget.tenantId,
@@ -1170,19 +1345,24 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
                   (widget.violation['status'] as String? ?? 'open') == 'open',
             ),
           ),
-          const SizedBox(height: 18),
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: widget.correctiveController,
-            builder: (context, value, _) {
-              final canSubmit = value.text.trim().isNotEmpty;
-              return _ViolationBottomActions(
-                isSaving: widget.isSaving,
-                canSubmit: canSubmit,
-                onSaveForLater: widget.onSaveResponse,
-                onSubmitForReview: widget.onSubmitForReview,
-              );
-            },
-          ),
+          if ((widget.violation['status'] as String? ?? 'open') !=
+                  'pending_review' &&
+              (widget.violation['status'] as String? ?? 'open') !=
+                  'closed') ...[
+            const SizedBox(height: 18),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: widget.correctiveController,
+              builder: (context, value, _) {
+                final canSubmit = value.text.trim().isNotEmpty;
+                return _ViolationBottomActions(
+                  isSaving: widget.isSaving,
+                  canSubmit: canSubmit,
+                  onSaveForLater: widget.onSaveResponse,
+                  onSubmitForReview: widget.onSubmitForReview,
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -1490,11 +1670,6 @@ class _DiscussionPanelState extends State<_DiscussionPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _WorkSectionHeader(
-          title: 'Notes',
-          body: 'Add quick team updates without changing the fix response.',
-        ),
-        const SizedBox(height: 10),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _violationRepository.streamThreadEntries(
             tenantId: widget.tenantId,
@@ -1504,57 +1679,102 @@ class _DiscussionPanelState extends State<_DiscussionPanel> {
           builder: (context, snapshot) {
             final entries = snapshot.data?.docs ?? [];
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (entries.isEmpty) {
-              return const _EmptyWorkPanel(
-                icon: Icons.forum_outlined,
-                title: 'No notes yet',
-                body: 'Add quick updates while the team works this violation.',
+              return const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _WorkSectionHeader(
+                    title: 'Notes',
+                    body:
+                        'Add quick team updates without changing the fix response.',
+                  ),
+                  SizedBox(height: 12),
+                  Center(child: CircularProgressIndicator()),
+                ],
               );
             }
-            final visibleEntries = _showAllNotes ? entries : entries.take(3);
+            if (entries.isEmpty) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _WorkSectionHeader(
+                    title: 'Notes',
+                    body:
+                        'Add quick team updates without changing the fix response.',
+                  ),
+                  const SizedBox(height: 10),
+                  const _EmptyWorkPanel(
+                    icon: Icons.forum_outlined,
+                    title: 'No notes yet',
+                    body:
+                        'Add quick updates while the team works this violation.',
+                  ),
+                  const SizedBox(height: 12),
+                  _notesActions(0),
+                ],
+              );
+            }
+            final visibleEntries = (_showAllNotes ? entries : entries.take(3))
+                .toList();
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final entry in visibleEntries)
+                const _WorkSectionHeader(
+                  title: 'Notes',
+                  body:
+                      'Add quick team updates without changing the fix response.',
+                ),
+                const SizedBox(height: 10),
+                for (var index = 0; index < visibleEntries.length; index++)
                   _ThreadEntryTile(
                     tenantId: widget.tenantId,
                     siteId: widget.siteId,
                     violationId: widget.violationId,
-                    entryId: entry.id,
-                    entry: entry.data(),
+                    entryId: visibleEntries.elementAt(index).id,
+                    entry: visibleEntries.elementAt(index).data(),
+                    showDivider: index < visibleEntries.length - 1,
                   ),
-                if (entries.length > 3)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _showAllNotes = !_showAllNotes;
-                        });
-                      },
-                      icon: Icon(
-                        _showAllNotes
-                            ? Icons.expand_less
-                            : Icons.expand_more,
-                      ),
-                      label: Text(
-                        _showAllNotes
-                            ? 'Show latest notes'
-                            : 'View all ${entries.length} notes',
-                      ),
-                    ),
-                  ),
+                const SizedBox(height: 12),
+                _notesActions(entries.length),
               ],
             );
           },
         ),
-        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _notesActions(int entryCount) {
+    return Row(
+      children: [
         _InlineSectionAction(
           icon: Icons.add_comment_outlined,
           label: 'Add note',
           onPressed: _showAddNoteSheet,
         ),
+        const Spacer(),
+        if (entryCount > 3)
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _showAllNotes = !_showAllNotes;
+              });
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: _navy,
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+              minimumSize: const Size(0, 34),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            label: Text(
+              _showAllNotes
+                  ? 'Show recent notes'
+                  : 'View all $entryCount notes',
+            ),
+            icon: Icon(
+              _showAllNotes ? Icons.expand_less : Icons.expand_more,
+              size: 18,
+            ),
+          ),
       ],
     );
   }
@@ -1667,6 +1887,7 @@ class _ThreadEntryTile extends StatelessWidget {
     required this.violationId,
     required this.entryId,
     required this.entry,
+    required this.showDivider,
   });
 
   final String tenantId;
@@ -1674,8 +1895,12 @@ class _ThreadEntryTile extends StatelessWidget {
   final String violationId;
   final String entryId;
   final Map<String, dynamic> entry;
+  final bool showDivider;
 
-  Future<void> _deletePost(BuildContext context, List<String> attachmentIds) async {
+  Future<void> _deletePost(
+    BuildContext context,
+    List<String> attachmentIds,
+  ) async {
     try {
       await FirestorePaths.violationThreads(
         tenantId,
@@ -1706,44 +1931,54 @@ class _ThreadEntryTile extends StatelessWidget {
         entry['createdByDisplayNameSnapshot'] as String? ??
         (entry['createdBy'] as String?) ??
         'FiScore user';
-    final createdAt = _dateText(entry['createdAt']);
+    final createdAt = _noteTimeText(entry['createdAt']);
     final attachmentIds = (entry['attachmentIds'] as List?) ?? const [];
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFAFBFD),
-        border: Border.all(color: _line.withValues(alpha: 0.78)),
-        borderRadius: BorderRadius.circular(10),
+        border: showDivider
+            ? Border(bottom: BorderSide(color: _line.withValues(alpha: 0.8)))
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (body.isNotEmpty)
+            Text(
+              body,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: _ink,
+                fontSize: 14,
+                height: 1.38,
+              ),
+            ),
+          if (attachmentIds.isNotEmpty) ...[
+            if (body.isNotEmpty) const SizedBox(height: 8),
+            _PostedAttachmentStrip(
+              tenantId: tenantId,
+              siteId: siteId,
+              violationId: violationId,
+              attachmentIds: attachmentIds.whereType<String>().toList(),
+            ),
+          ],
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  author,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: _ink,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              if (createdAt.isNotEmpty)
-                Text(
-                  createdAt,
+                  createdAt.isEmpty ? author : '$author  |  $createdAt',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: _muted,
                     fontSize: 12,
                   ),
                 ),
+              ),
               PopupMenuButton<String>(
                 tooltip: 'More',
-                icon: const Icon(Icons.more_horiz, size: 20),
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.more_horiz, size: 19, color: _muted),
                 onSelected: (value) async {
                   if (value == 'delete') {
                     await _deletePost(
@@ -1753,32 +1988,11 @@ class _ThreadEntryTile extends StatelessWidget {
                   }
                 },
                 itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete post'),
-                  ),
+                  PopupMenuItem(value: 'delete', child: Text('Delete post')),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            body,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: _ink,
-              fontSize: 14,
-              height: 1.3,
-            ),
-          ),
-          if (attachmentIds.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _PostedAttachmentStrip(
-              tenantId: tenantId,
-              siteId: siteId,
-              violationId: violationId,
-              attachmentIds: attachmentIds.whereType<String>().toList(),
-            ),
-          ],
         ],
       ),
     );
@@ -1873,11 +2087,8 @@ class _StructuredResponsePanel extends StatelessWidget {
             label: 'Add response detail',
             onPressed: isSaving
                 ? null
-                : () => _showFixDetailSheet(
-                    context,
-                    inactiveFields,
-                    onAddField,
-                  ),
+                : () =>
+                      _showFixDetailSheet(context, inactiveFields, onAddField),
           ),
       ],
     );
@@ -1977,11 +2188,9 @@ class _SubtleHintTextField extends StatelessWidget {
       controller: controller,
       minLines: 2,
       maxLines: 5,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        color: _ink,
-        fontSize: 15,
-        height: 1.3,
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(color: _ink, fontSize: 15, height: 1.3),
       decoration: InputDecoration(
         hintText: hint,
         contentPadding: const EdgeInsets.symmetric(
@@ -2049,9 +2258,9 @@ class _InlineSectionAction extends StatelessWidget {
         minimumSize: const Size(0, 34),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         alignment: Alignment.centerLeft,
-        textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-        ),
+        textStyle: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       ),
       icon: Icon(icon, size: 18),
       label: Text(label),
@@ -2077,34 +2286,35 @@ class _ViolationBottomActions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: isSaving ? null : onSaveForLater,
-            icon: const Icon(Icons.bookmark_border_outlined),
-            label: const Text('Save for later'),
-          ),
-        ),
-        const SizedBox(height: 10),
         if (!canSubmit)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               'Enter what was fixed to submit for review.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: _muted,
-                height: 1.35,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: _muted, height: 1.35),
             ),
           ),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: isSaving || !canSubmit ? null : onSubmitForReview,
-            style: _greenFilledButtonStyle(),
-            icon: const Icon(Icons.outbox_outlined),
-            label: const Text('Submit for review'),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: isSaving ? null : onSaveForLater,
+                icon: const Icon(Icons.bookmark_border_outlined),
+                label: const Text('Save for later'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: isSaving || !canSubmit ? null : onSubmitForReview,
+                style: _greenFilledButtonStyle(),
+                icon: const Icon(Icons.outbox_outlined),
+                label: const Text('Submit for review'),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -2127,6 +2337,131 @@ class _WorkSectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: child,
+    );
+  }
+}
+
+class _ViolationTrainingSection extends StatefulWidget {
+  const _ViolationTrainingSection({
+    required this.tenantId,
+    required this.siteId,
+    required this.violationId,
+    required this.violation,
+    required this.currentRole,
+  });
+
+  final String tenantId;
+  final String siteId;
+  final String violationId;
+  final Map<String, dynamic> violation;
+  final String currentRole;
+
+  @override
+  State<_ViolationTrainingSection> createState() =>
+      _ViolationTrainingSectionState();
+}
+
+class _ViolationTrainingSectionState extends State<_ViolationTrainingSection> {
+  final TrainingRepository _repository = TrainingRepository();
+
+  bool get _canAssign => _canAssignTraining(widget.currentRole);
+  String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  Future<void> _assign() async {
+    final created = await showTrainingAssignmentSheet(
+      context,
+      tenantId: widget.tenantId,
+      siteId: widget.siteId,
+      preferredTrainingId: _recommendedTrainingIdForViolation(widget.violation),
+      linkedViolationId: widget.violationId,
+      linkedViolationTitle:
+          widget.violation['title'] as String? ??
+          widget.violation['summaryText'] as String?,
+    );
+    if (created == true && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Training assigned for this violation.'),
+          ),
+        );
+    }
+  }
+
+  Future<void> _openTrainingAssignment(
+    String assignmentId,
+    Map<String, dynamic> assignment,
+  ) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (routeContext) => Scaffold(
+          backgroundColor: _page,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+              child: _TrainingPlayerView(
+                tenantId: widget.tenantId,
+                assignmentId: assignmentId,
+                assignment: assignment,
+                canComplete: assignment['assignedTo'] == _userId,
+                canManage: _canAssign,
+                onBack: () => Navigator.of(routeContext).pop(),
+                onCompleted: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.siteId.isEmpty) return const SizedBox.shrink();
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _repository.assignmentsStream(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        userId: _userId,
+        canAssign: _canAssign,
+      ),
+      builder: (context, snapshot) {
+        final linked = (snapshot.data?.docs ?? [])
+            .where(
+              (doc) => doc.data()['linkedViolationId'] == widget.violationId,
+            )
+            .toList();
+        if (linked.isEmpty && !_canAssign) return const SizedBox.shrink();
+        return _WorkSectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _WorkSectionHeader(
+                title: 'Training',
+                body: 'Targeted coaching to help prevent this issue recurring.',
+              ),
+              if (linked.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                for (final assignment in linked)
+                  _TrainingAssignmentCard(
+                    assignment: assignment.data(),
+                    onTap: () => _openTrainingAssignment(
+                      assignment.id,
+                      assignment.data(),
+                    ),
+                  ),
+              ],
+              if (_canAssign)
+                _InlineSectionAction(
+                  icon: Icons.school_outlined,
+                  label: linked.isEmpty ? 'Assign training' : 'Assign another',
+                  onPressed: _assign,
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -2154,8 +2489,8 @@ class _AttachmentsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _WorkSectionHeader(
-          title: 'Attachments',
-          body: 'Attach photos or short video proof for the reviewer.',
+          title: 'Proof',
+          body: 'Photos or short videos that show the issue and completed fix.',
         ),
         _FixProofStrip(
           tenantId: tenantId,
@@ -2196,65 +2531,139 @@ class _FixProofStrip extends StatelessWidget {
         violationId,
       ).collection('attachments').snapshots(),
       builder: (context, snapshot) {
-        final proofAttachments = (snapshot.data?.docs ?? [])
-            .map((doc) => {'_id': doc.id, ...doc.data()})
-            .where((data) => data['linkedContext'] == 'fix')
-            .toList()
-          ..sort((a, b) {
-            final aTime = a['createdAt'];
-            final bTime = b['createdAt'];
-            if (aTime is Timestamp && bTime is Timestamp) {
-              return bTime.compareTo(aTime);
-            }
-            return 0;
-          });
+        final proofAttachments =
+            (snapshot.data?.docs ?? [])
+                .map((doc) => {'_id': doc.id, ...doc.data()})
+                .where((data) => data['linkedContext'] == 'fix')
+                .toList()
+              ..sort((a, b) {
+                final aTime = a['createdAt'];
+                final bTime = b['createdAt'];
+                if (aTime is Timestamp && bTime is Timestamp) {
+                  return bTime.compareTo(aTime);
+                }
+                return 0;
+              });
 
         if (proofAttachments.isEmpty) {
           return const SizedBox.shrink();
         }
 
+        final observedProof = proofAttachments
+            .where(
+              (attachment) =>
+                  _displayText(attachment['sourceAuditId']).isNotEmpty,
+            )
+            .toList();
+        final resolutionProof = proofAttachments
+            .where(
+              (attachment) => _displayText(attachment['sourceAuditId']).isEmpty,
+            )
+            .toList();
+
         return Padding(
           padding: const EdgeInsets.only(top: 10),
-          child: _AttachmentPreviewStrip(
-            attachments: proofAttachments,
-            localPreviews: localPreviews,
-            onDelete: (attachment) async {
-              final id = attachment['_id'] as String?;
-              if (id == null) {
-                return;
-              }
-              final status = attachment['status'] as String? ?? 'ready';
-              if (status == 'ready') {
-                final confirmed = await _confirmDestructiveAction(
-                  context,
-                  title: 'Remove this proof photo?',
-                  body: 'This deletes the photo from this violation.',
-                  actionLabel: 'Remove',
-                );
-                if (!confirmed) {
-                  return;
-                }
-              }
-              try {
-                await ViolationMediaService().deleteAttachment(
-                  tenantId: tenantId,
-                  siteId: siteId,
-                  violationId: violationId,
-                  attachmentId: id,
-                );
-              } catch (_) {
-                if (context.mounted) {
-                  _showMediaSnack(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (observedProof.isNotEmpty)
+                _ProofAttachmentGroup(
+                  label: 'Observed during check',
+                  attachments: observedProof,
+                  localPreviews: localPreviews,
+                ),
+              if (resolutionProof.isNotEmpty)
+                _ProofAttachmentGroup(
+                  label: observedProof.isEmpty ? null : 'Resolution proof',
+                  attachments: resolutionProof,
+                  localPreviews: localPreviews,
+                  onDelete: (attachment) => _removeProofAttachment(
                     context,
-                    'Could not remove proof. Please try again.',
-                  );
-                }
-              }
-            },
+                    attachment: attachment,
+                    tenantId: tenantId,
+                    siteId: siteId,
+                    violationId: violationId,
+                  ),
+                ),
+            ],
           ),
         );
       },
     );
+  }
+}
+
+class _ProofAttachmentGroup extends StatelessWidget {
+  const _ProofAttachmentGroup({
+    required this.label,
+    required this.attachments,
+    required this.localPreviews,
+    this.onDelete,
+  });
+
+  final String? label;
+  final List<Map<String, dynamic>> attachments;
+  final Map<String, Uint8List> localPreviews;
+  final ValueChanged<Map<String, dynamic>>? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: label == null ? 0 : 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (label != null) ...[
+            Text(
+              label!,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: _muted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
+          _AttachmentPreviewStrip(
+            attachments: attachments,
+            localPreviews: localPreviews,
+            onDelete: onDelete,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _removeProofAttachment(
+  BuildContext context, {
+  required Map<String, dynamic> attachment,
+  required String tenantId,
+  required String siteId,
+  required String violationId,
+}) async {
+  final id = attachment['_id'] as String?;
+  if (id == null) return;
+  final status = attachment['status'] as String? ?? 'ready';
+  if (status == 'ready') {
+    final confirmed = await _confirmDestructiveAction(
+      context,
+      title: 'Remove this proof photo?',
+      body: 'This deletes the photo from this violation.',
+      actionLabel: 'Remove',
+    );
+    if (!confirmed) return;
+  }
+  try {
+    await ViolationMediaService().deleteAttachment(
+      tenantId: tenantId,
+      siteId: siteId,
+      violationId: violationId,
+      attachmentId: id,
+    );
+  } catch (_) {
+    if (context.mounted) {
+      _showMediaSnack(context, 'Could not remove proof. Please try again.');
+    }
   }
 }
 
@@ -2365,9 +2774,7 @@ class _AttachmentPreviewStrip extends StatelessWidget {
             key: ValueKey('attachment-$attachmentId'),
             attachment: attachment,
             localBytes: localPreviews[attachmentId],
-            onDelete: onDelete == null
-                ? null
-                : () => onDelete!(attachment),
+            onDelete: onDelete == null ? null : () => onDelete!(attachment),
           );
         },
       ),
@@ -2455,11 +2862,7 @@ class _ProcessingAttachmentTile extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         const Icon(Icons.image_outlined, color: _muted),
-        Positioned(
-          right: 6,
-          bottom: 6,
-          child: _TinyUploadSpinner(),
-        ),
+        Positioned(right: 6, bottom: 6, child: _TinyUploadSpinner()),
       ],
     );
   }
@@ -2482,11 +2885,7 @@ class _LocalProcessingPreview extends StatelessWidget {
               const Icon(Icons.broken_image_outlined, color: _muted),
         ),
         Container(color: const Color(0x33071A4A)),
-        Positioned(
-          right: 6,
-          bottom: 6,
-          child: _TinyUploadSpinner(),
-        ),
+        Positioned(right: 6, bottom: 6, child: _TinyUploadSpinner()),
       ],
     );
   }
@@ -2830,11 +3229,13 @@ class _ViolationActions extends StatelessWidget {
   const _ViolationActions({
     required this.status,
     required this.isSaving,
+    required this.onSendBack,
     required this.onUpdateStatus,
   });
 
   final String status;
   final bool isSaving;
+  final VoidCallback onSendBack;
   final void Function(
     String status, {
     String? reviewStatus,
@@ -2849,9 +3250,7 @@ class _ViolationActions extends StatelessWidget {
     if (status == 'pending_review') {
       actions.addAll([
         OutlinedButton.icon(
-          onPressed: isSaving
-              ? null
-              : () => onUpdateStatus('open', reviewStatus: 'needs_work'),
+          onPressed: isSaving ? null : onSendBack,
           icon: const Icon(Icons.undo),
           label: const Text('Send back'),
         ),
@@ -2865,7 +3264,7 @@ class _ViolationActions extends StatelessWidget {
                 ),
           style: _greenFilledButtonStyle(),
           icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Close'),
+          label: const Text('Close violation'),
         ),
       ]);
     } else if (status == 'closed') {
@@ -2884,13 +3283,98 @@ class _ViolationActions extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Column(
+    if (actions.length == 1) {
+      return SizedBox(width: double.infinity, child: actions.first);
+    }
+
+    return Row(
       children: [
-        for (final action in actions) ...[
-          SizedBox(width: double.infinity, child: action),
-          const SizedBox(height: 10),
-        ],
+        Expanded(child: actions.first),
+        const SizedBox(width: 10),
+        Expanded(child: actions.last),
       ],
+    );
+  }
+}
+
+class _SendBackSheet extends StatefulWidget {
+  const _SendBackSheet();
+
+  @override
+  State<_SendBackSheet> createState() => _SendBackSheetState();
+}
+
+class _SendBackSheetState extends State<_SendBackSheet> {
+  final _feedbackController = TextEditingController();
+
+  @override
+  void dispose() {
+    _feedbackController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final feedback = _feedbackController.text.trim();
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Send back for changes',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Tell the team what needs to be corrected.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: _muted),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _feedbackController,
+              minLines: 3,
+              maxLines: 5,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                hintText: 'Add review feedback.',
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: feedback.isEmpty
+                        ? null
+                        : () => Navigator.of(context).pop(feedback),
+                    child: const Text('Send back'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -3069,10 +3553,9 @@ Future<bool> _confirmDestructiveAction(
               const SizedBox(height: 8),
               Text(
                 body,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: _muted,
-                  height: 1.35,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: _muted, height: 1.35),
               ),
               const SizedBox(height: 18),
               Row(
@@ -3148,6 +3631,13 @@ Color _severityColor(String severity) {
 
 String _compactSourceSummary(Map<String, dynamic> violation) {
   final sourceType = violation['sourceType'] as String?;
+  if (sourceType == 'internal_audit') {
+    return _joinNonEmpty([
+      _sourceLabel(sourceType),
+      _displayText(violation['templateNameSnapshot']),
+      _dateText(violation['completedAt']),
+    ]);
+  }
   return _joinNonEmpty([
     _sourceLabel(sourceType),
     _dateText(violation['inspectionDate']),
@@ -3212,4 +3702,54 @@ String _dateText(Object? value) {
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
   return value.toString();
+}
+
+String _noteTimeText(Object? value) {
+  if (value is! Timestamp) {
+    return _dateText(value);
+  }
+
+  final date = value.toDate().toLocal();
+  final now = DateTime.now();
+  final difference = now.difference(date);
+  if (difference.isNegative || difference.inMinutes < 1) {
+    return 'Just now';
+  }
+  if (difference.inMinutes < 60) {
+    return '${difference.inMinutes} min ago';
+  }
+
+  final nowDay = DateTime(now.year, now.month, now.day);
+  final noteDay = DateTime(date.year, date.month, date.day);
+  final calendarDays = nowDay.difference(noteDay).inDays;
+  if (calendarDays == 0) {
+    return '${difference.inHours} hr ago';
+  }
+  if (calendarDays == 1) {
+    return 'Yesterday';
+  }
+  if (calendarDays < 7) {
+    return '$calendarDays days ago';
+  }
+
+  final dateText = '${_shortMonthName(date.month)} ${date.day}';
+  return date.year == now.year ? dateText : '$dateText, ${date.year}';
+}
+
+String _shortMonthName(int month) {
+  const monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return monthNames[month - 1];
 }

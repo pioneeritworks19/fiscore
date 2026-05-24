@@ -243,12 +243,12 @@ Version 1 should strongly prefer explicit confirmation before site removal becau
 
 ### Goal
 
-Allow admins and managers to invite users into the tenant.
+Allow tenant owners and admins to invite users into the tenant.
 
 ### Primary Actors
 
 - admin
-- manager
+- tenant owner
 
 ### Steps
 
@@ -256,8 +256,8 @@ Allow admins and managers to invite users into the tenant.
 2. inviter enters the user's email and assigns a role
 3. inviter optionally assigns site access
 4. invitation record is created
-5. invited user receives the invitation
-6. invited user accepts and joins the tenant
+5. invited user receives a passwordless sign-in link by email
+6. invited user signs in and accepts the invitation
 
 ### Result
 
@@ -267,6 +267,7 @@ Allow admins and managers to invite users into the tenant.
 ### Version 1 Identity Rule
 
 - invitations should use email as the primary identifier
+- invited users should be able to authenticate by passwordless email link without requiring a Google account
 - phone number may exist on the user profile, but should not be the primary invite key in version 1
 
 ## 7. Switch Site Workflow
@@ -471,6 +472,8 @@ Allow a manager or auditor to start an internal audit for a restaurant, either a
 
 ### Primary Actors
 
+- tenant owner
+- admin
 - manager
 - auditor
 
@@ -506,6 +509,8 @@ Allow the same user to save an audit draft and return later.
 
 ### Primary Actors
 
+- tenant owner
+- admin
 - manager
 - auditor
 
@@ -531,6 +536,8 @@ Allow a manager or auditor to finish an audit and submit it.
 
 ### Primary Actors
 
+- tenant owner
+- admin
 - manager
 - auditor
 
@@ -664,7 +671,7 @@ For important remediation work, the violation should function as a persistent th
 
 ### Goal
 
-Allow a manager to assign targeted training linked to a violation, audit context, or general site need.
+Allow a manager to assign targeted training linked to a violation or general site need.
 
 ### Primary Actors
 
@@ -672,9 +679,9 @@ Allow a manager to assign targeted training linked to a violation, audit context
 
 ### Steps
 
-1. manager opens a violation, audit finding, or training area
-2. FiScore may show recommended training options based on context
-3. manager selects the user and training item
+1. manager opens a violation or selects `Assign Training` from the training area
+2. FiScore opens a searchable training library and may recommend training based on violation context
+3. manager selects a training item and assigned user
 4. manager sets due date and assignment note if needed
 5. FiScore creates the training assignment
 6. assigned user sees the training in their work queue
@@ -686,8 +693,15 @@ Allow a manager to assign targeted training linked to a violation, audit context
 ### Version 1 Linkage Recommendation
 
 - use `violationId` as the main issue-level link when training is assigned because of a violation
-- keep `auditId` when the assignment comes from audit context
+- for an internal-audit issue, assign training from its created violation rather than storing a second audit link
 - treat `riskArea` primarily as training metadata or system-derived context rather than manual entry during routine assignment
+
+### Dashboard Entry Points
+
+- `Open violations` opens the active violations queue
+- `Training assigned to me` opens the current user's training queue
+- `Fixes ready for review` opens the manager review queue
+- `Staff training overdue` opens manager team progress filtered to overdue assignments
 
 ## 19. Complete Training Workflow
 

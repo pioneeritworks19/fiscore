@@ -3,9 +3,11 @@ part of '../../main.dart';
 class _MoreContent extends StatelessWidget {
   const _MoreContent({
     required this.onAddSite,
+    required this.onManageTeam,
   });
 
   final VoidCallback onAddSite;
+  final VoidCallback? onManageTeam;
 
   @override
   Widget build(BuildContext context) {
@@ -38,11 +40,14 @@ class _MoreContent extends StatelessWidget {
           enabled: true,
           onTap: onAddSite,
         ),
-        const _ActionRow(
+        _ActionRow(
           icon: Icons.groups_outlined,
           title: 'Team management',
-          body: 'Invite staff and assign role-based access after the core dashboard is stable.',
-          enabled: false,
+          body: onManageTeam == null
+              ? 'Workspace owners and admins manage team access.'
+              : 'Invite staff, assign roles, and control site access.',
+          enabled: onManageTeam != null,
+          onTap: onManageTeam,
         ),
         const _ActionRow(
           icon: Icons.settings_outlined,

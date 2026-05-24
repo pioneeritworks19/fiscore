@@ -6,6 +6,7 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authService = AuthService();
+    final initialLink = Uri.base.toString();
 
     return StreamBuilder<User?>(
       stream: authService.authStateChanges(),
@@ -20,6 +21,9 @@ class AuthGate extends StatelessWidget {
 
         final user = snapshot.data;
         if (user == null) {
+          if (authService.isEmailSignInLink(initialLink)) {
+            return _EmailLinkCompletionScreen(emailLink: initialLink);
+          }
           return const WelcomeScreen();
         }
 

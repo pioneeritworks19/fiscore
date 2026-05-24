@@ -32,6 +32,7 @@ Phone number may still exist in the user profile, but it should not be the prima
 Recommended version 1 position:
 
 - invite by email
+- authenticate invited users through a passwordless email sign-in link, with Google sign-in remaining available
 - phone number optional on profile
 - phone may be used later for contact or reminders
 
@@ -64,8 +65,8 @@ When a user leaves:
 
 Version 1 allowed inviters:
 
+- `tenant_owner`
 - `admin`
-- `manager`
 
 ## Where It Lives In The App
 
@@ -89,8 +90,8 @@ Open Team
 -> Choose site access
 -> Send invite
 -> Invitation record created
--> User receives invitation
--> User signs in
+-> User receives secure sign-in link by email
+-> User signs in through the link or matching Google account
 -> User accepts invitation
 -> Tenant membership becomes active
 -> Site access becomes active
@@ -137,6 +138,14 @@ Create a new pending invitation for a user.
 - `auditor`
 - `staff`
 
+### Role management guardrails
+
+- only `tenant_owner` can invite or edit an `admin`
+- `admin` can invite and edit `manager`, `auditor`, and `staff`
+- the tenant owner role and access cannot be changed through normal team management
+- users cannot change their own role or site access
+- inactive members are reactivated through a new invitation, not edited in place
+
 ## 3. Site Access Assignment
 
 ### Goal
@@ -182,9 +191,22 @@ The invitation should:
 
 - identify the tenant
 - identify the inviter if appropriate
-- direct the user to sign in
+- include or initiate a passwordless email sign-in link so users do not need a Google account
 
 Phone-based invite delivery can be considered later, but should not be the primary version 1 invite method.
+
+### Delivery and Branding TODO
+
+The current Firebase-provided email-link flow is sufficient for development, but it is not the intended launch experience.
+
+Before production rollout:
+
+- generate passwordless sign-in links in trusted backend code
+- send invitations using a transactional email provider and a verified FiScore domain
+- brand the message as a FiScore team invitation and identify the workspace being joined
+- configure a branded authentication/action-link domain instead of showing a Firebase project domain
+- validate deliverability with common mailbox providers, especially Gmail and Outlook/Hotmail
+- configure Android App Links and Apple Universal Links so the same invitation opens the installed mobile app and completes sign-in cleanly
 
 ## 6. User Accepts Invitation
 
@@ -194,7 +216,7 @@ Convert an invited user into an active tenant member.
 
 ### User actions
 
-1. user signs in with Google or Apple
+1. user signs in through their passwordless email link or with a matching Google account
 2. FiScore detects pending invite for the email
 3. user accepts the invitation
 
@@ -221,8 +243,8 @@ Remove access for a user who leaves or should no longer operate in the tenant.
 
 ### Allowed actors
 
+- tenant owner
 - admin
-- manager
 
 ### System behavior
 
@@ -232,11 +254,40 @@ Deactivation should:
 - preserve historical activity
 - retain attribution on audits, thread entries, responses, and review history
 
+If an inactive teammate is invited again, accepting the new invitation should reactivate the existing membership using the role and site access selected on the new invitation. The prior inactive history should not be deleted.
+
 ### Important product rule
 
 FiScore should not delete historical work just because a user is no longer active.
 
-## 9. Recommended Team UI States
+## 9. Team Activity History
+
+### Goal
+
+Give tenant owners and admins a reliable record of access administration without turning the Team screen into a complex audit tool.
+
+### Recorded version 1 events
+
+- invitation created
+- invitation access changed
+- invitation canceled
+- invitation accepted
+- inactive member reactivated
+- active member role or site access changed
+- member deactivated
+
+### Recommended data behavior
+
+- events are written by trusted backend functions in the same operation as the membership or invitation change
+- events retain actor, target, timestamp, and before/after access snapshots when relevant
+- events are readable only by active `tenant_owner` and `admin` users
+- events are immutable from the app
+
+### Recommended UI
+
+The Team screen should display a compact recent activity list for owners and admins, with newer events first and a lightweight option to reveal older recent changes.
+
+## 10. Recommended Team UI States
 
 ### Active
 
@@ -250,13 +301,14 @@ Users who were invited but have not yet completed acceptance.
 
 Users who previously had access but are now deactivated.
 
-## 10. Recommended Data Model Direction
+## 11. Recommended Data Model Direction
 
 At minimum, the invitation flow should work with:
 
 - `users/{userId}`
 - `tenants/{tenantId}`
 - `tenants/{tenantId}/members/{userId}`
+- `tenants/{tenantId}/teamActivity/{activityId}`
 - optional site-level membership records if site access is modeled separately
 
 Suggested tenant membership invite-related fields:
@@ -273,7 +325,7 @@ Suggested tenant membership invite-related fields:
 Potential later improvements:
 
 - phone-based invitation
-- resend invite
+- branded transactional invitation delivery
 - invite expiration rules
 - invitation reminder notifications
 - role-change approval guardrails
