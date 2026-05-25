@@ -175,6 +175,33 @@ Completion may include:
 
 Version 1 should keep completion simple and avoid complex certification engines unless required later.
 
+## Training Media
+
+Training topics may contain mixed content blocks so practical lessons can teach
+visually without becoming long-form courses.
+
+Supported topic blocks:
+
+- `text` for concise instructions
+- `image` for approved instructional examples
+- `video` for short or optional visual demonstrations
+- `tip` for the operational reminder shown after learning content
+
+FiScore Library media is stored once in immutable, versioned library paths.
+Each lesson version owns a `mediaAssets` registry keyed by `mediaId`, and
+content blocks reference those IDs rather than embedding Storage paths.
+Tenant library adoption stores references to that media rather than copying
+binary files into every tenant.
+
+When published training media changes materially, FiScore publishes a new
+library version. Existing assignments continue using their snapshotted
+sections and versioned media references; future assignments may use the updated
+lesson after the tenant adopts it.
+
+For micro-learning, required videos should normally remain short. Longer
+reference recordings may be included only as optional supplemental content.
+Required videos must be watched before a learner can continue.
+
 ## Knowledge Checks
 
 FiScore may support lightweight knowledge checks.

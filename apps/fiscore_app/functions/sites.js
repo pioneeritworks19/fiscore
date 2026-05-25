@@ -3,7 +3,7 @@ const { GoogleAuth } = require("google-auth-library");
 const {
   admin,
   db,
-  bucket,
+  storageBucket,
   region,
   siteActionRoles,
   requireAuth,
@@ -96,7 +96,7 @@ function parseStoragePath(value) {
     };
   }
   return {
-    bucketName: bucket.name,
+    bucketName: storageBucket().name,
     filePath: text,
   };
 }
@@ -150,6 +150,7 @@ async function copyMasterReportToTenant({
     `/attachments/${attachmentId}/report.${extension}`;
 
   try {
+    const bucket = storageBucket();
     const sourceFile = admin.storage().bucket(source.bucketName).file(source.filePath);
     const destinationFile = bucket.file(destinationPath);
     await sourceFile.copy(destinationFile);

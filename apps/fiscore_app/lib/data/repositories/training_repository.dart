@@ -90,6 +90,9 @@ class TrainingRepository {
           (section) => Map<String, dynamic>.from(section as Map),
         ),
       ),
+      'trainingMediaAssetsSnapshot': Map<String, dynamic>.from(
+        training['mediaAssets'] as Map? ?? const {},
+      ),
       'quickCheckQuestionsSnapshot': List<Map<String, dynamic>>.from(
         (training['quickCheckQuestions'] as List? ?? const []).map(
           (question) => Map<String, dynamic>.from(question as Map),
@@ -144,6 +147,9 @@ class TrainingRepository {
           (training['sections'] as List? ?? const []).map(
             (section) => Map<String, dynamic>.from(section as Map),
           ),
+        ),
+        'trainingMediaAssetsSnapshot': Map<String, dynamic>.from(
+          training['mediaAssets'] as Map? ?? const {},
         ),
         'quickCheckQuestionsSnapshot': List<Map<String, dynamic>>.from(
           (training['quickCheckQuestions'] as List? ?? const []).map(

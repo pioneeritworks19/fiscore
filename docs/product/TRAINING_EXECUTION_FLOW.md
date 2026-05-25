@@ -391,6 +391,24 @@ The assigned user should see training in:
 
 For FiScore starter micro-learning, lesson sections and quick-check questions are maintained in the Training library configuration. When assigned, that content is snapshotted onto the assignment so later library updates do not change training already assigned or completed.
 
+### Media-enabled lessons
+
+Lesson sections may include ordered `blocks` of type `text`, `image`, `video`,
+or `tip`. Existing text-only sections remain supported.
+
+  - FiScore Library images and videos live in immutable versioned Storage paths.
+  - Each lesson version stores media metadata by `mediaId`; topic blocks
+    reference that ID instead of containing Storage paths.
+- Tenant adoption retains media references instead of copying the file into
+  every tenant.
+- Assignment section snapshots retain the exact versioned media references
+  assigned to the employee.
+- A lesson with changed learning media becomes a newer library version and
+  appears as `Update` in `Explore FiScore`.
+  - Required short videos prevent progression until playback completes.
+  - Longer demonstration videos are optional supplemental content in
+  micro-learning lessons.
+
 ### Recommended assignment states
 
 - `assigned`

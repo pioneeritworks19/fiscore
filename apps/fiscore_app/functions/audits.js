@@ -2,7 +2,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const {
   admin,
   db,
-  bucket,
+  storageBucket,
   region,
   internalAuditRoles,
   requireAuth,
@@ -161,6 +161,7 @@ const submitInternalAudit = onCall({ region }, async (request) => {
       ? "Good"
       : "Needs attention";
   const now = admin.firestore.FieldValue.serverTimestamp();
+  const bucket = storageBucket();
   const batch = db.batch();
   const createdViolationIds = [];
   for (const question of findings) {

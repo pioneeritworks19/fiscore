@@ -29,42 +29,124 @@ function publishedLibraryCollection(contentType) {
   return db.collection(`fiscoreLibrary/${contentType}/items`);
 }
 
+function libraryVersion(item) {
+  return Number(item?.libraryVersion || item?.version || 1);
+}
+
+function versionReference(collection, libraryItemId, version) {
+  return collection.doc(libraryItemId).collection("versions").doc(String(version));
+}
+
+function publishedVersionData(item, libraryItemId, version) {
+  return {
+    ...item,
+    libraryItemId,
+    libraryVersion: version,
+    version,
+    publishingSource: "fiscore",
+    status: "published",
+  };
+}
+
+function publishedSummaryData(item, libraryItemId, currentVersion, existing) {
+  const { sections, quickCheckQuestions, mediaAssets, ...summary } = item;
+  return {
+    ...summary,
+    libraryItemId,
+    libraryVersion: currentVersion,
+    currentVersion,
+    latestPublishedVersion: currentVersion,
+    publishingSource: "fiscore",
+    status: "published",
+    publishedAt:
+      existing?.publishedAt || admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
 async function ensurePublishedLibrary(contentType) {
   const library = starterLibrary(contentType);
   const collection = publishedLibraryCollection(contentType);
   const entries = Object.entries(library);
-  const snapshots = await Promise.all(
-    entries.map(([libraryItemId]) => collection.doc(libraryItemId).get()),
-  );
   const batch = db.batch();
   let changed = false;
-  entries.forEach(([libraryItemId, item], index) => {
-    const existing = snapshots[index].data();
-    const currentVersion = Number(existing?.libraryVersion || 0);
-    const starterVersion = Number(item.libraryVersion || item.version || 1);
-    if (snapshots[index].exists && currentVersion >= starterVersion) {
-      return;
+  for (const [libraryItemId, item] of entries) {
+    const reference = collection.doc(libraryItemId);
+    const snapshot = await reference.get();
+    const existing = snapshot.data();
+    const existingVersion = snapshot.exists
+      ? Number(existing.currentVersion || existing.libraryVersion || 0)
+      : 0;
+    const starterVersion = libraryVersion(item);
+
+    if (snapshot.exists && existingVersion > 0) {
+      const existingVersionReference = versionReference(
+        collection,
+        libraryItemId,
+        existingVersion,
+      );
+      const existingVersionSnapshot = await existingVersionReference.get();
+      if (!existingVersionSnapshot.exists) {
+        changed = true;
+        batch.set(
+          existingVersionReference,
+          publishedVersionData(existing, libraryItemId, existingVersion),
+        );
+      }
     }
-    changed = true;
-    batch.set(collection.doc(libraryItemId), {
-      ...item,
+
+    const starterVersionReference = versionReference(
+      collection,
       libraryItemId,
-      publishingSource: "fiscore",
-      status: "published",
-      publishedAt:
-        existing?.publishedAt || admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-  });
+      starterVersion,
+    );
+    const starterVersionSnapshot = await starterVersionReference.get();
+    if (!starterVersionSnapshot.exists) {
+      changed = true;
+      batch.set(
+        starterVersionReference,
+        publishedVersionData(item, libraryItemId, starterVersion),
+      );
+    }
+
+    if (!snapshot.exists || starterVersion >= existingVersion) {
+      if (
+        !snapshot.exists ||
+        existing.currentVersion !== starterVersion ||
+        existing.latestPublishedVersion !== starterVersion
+      ) {
+        changed = true;
+      }
+      batch.set(
+        reference,
+        publishedSummaryData(item, libraryItemId, starterVersion, existing),
+      );
+    }
+  }
   if (changed) {
     await batch.commit();
   }
   const catalogSnapshot = await collection
     .where("status", "==", "published")
     .get();
-  return catalogSnapshot.docs.map((document) => ({
-    libraryItemId: document.id,
-    ...document.data(),
+  return Promise.all(catalogSnapshot.docs.map(async (document) => {
+    const summary = document.data();
+    const currentVersion = Number(
+      summary.currentVersion || summary.libraryVersion || 1,
+    );
+    const versionSnapshot = await versionReference(
+      collection,
+      document.id,
+      currentVersion,
+    ).get();
+    return {
+      libraryItemId: document.id,
+      ...summary,
+      ...(versionSnapshot.data() || {}),
+      currentVersion,
+      latestPublishedVersion:
+        Number(summary.latestPublishedVersion || currentVersion),
+    };
   }));
 }
 
@@ -149,14 +231,13 @@ const adoptFiScoreLibraryItem = onCall({ region }, async (request) => {
     120,
   );
   await requireTenantRole(tenantId, auth.uid, siteActionRoles);
-  await ensurePublishedLibrary(contentType);
-  const librarySnapshot = await publishedLibraryCollection(contentType)
-    .doc(libraryItemId)
-    .get();
-  if (!librarySnapshot.exists || librarySnapshot.data().status !== "published") {
+  const publishedItems = await ensurePublishedLibrary(contentType);
+  const item = publishedItems.find(
+    (publishedItem) => publishedItem.libraryItemId === libraryItemId,
+  );
+  if (!item || item.status !== "published") {
     throw new HttpsError("not-found", "Library item was not found.");
   }
-  const item = librarySnapshot.data();
   const reference = db.doc(tenantItemPath(tenantId, contentType, libraryItemId));
   const current = await reference.get();
   const currentData = current.data();
@@ -184,6 +265,8 @@ const adoptFiScoreLibraryItem = onCall({ region }, async (request) => {
       : {}),
     isActive: true,
     status: "active",
+    libraryVersionPath:
+      `fiscoreLibrary/${contentType}/items/${libraryItemId}/versions/${item.libraryVersion}`,
     updateAvailable: false,
     lastSyncedAt: now,
     updatedAt: now,

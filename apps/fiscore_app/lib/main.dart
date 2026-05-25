@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import 'firebase_options.dart';
 
@@ -35,6 +36,7 @@ part 'features/violations/violations_screen.dart';
 part 'features/training/training_screen.dart';
 part 'features/training/training_library_screen.dart';
 part 'features/training/training_player_screen.dart';
+part 'features/training/training_media_widgets.dart';
 part 'features/training/training_assignment_sheet.dart';
 part 'features/sites/sites_overview_screen.dart';
 part 'core/widgets/dashboard_section.dart';

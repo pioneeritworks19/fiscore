@@ -2,7 +2,7 @@ const { onObjectFinalized } = require("firebase-functions/v2/storage");
 const {
   admin,
   db,
-  bucket,
+  storageBucket,
   storageRegion,
   safeDeleteStorageFile,
 } = require("./shared/runtime");
@@ -49,6 +49,7 @@ const processViolationAttachmentImage = onObjectFinalized(
     const basePath = objectPath.replace(/\/original\.[^/]+$/i, "");
     const compressedPath = `${basePath}/image.jpg`;
     const thumbnailPath = `${basePath}/thumb.jpg`;
+    const bucket = storageBucket();
 
     try {
       await attachmentRef.set(

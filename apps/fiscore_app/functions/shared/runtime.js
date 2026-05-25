@@ -6,7 +6,6 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-const bucket = admin.storage().bucket();
 const region = "us-central1";
 const storageRegion = "us-east1";
 const tenantAdminRoles = ["tenant_owner", "admin"];
@@ -14,6 +13,10 @@ const siteActionRoles = ["tenant_owner", "admin", "manager"];
 const internalAuditRoles = ["tenant_owner", "admin", "manager", "auditor"];
 const allowedMemberRoles = ["admin", "manager", "auditor", "staff"];
 const allSiteAccessRoles = ["tenant_owner", "admin"];
+
+function storageBucket() {
+  return admin.storage().bucket();
+}
 
 function requireAuth(request) {
   if (!request.auth) {
@@ -141,7 +144,7 @@ function safeText(value, fallback = null) {
 
 async function safeDeleteStorageFile(filePath) {
   try {
-    await bucket.file(filePath).delete();
+    await storageBucket().file(filePath).delete();
   } catch (error) {
     if (error.code !== 404) {
       throw error;
@@ -152,7 +155,7 @@ async function safeDeleteStorageFile(filePath) {
 module.exports = {
   admin,
   db,
-  bucket,
+  storageBucket,
   region,
   storageRegion,
   tenantAdminRoles,

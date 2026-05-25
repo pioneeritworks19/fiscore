@@ -508,6 +508,16 @@ Stores tenant-readable copies of public inspection findings for historical sourc
 
 `fiscoreLibrary/training/items/{libraryItemId}`
 
+Published library items are summary/current-pointer documents. Immutable
+published content is stored below each item:
+
+`fiscoreLibrary/{contentType}/items/{libraryItemId}/versions/{libraryVersion}`
+
+The summary document includes `currentVersion` and
+`latestPublishedVersion`. Tenant adoption copies the chosen version content
+and stores `libraryVersionPath`; previously assigned content remains captured
+in assignment snapshots.
+
 ### Purpose
 
 Stores FiScore-authored published content available for tenants to discover
@@ -1412,6 +1422,26 @@ Stores training content metadata available to the tenant.
 - starter micro-learning may store compact `sections` and `quickCheckQuestions` directly on the training document
 - future tenant-authored training uses the same collection with
   `trainingSource = tenant_custom`
+
+Training documents may include a `mediaAssets` map keyed by generated
+`mediaId`. Each media record stores fields such as `type`, `fileName`,
+`contentType`, `storagePath`, `altText`, `durationLabel`, and `required`.
+
+Training `sections` may also contain ordered `blocks` for visual lessons:
+
+- `type`: `text`, `image`, `video`, or `tip`
+- `body`: text or tip content where applicable
+- `mediaId`: reference to the `mediaAssets` record for image/video blocks
+- `caption`: user-facing media description
+- `durationLabel`: user-facing video duration where applicable
+- media behavior such as `required` is defined by the referenced media record
+
+FiScore Library media is referenced by tenant-synced training documents and
+assignment snapshots. Media files are not duplicated into tenant storage.
+
+Storage convention:
+
+`fiscoreLibrary/training/{libraryTrainingId}/versions/{libraryVersion}/media/{mediaId}/{fileName}`
 
 ## 20B. Training Topics
 

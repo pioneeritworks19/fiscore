@@ -33,6 +33,11 @@ service firebase.storage {
         );
     }
 
+    match /fiscoreLibrary/training/{trainingId}/versions/{version}/media/{mediaId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
     match /tenants/{tenantId}/sites/{siteId}/violations/{violationId}/attachments/{attachmentId}/{fileName} {
       allow read: if hasSiteAccess(tenantId, siteId);
       allow create: if hasSiteAccess(tenantId, siteId) &&

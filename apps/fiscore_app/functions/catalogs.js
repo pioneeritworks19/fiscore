@@ -298,17 +298,19 @@ const starterTrainingLibrary = {
   },
   cleaning_sanitizer: {
     title: "Cleaning and sanitizer readiness",
-    description: "Use sanitizer safely and prevent contamination.",
+    description: "Use sanitizer safely and prevent contamination with visual guidance.",
     trainingSource: "library_synced",
     libraryTrainingId: "cleaning_sanitizer",
-    libraryVersion: 2,
+    libraryVersion: 3,
     syncMode: "synced_from_library",
     syncStatus: "up_to_date",
     trainingType: "micro_learning",
-    durationMinutes: 4,
+    durationMinutes: 6,
+    contentFormat: "visual_lesson",
+    mediaSummary: "Video lesson",
     riskArea: "cleaning_and_sanitizing",
     relatedRiskAreas: ["cleaning_and_sanitizing", "chemical_safety"],
-    version: 2,
+    version: 3,
     status: "active",
     hasQuickCheck: true,
     topicSummaries: [
@@ -316,24 +318,96 @@ const starterTrainingLibrary = {
       "Keep chemicals away from food",
       "Clean food-contact surfaces",
     ],
+    mediaAssets: {
+      med_sanitizer_strip_01: {
+        id: "med_sanitizer_strip_01",
+        type: "image",
+        fileName: "sanitizer-test-strips.jpg",
+        contentType: "image/jpeg",
+        storagePath: "fiscoreLibrary/training/cleaning_sanitizer/versions/3/media/med_sanitizer_strip_01/image.jpg",
+        altText: "Sanitizer test strip compared with an approved concentration range.",
+      },
+      med_chemical_storage_01: {
+        id: "med_chemical_storage_01",
+        type: "image",
+        fileName: "chemical-storage.jpg",
+        contentType: "image/jpeg",
+        storagePath: "fiscoreLibrary/training/cleaning_sanitizer/versions/3/media/med_chemical_storage_01/image.jpg",
+        altText: "Cleaning chemicals stored below and separated from food and utensils.",
+      },
+      med_cleaning_demo_01: {
+        id: "med_cleaning_demo_01",
+        type: "video",
+        fileName: "cleaning-and-sanitation-required.mp4",
+        contentType: "video/mp4",
+        storagePath: "fiscoreLibrary/training/cleaning_sanitizer/versions/3/media/med_cleaning_demo_01/video.mp4",
+        durationLabel: "2 min",
+        required: true,
+      },
+    },
     sections: [
       {
         id: "prepare_sanitizer",
         title: "Prepare sanitizer correctly",
         body: "Follow the product instructions and verify sanitizer strength with the correct test strips before use.",
         actionTip: "Replace sanitizer solution when it is dirty or outside the safe range.",
+        blocks: [
+          {
+            type: "text",
+            body: "Follow the product instructions and verify sanitizer strength with the correct test strips before use.",
+          },
+          {
+            type: "image",
+            mediaId: "med_sanitizer_strip_01",
+            caption: "Compare the test strip result to the product's approved concentration range.",
+          },
+          {
+            type: "tip",
+            body: "Replace sanitizer solution when it is dirty or outside the safe range.",
+          },
+        ],
       },
       {
         id: "store_chemicals",
         title: "Keep chemicals away from food",
         body: "Store chemicals in their designated area, away from food, utensils, linens, and preparation surfaces.",
         actionTip: "Never place a chemical bottle above ingredients or clean equipment.",
+        blocks: [
+          {
+            type: "text",
+            body: "Store chemicals in their designated area, away from food, utensils, linens, and preparation surfaces.",
+          },
+          {
+            type: "image",
+            mediaId: "med_chemical_storage_01",
+            caption: "Keep cleaning chemicals in their designated storage area, separated from food and clean tools.",
+          },
+          {
+            type: "tip",
+            body: "Never place a chemical bottle above ingredients or clean equipment.",
+          },
+        ],
       },
       {
         id: "clean_surfaces",
         title: "Clean food-contact surfaces",
         body: "Clean and sanitize food-contact surfaces after contamination and as required during food preparation.",
         actionTip: "Use a clean surface before handling ready-to-eat food.",
+        blocks: [
+          {
+            type: "text",
+            body: "Clean and sanitize food-contact surfaces after contamination and as required during food preparation.",
+          },
+          {
+            type: "video",
+            mediaId: "med_cleaning_demo_01",
+            caption: "Required demonstration: cleaning and sanitizing a food-contact surface",
+          },
+          {
+            type: "tip",
+            body: "Use a clean surface before handling ready-to-eat food.",
+          },
+        ],
       },
     ],
     quickCheckQuestions: [

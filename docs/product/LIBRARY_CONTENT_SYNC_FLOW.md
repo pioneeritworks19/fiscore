@@ -78,10 +78,11 @@ Let tenants benefit from centrally maintained content while keeping adoption exp
 When a tenant chooses `Synced from Library`:
 
 - create a tenant-owned checklist or training record
-- copy the current published library version into the tenant record
+- copy the current published immutable library version into the tenant record
 - store linkage metadata:
   - `libraryTemplateId` or `libraryTrainingId`
   - `libraryVersion`
+  - `libraryVersionPath`
   - `syncMode = synced_from_library`
   - `syncStatus = up_to_date`
   - `lastSyncedAt`
@@ -128,6 +129,16 @@ For synced items only:
 4. show that state in the tenant UI
 
 The product should not silently apply the update.
+
+### Published library storage model
+
+- `fiscoreLibrary/{contentType}/items/{libraryItemId}` is a summary document
+  with the current published version pointer.
+- `fiscoreLibrary/{contentType}/items/{libraryItemId}/versions/{libraryVersion}`
+  stores immutable published content.
+- publishing a new version does not delete or overwrite earlier versions.
+- tenant adoption stores `libraryVersionPath` so its source release is
+  explicit, while assignment or audit snapshots remain stable.
 
 ## Checklist Update Adoption Flow
 

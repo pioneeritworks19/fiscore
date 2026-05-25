@@ -35,6 +35,7 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
   bool _isLoading = false;
   bool _isSaving = false;
   bool _completed = false;
+  final Set<String> _completedRequiredMediaIds = {};
 
   String get _title =>
       widget.assignment['trainingTitleSnapshot'] as String? ?? 'Training';
@@ -47,6 +48,10 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
   List<Map<String, dynamic>> get _questions => _mapsFrom(
     widget.assignment['quickCheckQuestionsSnapshot'] ??
         _libraryTraining?['quickCheckQuestions'],
+  );
+  Map<String, Map<String, dynamic>> get _mediaAssets => _mediaAssetsFrom(
+    widget.assignment['trainingMediaAssetsSnapshot'] ??
+        _libraryTraining?['mediaAssets'],
   );
   bool get _isAlreadyComplete =>
       _completed || widget.assignment['status'] == 'completed';
@@ -63,6 +68,22 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
     return (value as List? ?? const [])
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Map<String, Map<String, dynamic>> _mediaAssetsFrom(Object? value) {
+    final items = value as Map? ?? const {};
+    return items.map(
+      (key, asset) =>
+          MapEntry(key.toString(), Map<String, dynamic>.from(asset as Map)),
+    );
+  }
+
+  List<String> _requiredMediaIds(Map<String, dynamic> section) {
+    return _trainingContentBlocks(section)
+        .where((block) => block['type'] == 'video')
+        .map((block) => block['mediaId'] as String? ?? '')
+        .where((id) => id.isNotEmpty && _mediaAssets[id]?['required'] == true)
         .toList();
   }
 
@@ -363,6 +384,10 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
   }
 
   Widget _buildTopic(BuildContext context, Map<String, dynamic> section) {
+    final requiredMediaIds = _requiredMediaIds(section);
+    final pendingRequiredMedia = requiredMediaIds
+        .where((id) => !_completedRequiredMediaIds.contains(id))
+        .toList();
     return _shell(
       context,
       children: [
@@ -389,24 +414,33 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          section['body'] as String? ?? '',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyLarge?.copyWith(color: _ink, height: 1.45),
-        ),
-        const SizedBox(height: 18),
-        _TrainingInfoBlock(
-          title: 'Remember',
-          body: section['actionTip'] as String? ?? '',
-        ),
+        for (final block in _trainingContentBlocks(section))
+          _TrainingContentBlock(
+            block: block,
+            mediaAsset: _mediaAssets[block['mediaId']],
+            onRequiredMediaCompleted: (mediaId) {
+              if (_completedRequiredMediaIds.add(mediaId)) {
+                setState(() {});
+              }
+            },
+          ),
         const SizedBox(height: 24),
+        if (pendingRequiredMedia.isNotEmpty) ...[
+          const _StatusMessage(
+            icon: Icons.play_circle_outline,
+            color: _navy,
+            text: 'Watch the required video to continue.',
+          ),
+          const SizedBox(height: 12),
+        ],
         Row(
           children: [
             TextButton(onPressed: _previousPage, child: const Text('Previous')),
             const Spacer(),
             FilledButton.icon(
-              onPressed: _isSaving ? null : _nextTopic,
+              onPressed: _isSaving || pendingRequiredMedia.isNotEmpty
+                  ? null
+                  : _nextTopic,
               icon: const Icon(Icons.chevron_right),
               label: Text(
                 _page == _sections.length

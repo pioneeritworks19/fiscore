@@ -514,6 +514,8 @@ class _TrainingLibraryCard extends StatelessWidget {
         ? 'FiScore Library'
         : 'Created by your team';
     final durationMinutes = training['durationMinutes'] as int? ?? 0;
+    final contentLabel =
+        training['mediaSummary'] as String? ?? 'Micro-learning';
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -544,7 +546,7 @@ class _TrainingLibraryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '$sourceLabel  |  $durationMinutes min  |  Micro-learning',
+                  '$sourceLabel  |  $durationMinutes min  |  $contentLabel',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: _muted,
                     fontWeight: FontWeight.w600,
