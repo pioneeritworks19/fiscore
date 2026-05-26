@@ -370,8 +370,8 @@ class _NeedsActionCard extends StatelessWidget {
                 icon: Icons.fact_check_outlined,
                 color: const Color(0xFF2859C5),
                 count: myCheckCount,
-                title: 'Checks assigned to me',
-                detail: 'Complete assigned checklists',
+                title: 'My checks',
+                detail: 'Continue checks you started or were assigned',
                 onTap: onOpenMyChecks,
               ),
             if (myTrainingCount > 0)

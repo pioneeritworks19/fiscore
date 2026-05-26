@@ -40,7 +40,7 @@ class _ActionInboxContent extends StatelessWidget {
     final title = switch (initialFilter) {
       'review' => 'Fixes ready for review',
       'assigned_fixes' => 'My assigned fixes',
-      'checks' => 'My assigned checks',
+      'checks' => 'My checks',
       'training' => 'My training',
       'training_overdue' => 'Overdue training',
       'audit_overdue' => 'Overdue checks',
@@ -49,7 +49,7 @@ class _ActionInboxContent extends StatelessWidget {
     final subtitle = switch (initialFilter) {
       'review' => 'Review submitted fixes and close the work loop.',
       'assigned_fixes' => 'Complete resolutions assigned to you.',
-      'checks' => 'Complete the checks assigned to you.',
+      'checks' => 'Continue checks you started or were assigned.',
       'training' => 'Complete the coaching assigned to you.',
       'training_overdue' =>
         'Follow up on training that has passed its due date.',
@@ -206,10 +206,14 @@ class _ActionInboxRow extends StatelessWidget {
     final isHigh = action['priority'] == 'high';
     final isOverdue = action['dueState'] == 'overdue';
     final isAssignedCheck = action['targetType'] == 'audit_assignment';
+    final checkOwnershipLabel =
+        action['assignmentSourceSnapshot'] == 'self_started'
+        ? 'Started by you'
+        : 'Assigned to you';
     final checkActionLabel =
-        (action['title'] as String? ?? '').startsWith('Finish')
-        ? 'Resume'
-        : 'Start';
+        (action['title'] as String? ?? '').startsWith('Complete')
+        ? 'Start'
+        : 'Resume';
     final color = isHigh || isOverdue
         ? const Color(0xFFD92D20)
         : const Color(0xFF2859C5);
@@ -261,7 +265,19 @@ class _ActionInboxRow extends StatelessWidget {
                       context,
                     ).textTheme.bodySmall?.copyWith(color: _muted),
                   ),
-                  if (dueText != null) ...[
+                  if (isAssignedCheck) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      [
+                        checkOwnershipLabel,
+                        if (dueText != null) dueText,
+                      ].join(' / '),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: isOverdue ? color : _muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ] else if (dueText != null) ...[
                     const SizedBox(height: 6),
                     Text(
                       dueText,

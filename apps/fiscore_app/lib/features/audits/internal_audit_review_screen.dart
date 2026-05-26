@@ -435,6 +435,7 @@ class _InternalAuditCompletion extends StatelessWidget {
     required this.auditId,
     required this.audit,
     required this.responses,
+    required this.exitLabel,
     required this.onBack,
     required this.onOpenViolation,
   });
@@ -444,6 +445,7 @@ class _InternalAuditCompletion extends StatelessWidget {
   final String auditId;
   final Map<String, dynamic> audit;
   final Map<String, Map<String, dynamic>> responses;
+  final String exitLabel;
   final VoidCallback onBack;
   final ValueChanged<String> onOpenViolation;
 
@@ -459,7 +461,7 @@ class _InternalAuditCompletion extends StatelessWidget {
         TextButton.icon(
           onPressed: onBack,
           icon: const Icon(Icons.chevron_left),
-          label: const Text('Back to checks'),
+          label: Text(exitLabel),
         ),
         Container(
           width: double.infinity,

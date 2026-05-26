@@ -6,12 +6,16 @@ class _AuditsContent extends StatefulWidget {
     required this.siteId,
     required this.currentRole,
     this.initialAssignmentId,
+    this.assignedCheckBackLabel,
+    this.onBackFromAssignedCheck,
   });
 
   final String tenantId;
   final String siteId;
   final String currentRole;
   final String? initialAssignmentId;
+  final String? assignedCheckBackLabel;
+  final VoidCallback? onBackFromAssignedCheck;
 
   @override
   State<_AuditsContent> createState() => _AuditsContentState();
@@ -61,6 +65,8 @@ class _AuditsContentState extends State<_AuditsContent> {
             siteId: widget.siteId,
             currentRole: widget.currentRole,
             initialAssignmentId: widget.initialAssignmentId,
+            assignedCheckBackLabel: widget.assignedCheckBackLabel,
+            onBackFromAssignedCheck: widget.onBackFromAssignedCheck,
             onSubflowChanged: (value) {
               if (_inSubflow != value) setState(() => _inSubflow = value);
             },
@@ -86,6 +92,8 @@ class _InternalAuditsContent extends StatefulWidget {
     required this.siteId,
     required this.currentRole,
     required this.initialAssignmentId,
+    required this.assignedCheckBackLabel,
+    required this.onBackFromAssignedCheck,
     required this.onSubflowChanged,
   });
 
@@ -93,6 +101,8 @@ class _InternalAuditsContent extends StatefulWidget {
   final String siteId;
   final String currentRole;
   final String? initialAssignmentId;
+  final String? assignedCheckBackLabel;
+  final VoidCallback? onBackFromAssignedCheck;
   final ValueChanged<bool> onSubflowChanged;
 
   @override
@@ -107,6 +117,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
   String? _openedInitialAssignmentId;
   String? _loadedViolationId;
   bool _selectingTemplate = false;
+  bool _isAssignedCheckFlow = false;
   bool _isWorking = false;
   bool _isSavingViolation = false;
   String? _error;
@@ -178,8 +189,17 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
       _selectingTemplate = false;
       _violationMessage = null;
       _violationError = null;
+      _isAssignedCheckFlow = false;
     });
     widget.onSubflowChanged(false);
+  }
+
+  void _exitAuditSession() {
+    if (_isAssignedCheckFlow && widget.onBackFromAssignedCheck != null) {
+      widget.onBackFromAssignedCheck!();
+      return;
+    }
+    _backToInternalAudits();
   }
 
   void _loadViolationResponse(
@@ -385,6 +405,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
       setState(() {
         _activeAuditId = auditId;
         _selectingTemplate = false;
+        _isAssignedCheckFlow = false;
       });
       widget.onSubflowChanged(true);
     } on AppException catch (error) {
@@ -412,7 +433,10 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
         assignmentId: assignmentId,
       );
       if (!mounted) return;
-      _openSubflow(() => _activeAuditId = auditId);
+      _openSubflow(() {
+        _activeAuditId = auditId;
+        _isAssignedCheckFlow = true;
+      });
     } on AppException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
@@ -467,13 +491,20 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
     }
   }
 
-  Future<void> _cancelCheck(String assignmentId) async {
+  Future<void> _cancelCheck(
+    String assignmentId, {
+    bool selfStarted = false,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel assigned check?'),
-        content: const Text(
-          'The teammate will no longer need to complete this check.',
+        title: Text(
+          selfStarted ? 'Cancel this check?' : 'Cancel assigned check?',
+        ),
+        content: Text(
+          selfStarted
+              ? 'This in-progress check will be cancelled and removed from your work list.'
+              : 'The teammate will no longer need to complete this check.',
         ),
         actions: [
           TextButton(
@@ -610,7 +641,10 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
         siteId: widget.siteId,
         auditId: _activeAuditId!,
         repository: _repository,
-        onBack: _backToInternalAudits,
+        exitLabel: _isAssignedCheckFlow && widget.assignedCheckBackLabel != null
+            ? widget.assignedCheckBackLabel!
+            : 'Back to checks',
+        onBack: _exitAuditSession,
         onOpenViolation: (violationId) {
           setState(() {
             _selectedViolationId = violationId;
@@ -679,6 +713,16 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                     bDue?.millisecondsSinceEpoch ?? 0,
                   );
                 });
+            final assignedChecks = assignments
+                .where(
+                  (doc) => doc.data()['assignmentSource'] != 'self_started',
+                )
+                .toList();
+            final selfStartedChecks = assignments
+                .where(
+                  (doc) => doc.data()['assignmentSource'] == 'self_started',
+                )
+                .toList();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -720,7 +764,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                   const SizedBox(height: 18),
                   const Center(child: CircularProgressIndicator()),
                 ] else ...[
-                  if (assignments.isNotEmpty) ...[
+                  if (assignedChecks.isNotEmpty) ...[
                     const SizedBox(height: 18),
                     Text(
                       _canAssignChecks ? 'Assigned checks' : 'Assigned to me',
@@ -730,18 +774,20 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    ...assignments.map(
+                    ...assignedChecks.map(
                       (doc) => _AssignedAuditRow(
                         assignment: doc.data(),
                         isAssignee: doc.data()['assignedTo'] == currentUserId,
-                        canManage: _canAssignChecks,
+                        canReassign: _canAssignChecks,
+                        canCancel: _canAssignChecks,
                         onStart: () => _startAssignedAudit(doc.id),
                         onReassign: () => _reassignCheck(doc.id, doc.data()),
                         onCancel: () => _cancelCheck(doc.id),
                       ),
                     ),
                   ],
-                  if (inProgress.isNotEmpty) ...[
+                  if (selfStartedChecks.isNotEmpty ||
+                      inProgress.isNotEmpty) ...[
                     const SizedBox(height: 18),
                     Text(
                       'In progress',
@@ -751,12 +797,35 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    ...selfStartedChecks.map(
+                      (doc) => _AssignedAuditRow(
+                        assignment: doc.data(),
+                        isAssignee: doc.data()['assignedTo'] == currentUserId,
+                        canReassign: false,
+                        canCancel:
+                            _canAssignChecks ||
+                            doc.data()['assignedTo'] == currentUserId,
+                        onStart: () => _startAssignedAudit(doc.id),
+                        onReassign: () {},
+                        onCancel: () => _cancelCheck(doc.id, selfStarted: true),
+                      ),
+                    ),
                     ...inProgress.map(
-                      (doc) => _InternalAuditRow(
-                        audit: doc.data(),
-                        actionLabel: 'Resume',
-                        onOpen: () =>
+                      (doc) => _AssignedAuditRow(
+                        assignment: {
+                          'templateNameSnapshot': doc
+                              .data()['templateNameSnapshot'],
+                          'assignedToNameSnapshot': doc
+                              .data()['startedByDisplayNameSnapshot'],
+                          'status': 'in_progress',
+                        },
+                        isAssignee: doc.data()['startedBy'] == currentUserId,
+                        canReassign: false,
+                        canCancel: false,
+                        onStart: () =>
                             _openSubflow(() => _activeAuditId = doc.id),
+                        onReassign: () {},
+                        onCancel: () {},
                       ),
                     ),
                   ],

@@ -35,6 +35,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
   String _trainingInitialView = 'home';
   String? _trainingInitialAssignmentId;
   String? _auditInitialAssignmentId;
+  String? _auditReturnActionFilter;
   bool _hasAppliedInitialLanding = false;
   String? _activeSiteId;
   String? _linkingRestaurantId;
@@ -337,6 +338,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                       _activeSiteId = siteId;
                       _isShowingActionInbox = false;
                       _auditInitialAssignmentId = assignmentId;
+                      _auditReturnActionFilter = _actionInboxInitialFilter;
                       _selectedTabIndex = 3;
                     });
                   },
@@ -367,6 +369,8 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                   onOpenAudits: () {
                     setState(() {
                       _isShowingActionInbox = false;
+                      _auditInitialAssignmentId = null;
+                      _auditReturnActionFilter = null;
                       _selectedTabIndex = 3;
                     });
                   },
@@ -379,6 +383,8 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                   onStartAudit: () {
                     setState(() {
                       _isShowingActionInbox = false;
+                      _auditInitialAssignmentId = null;
+                      _auditReturnActionFilter = null;
                       _selectedTabIndex = 3;
                     });
                   },
@@ -438,6 +444,20 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                 siteId: activeSiteDoc.id,
                 currentRole: currentMember['role'] as String? ?? 'staff',
                 initialAssignmentId: _auditInitialAssignmentId,
+                assignedCheckBackLabel: _auditReturnActionFilter == null
+                    ? null
+                    : 'Back to my checks',
+                onBackFromAssignedCheck: _auditReturnActionFilter == null
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedTabIndex = 1;
+                          _actionInboxInitialFilter = _auditReturnActionFilter!;
+                          _isShowingActionInbox = true;
+                          _auditInitialAssignmentId = null;
+                          _auditReturnActionFilter = null;
+                        });
+                      },
               );
         break;
       case 4:
@@ -531,6 +551,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
           }
           if (index == 3) {
             _auditInitialAssignmentId = null;
+            _auditReturnActionFilter = null;
           }
           if (index != 5) {
             _isManagingTeam = false;

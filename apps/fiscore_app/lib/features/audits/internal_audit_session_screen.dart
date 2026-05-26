@@ -6,6 +6,7 @@ class _InternalAuditSessionView extends StatefulWidget {
     required this.siteId,
     required this.auditId,
     required this.repository,
+    required this.exitLabel,
     required this.onBack,
     required this.onOpenViolation,
   });
@@ -14,6 +15,7 @@ class _InternalAuditSessionView extends StatefulWidget {
   final String siteId;
   final String auditId;
   final InternalAuditRepository repository;
+  final String exitLabel;
   final VoidCallback onBack;
   final ValueChanged<String> onOpenViolation;
 
@@ -204,6 +206,7 @@ class _InternalAuditSessionViewState extends State<_InternalAuditSessionView> {
                 auditId: widget.auditId,
                 audit: audit,
                 responses: responses,
+                exitLabel: widget.exitLabel,
                 onBack: widget.onBack,
                 onOpenViolation: widget.onOpenViolation,
               );
@@ -257,7 +260,7 @@ class _InternalAuditSessionViewState extends State<_InternalAuditSessionView> {
                 TextButton.icon(
                   onPressed: widget.onBack,
                   icon: const Icon(Icons.chevron_left),
-                  label: const Text('Back to checks'),
+                  label: Text(widget.exitLabel),
                 ),
                 Text(
                   audit['templateNameSnapshot'] as String? ?? 'Internal check',

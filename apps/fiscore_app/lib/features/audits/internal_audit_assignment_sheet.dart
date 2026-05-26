@@ -400,7 +400,8 @@ class _AssignedAuditRow extends StatelessWidget {
   const _AssignedAuditRow({
     required this.assignment,
     required this.isAssignee,
-    required this.canManage,
+    required this.canReassign,
+    required this.canCancel,
     required this.onStart,
     required this.onReassign,
     required this.onCancel,
@@ -408,7 +409,8 @@ class _AssignedAuditRow extends StatelessWidget {
 
   final Map<String, dynamic> assignment;
   final bool isAssignee;
-  final bool canManage;
+  final bool canReassign;
+  final bool canCancel;
   final VoidCallback onStart;
   final VoidCallback onReassign;
   final VoidCallback onCancel;
@@ -416,7 +418,16 @@ class _AssignedAuditRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = assignment['status'] as String? ?? 'assigned';
-    final assignee = assignment['assignedToNameSnapshot'] as String? ?? '';
+    final assignee =
+        (assignment['assignedToNameSnapshot'] as String? ?? '').trim();
+    final selfStarted = assignment['assignmentSource'] == 'self_started';
+    final ownerLabel = selfStarted
+        ? isAssignee
+              ? 'Started by you'
+              : assignee.isNotEmpty
+              ? 'Started by $assignee'
+              : 'Self-started'
+        : assignee;
     final due = _auditAssignmentDueLabel(assignment['dueDate']);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -446,8 +457,8 @@ class _AssignedAuditRow extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     [
-                      if (canManage && assignee.isNotEmpty) assignee,
-                      due,
+                      if (ownerLabel.isNotEmpty) ownerLabel,
+                      if (due != null) due,
                       if (status == 'in_progress') 'In progress',
                     ].join(' / '),
                     style: Theme.of(
@@ -462,15 +473,23 @@ class _AssignedAuditRow extends StatelessWidget {
                 onPressed: onStart,
                 child: Text(status == 'in_progress' ? 'Resume' : 'Start'),
               ),
-            if (canManage)
+            if (canReassign || canCancel)
               PopupMenuButton<String>(
                 onSelected: (value) {
                   if (value == 'reassign') onReassign();
                   if (value == 'cancel') onCancel();
                 },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'reassign', child: Text('Reassign')),
-                  PopupMenuItem(value: 'cancel', child: Text('Cancel check')),
+                itemBuilder: (context) => [
+                  if (canReassign)
+                    const PopupMenuItem(
+                      value: 'reassign',
+                      child: Text('Reassign'),
+                    ),
+                  if (canCancel)
+                    const PopupMenuItem(
+                      value: 'cancel',
+                      child: Text('Cancel check'),
+                    ),
                 ],
               ),
           ],
@@ -480,8 +499,8 @@ class _AssignedAuditRow extends StatelessWidget {
   }
 }
 
-String _auditAssignmentDueLabel(Object? value) {
-  if (value is! Timestamp) return 'No due date';
+String? _auditAssignmentDueLabel(Object? value) {
+  if (value is! Timestamp) return null;
   final date = value.toDate();
   final today = DateTime.now();
   final difference = DateTime(

@@ -822,6 +822,7 @@ recurring scheduling complexity.
 - `assignedTo`
 - `assignedToNameSnapshot`
 - `assignedBy`
+- `assignmentSource`
 - `dueDate`
 - `assignmentNote`
 - `status`
@@ -839,11 +840,17 @@ recurring scheduling complexity.
 - `completed`
 - `cancelled`
 
+### Suggested `assignmentSource` values
+
+- `assigned`
+- `self_started`
+
 ### Notes
 
 - the assignment stores the checklist snapshot used when it was assigned
 - starting an assignment creates an audit session linked by `auditId`
-- ad-hoc `Start check` remains available independently of assignments
+- selecting `Start check` creates a `self_started` assignment owned by the
+  signed-in user so an incomplete check remains visible in their action inbox
 - an assignee action item is created, completed, reassigned, cancelled, or
   marked overdue through trusted Cloud Functions
 
@@ -1592,6 +1599,7 @@ workflow record.
 - `detail`
 - `dueAt`
 - `dueState`
+- `assignmentSourceSnapshot`
 - `managerVisible`
 - `readAt`
 - `completedAt`

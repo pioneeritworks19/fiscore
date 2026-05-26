@@ -103,14 +103,43 @@ const createInternalAudit = onCall({ region }, async (request) => {
   }
   const now = admin.firestore.FieldValue.serverTimestamp();
   const auditRef = siteRef.collection("audits").doc();
+  if (!assignmentId) {
+    assignmentRef = siteRef.collection("auditAssignments").doc();
+    assignment = {
+      tenantId,
+      siteId,
+      templateId,
+      templateVersion: template.version,
+      templateNameSnapshot: template.name,
+      templateSnapshot: template,
+      assignedTo: auth.uid,
+      assignedToNameSnapshot: safeText(
+        member.displayNameSnapshot,
+        safeText(auth.token.name, "Team member"),
+      ),
+      assignedBy: auth.uid,
+      assignedByNameSnapshot: safeText(
+        member.displayNameSnapshot,
+        safeText(auth.token.name, "Team member"),
+      ),
+      assignmentSource: "self_started",
+      dueDate: null,
+      assignmentNote: "",
+      status: "in_progress",
+      auditId: auditRef.id,
+      startedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
   const batch = db.batch();
   batch.set(auditRef, {
     tenantId,
     siteId,
     type: "internal_audit",
     status: "in_progress",
-    origin: assignmentId ? "assigned" : "ad_hoc",
-    auditAssignmentId: assignmentId || null,
+    origin: assignmentId ? "assigned" : "self_started",
+    auditAssignmentId: assignmentRef?.id || null,
     assignedTo: assignment?.assignedTo || null,
     assignedToNameSnapshot: assignment?.assignedToNameSnapshot || null,
     templateId: template.id,
@@ -128,7 +157,7 @@ const createInternalAudit = onCall({ region }, async (request) => {
     createdAt: now,
     updatedAt: now,
   });
-  if (assignmentRef) {
+  if (assignmentId && assignmentRef) {
     batch.set(assignmentRef, {
       status: "in_progress",
       auditId: auditRef.id,
@@ -138,11 +167,18 @@ const createInternalAudit = onCall({ region }, async (request) => {
     batch.set(
       actionReference(tenantId, "audit_completion", assignmentId, auth.uid),
       {
-        title: "Finish assigned check",
+        title: "Continue check",
         updatedAt: now,
       },
       { merge: true },
     );
+  } else if (assignmentRef && assignment) {
+    batch.set(assignmentRef, assignment);
+    await createAuditAction(batch, {
+      tenantId,
+      assignmentId: assignmentRef.id,
+      assignment,
+    });
   }
   await batch.commit();
   return { auditId: auditRef.id };
@@ -202,6 +238,7 @@ const assignInternalAudit = onCall({ region }, async (request) => {
       actor.displayNameSnapshot,
       safeText(auth.token.name, "FiScore manager"),
     ),
+    assignmentSource: "assigned",
     dueDate,
     assignmentNote: safeText(request.data?.note, ""),
     status: "assigned",
@@ -257,11 +294,13 @@ const reassignInternalAudit = onCall({ region }, async (request) => {
     ...assignment,
     assignedTo,
     assignedToNameSnapshot,
+    assignmentSource: "assigned",
   };
   const batch = db.batch();
   batch.set(assignmentRef, {
     assignedTo,
     assignedToNameSnapshot,
+    assignmentSource: "assigned",
     reassignedAt: now,
     reassignedBy: auth.uid,
     updatedAt: now,
@@ -296,7 +335,6 @@ const cancelInternalAuditAssignment = onCall({ region }, async (request) => {
   const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
   const siteId = cleanString(request.data?.siteId, "Site ID", 160);
   const assignmentId = cleanString(request.data?.assignmentId, "Assignment ID", 180);
-  await requireSiteRole(tenantId, siteId, auth.uid, siteActionRoles);
   const assignmentRef = db.doc(
     `tenants/${tenantId}/sites/${siteId}/auditAssignments/${assignmentId}`,
   );
@@ -305,6 +343,14 @@ const cancelInternalAuditAssignment = onCall({ region }, async (request) => {
     throw new HttpsError("not-found", "Assigned check was not found.");
   }
   const assignment = assignmentSnap.data();
+  const isOwnSelfStartedCheck =
+    assignment.assignmentSource === "self_started" &&
+    assignment.assignedTo === auth.uid;
+  if (!isOwnSelfStartedCheck) {
+    await requireSiteRole(tenantId, siteId, auth.uid, siteActionRoles);
+  } else {
+    await requireSiteRole(tenantId, siteId, auth.uid, auditParticipantRoles);
+  }
   if (assignment.status === "completed" || assignment.status === "cancelled") {
     throw new HttpsError("failed-precondition", "This check is already finished.");
   }

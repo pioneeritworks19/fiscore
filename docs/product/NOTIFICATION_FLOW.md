@@ -387,6 +387,8 @@ triggers:
 - completing or cancelling training completes its action item
 - a scheduled function marks incomplete training action items overdue
 - assigning a one-time internal check creates an assignee action item
+- starting an unassigned internal check creates a quiet self-owned action item
+  so the user can resume it from `My checks`
 - starting, reassigning, completing, or cancelling that check updates its
   action item
 - a scheduled function marks incomplete assigned-check action items overdue

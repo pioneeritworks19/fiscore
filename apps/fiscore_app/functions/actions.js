@@ -76,6 +76,7 @@ function setOpenAction(batch, {
   severitySnapshot = null,
   dueAt = null,
   dueState = null,
+  assignmentSourceSnapshot = null,
   managerVisible = false,
 }) {
   const now = admin.firestore.FieldValue.serverTimestamp();
@@ -100,6 +101,7 @@ function setOpenAction(batch, {
     severitySnapshot,
     dueAt,
     dueState,
+    assignmentSourceSnapshot,
     managerVisible,
     dedupeKey: `${type}:${targetId}:${recipientUserId}`,
     readAt: null,
@@ -255,6 +257,8 @@ async function createAuditAction(batch, {
   assignment,
 }) {
   const currentSiteName = await siteName(tenantId, assignment.siteId);
+  const isStartedByUser = assignment.assignmentSource === "self_started";
+  const isInProgress = assignment.status === "in_progress";
   const ref = setOpenAction(batch, {
     tenantId,
     type: "audit_completion",
@@ -266,9 +270,10 @@ async function createAuditAction(batch, {
     targetId: assignmentId,
     targetPath:
       `tenants/${tenantId}/sites/${assignment.siteId}/auditAssignments/${assignmentId}`,
-    title: "Complete assigned check",
+    title: isInProgress ? "Continue check" : "Complete assigned check",
     detail: safeText(assignment.templateNameSnapshot, "Internal check"),
     dueAt: assignment.dueDate,
+    assignmentSourceSnapshot: isStartedByUser ? "self_started" : "assigned",
     managerVisible: true,
   });
   setTargetKey(batch, ref, "audit_assignment", assignmentId);
