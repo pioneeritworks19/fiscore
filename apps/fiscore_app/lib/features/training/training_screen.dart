@@ -10,12 +10,14 @@ class _TrainingContent extends StatefulWidget {
     required this.siteId,
     required this.currentMember,
     this.initialView = 'home',
+    this.initialAssignmentId,
   });
 
   final String tenantId;
   final String siteId;
   final Map<String, dynamic> currentMember;
   final String initialView;
+  final String? initialAssignmentId;
 
   @override
   State<_TrainingContent> createState() => _TrainingContentState();
@@ -26,6 +28,7 @@ class _TrainingContentState extends State<_TrainingContent> {
   late String _view;
   String? _activeAssignmentId;
   Map<String, dynamic>? _activeAssignment;
+  String? _openedInitialAssignmentId;
   String? _message;
   String? _error;
 
@@ -44,6 +47,9 @@ class _TrainingContentState extends State<_TrainingContent> {
     super.didUpdateWidget(oldWidget);
     if (widget.initialView != oldWidget.initialView) {
       _view = widget.initialView;
+    }
+    if (widget.initialAssignmentId != oldWidget.initialAssignmentId) {
+      _openedInitialAssignmentId = null;
     }
   }
 
@@ -171,6 +177,18 @@ class _TrainingContentState extends State<_TrainingContent> {
         final completedCount = assignments
             .where((doc) => doc.data()['status'] == 'completed')
             .length;
+        if (widget.initialAssignmentId != null &&
+            widget.initialAssignmentId != _openedInitialAssignmentId) {
+          for (final assignment in assignments) {
+            if (assignment.id == widget.initialAssignmentId) {
+              _activeAssignmentId = assignment.id;
+              _activeAssignment = assignment.data();
+              _view = 'player';
+              _openedInitialAssignmentId = assignment.id;
+              break;
+            }
+          }
+        }
 
         final statusMessages = <Widget>[
           if (_message != null)

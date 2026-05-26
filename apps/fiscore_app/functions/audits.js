@@ -5,11 +5,26 @@ const {
   storageBucket,
   region,
   internalAuditRoles,
+  siteActionRoles,
   requireAuth,
   cleanString,
   requireSiteRole,
   safeText,
 } = require("./shared/runtime");
+const {
+  memberHasSiteAccess,
+  actionReference,
+  completeAction,
+  createAuditAction,
+} = require("./actions");
+
+const auditParticipantRoles = [
+  "tenant_owner",
+  "admin",
+  "manager",
+  "auditor",
+  "staff",
+];
 
 function templateQuestions(template) {
   return template.sections.flatMap((section) =>
@@ -26,25 +41,56 @@ const createInternalAudit = onCall({ region }, async (request) => {
   const auth = requireAuth(request);
   const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
   const siteId = cleanString(request.data?.siteId, "Site ID", 160);
-  const templateId = cleanString(request.data?.templateId, "Template ID", 120);
+  const assignmentId = safeText(request.data?.assignmentId);
+  const templateId = assignmentId
+    ? null
+    : cleanString(request.data?.templateId, "Template ID", 120);
   const member = await requireSiteRole(
     tenantId,
     siteId,
     auth.uid,
-    internalAuditRoles,
+    assignmentId ? auditParticipantRoles : internalAuditRoles,
   );
   const siteRef = db.doc(`tenants/${tenantId}/sites/${siteId}`);
   const siteSnap = await siteRef.get();
   if (!siteSnap.exists || siteSnap.data().status !== "active") {
     throw new HttpsError("not-found", "Active site was not found.");
   }
-  const templateSnap = await db
-    .doc(`tenants/${tenantId}/checklistTemplates/${templateId}`)
-    .get();
-  if (!templateSnap.exists) {
-    throw new HttpsError("not-found", "Checklist template was not found.");
+  let template;
+  let assignmentRef = null;
+  let assignment = null;
+  if (assignmentId) {
+    assignmentRef = siteRef.collection("auditAssignments").doc(assignmentId);
+    const assignmentSnap = await assignmentRef.get();
+    if (!assignmentSnap.exists) {
+      throw new HttpsError("not-found", "Assigned check was not found.");
+    }
+    assignment = assignmentSnap.data();
+    if (assignment.assignedTo !== auth.uid) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only the assigned teammate can start this check.",
+      );
+    }
+    if (assignment.status === "cancelled" || assignment.status === "completed") {
+      throw new HttpsError(
+        "failed-precondition",
+        "This assigned check is already finished.",
+      );
+    }
+    if (assignment.status === "in_progress" && safeText(assignment.auditId)) {
+      return { auditId: assignment.auditId };
+    }
+    template = assignment.templateSnapshot;
+  } else {
+    const templateSnap = await db
+      .doc(`tenants/${tenantId}/checklistTemplates/${templateId}`)
+      .get();
+    if (!templateSnap.exists) {
+      throw new HttpsError("not-found", "Checklist template was not found.");
+    }
+    template = templateSnap.data();
   }
-  const template = templateSnap.data();
   if (
     template.status !== "active" ||
     template.isActive === false ||
@@ -57,12 +103,16 @@ const createInternalAudit = onCall({ region }, async (request) => {
   }
   const now = admin.firestore.FieldValue.serverTimestamp();
   const auditRef = siteRef.collection("audits").doc();
-  await auditRef.set({
+  const batch = db.batch();
+  batch.set(auditRef, {
     tenantId,
     siteId,
     type: "internal_audit",
     status: "in_progress",
-    origin: "ad_hoc",
+    origin: assignmentId ? "assigned" : "ad_hoc",
+    auditAssignmentId: assignmentId || null,
+    assignedTo: assignment?.assignedTo || null,
+    assignedToNameSnapshot: assignment?.assignedToNameSnapshot || null,
     templateId: template.id,
     templateVersion: template.version,
     templateNameSnapshot: template.name,
@@ -78,7 +128,212 @@ const createInternalAudit = onCall({ region }, async (request) => {
     createdAt: now,
     updatedAt: now,
   });
+  if (assignmentRef) {
+    batch.set(assignmentRef, {
+      status: "in_progress",
+      auditId: auditRef.id,
+      startedAt: now,
+      updatedAt: now,
+    }, { merge: true });
+    batch.set(
+      actionReference(tenantId, "audit_completion", assignmentId, auth.uid),
+      {
+        title: "Finish assigned check",
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+  }
+  await batch.commit();
   return { auditId: auditRef.id };
+});
+
+const assignInternalAudit = onCall({ region }, async (request) => {
+  const auth = requireAuth(request);
+  const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
+  const siteId = cleanString(request.data?.siteId, "Site ID", 160);
+  const templateId = cleanString(request.data?.templateId, "Template ID", 120);
+  const assignedTo = cleanString(request.data?.assignedTo, "Assignee", 180);
+  const actor = await requireSiteRole(tenantId, siteId, auth.uid, siteActionRoles);
+  const templateSnap = await db.doc(
+    `tenants/${tenantId}/checklistTemplates/${templateId}`,
+  ).get();
+  if (!templateSnap.exists || templateSnap.data().status !== "active") {
+    throw new HttpsError("not-found", "Checklist template was not found.");
+  }
+  const memberSnap = await db.doc(`tenants/${tenantId}/members/${assignedTo}`).get();
+  if (!memberSnap.exists) {
+    throw new HttpsError("not-found", "Team member was not found.");
+  }
+  const assignee = memberSnap.data();
+  if (assignee.status !== "active" || !memberHasSiteAccess(assignee, siteId)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Choose an active teammate with access to this site.",
+    );
+  }
+  const dueDateValue = request.data?.dueDate;
+  const dueDate = dueDateValue && typeof dueDateValue === "string"
+    ? admin.firestore.Timestamp.fromDate(new Date(dueDateValue))
+    : null;
+  if (!dueDate || Number.isNaN(dueDate.toDate().valueOf())) {
+    throw new HttpsError("invalid-argument", "Choose a valid due date.");
+  }
+  const template = templateSnap.data();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const assignmentRef = db
+    .doc(`tenants/${tenantId}/sites/${siteId}`)
+    .collection("auditAssignments")
+    .doc();
+  const assignment = {
+    tenantId,
+    siteId,
+    templateId,
+    templateVersion: template.version,
+    templateNameSnapshot: template.name,
+    templateSnapshot: template,
+    assignedTo,
+    assignedToNameSnapshot: safeText(
+      assignee.displayNameSnapshot,
+      safeText(assignee.emailSnapshot, "Team member"),
+    ),
+    assignedBy: auth.uid,
+    assignedByNameSnapshot: safeText(
+      actor.displayNameSnapshot,
+      safeText(auth.token.name, "FiScore manager"),
+    ),
+    dueDate,
+    assignmentNote: safeText(request.data?.note, ""),
+    status: "assigned",
+    auditId: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const batch = db.batch();
+  batch.set(assignmentRef, assignment);
+  await createAuditAction(batch, {
+    tenantId,
+    assignmentId: assignmentRef.id,
+    assignment,
+  });
+  await batch.commit();
+  return { assignmentId: assignmentRef.id };
+});
+
+const reassignInternalAudit = onCall({ region }, async (request) => {
+  const auth = requireAuth(request);
+  const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
+  const siteId = cleanString(request.data?.siteId, "Site ID", 160);
+  const assignmentId = cleanString(request.data?.assignmentId, "Assignment ID", 180);
+  const assignedTo = cleanString(request.data?.assignedTo, "Assignee", 180);
+  await requireSiteRole(tenantId, siteId, auth.uid, siteActionRoles);
+  const assignmentRef = db.doc(
+    `tenants/${tenantId}/sites/${siteId}/auditAssignments/${assignmentId}`,
+  );
+  const assignmentSnap = await assignmentRef.get();
+  if (!assignmentSnap.exists) {
+    throw new HttpsError("not-found", "Assigned check was not found.");
+  }
+  const assignment = assignmentSnap.data();
+  if (assignment.status === "completed" || assignment.status === "cancelled") {
+    throw new HttpsError("failed-precondition", "This check is already finished.");
+  }
+  const memberSnap = await db.doc(`tenants/${tenantId}/members/${assignedTo}`).get();
+  const member = memberSnap.data();
+  if (!memberSnap.exists || member.status !== "active" ||
+      !memberHasSiteAccess(member, siteId)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Choose an active teammate with access to this site.",
+    );
+  }
+  const oldAssignee = assignment.assignedTo;
+  const assignedToNameSnapshot = safeText(
+    member.displayNameSnapshot,
+    safeText(member.emailSnapshot, "Team member"),
+  );
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const updatedAssignment = {
+    ...assignment,
+    assignedTo,
+    assignedToNameSnapshot,
+  };
+  const batch = db.batch();
+  batch.set(assignmentRef, {
+    assignedTo,
+    assignedToNameSnapshot,
+    reassignedAt: now,
+    reassignedBy: auth.uid,
+    updatedAt: now,
+  }, { merge: true });
+  if (safeText(assignment.auditId)) {
+    batch.set(
+      db.doc(`tenants/${tenantId}/sites/${siteId}/audits/${assignment.auditId}`),
+      {
+        assignedTo,
+        assignedToNameSnapshot,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+  }
+  completeAction(
+    batch,
+    actionReference(tenantId, "audit_completion", assignmentId, oldAssignee),
+    "reassigned",
+  );
+  await createAuditAction(batch, {
+    tenantId,
+    assignmentId,
+    assignment: updatedAssignment,
+  });
+  await batch.commit();
+  return { assignedTo };
+});
+
+const cancelInternalAuditAssignment = onCall({ region }, async (request) => {
+  const auth = requireAuth(request);
+  const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
+  const siteId = cleanString(request.data?.siteId, "Site ID", 160);
+  const assignmentId = cleanString(request.data?.assignmentId, "Assignment ID", 180);
+  await requireSiteRole(tenantId, siteId, auth.uid, siteActionRoles);
+  const assignmentRef = db.doc(
+    `tenants/${tenantId}/sites/${siteId}/auditAssignments/${assignmentId}`,
+  );
+  const assignmentSnap = await assignmentRef.get();
+  if (!assignmentSnap.exists) {
+    throw new HttpsError("not-found", "Assigned check was not found.");
+  }
+  const assignment = assignmentSnap.data();
+  if (assignment.status === "completed" || assignment.status === "cancelled") {
+    throw new HttpsError("failed-precondition", "This check is already finished.");
+  }
+  const batch = db.batch();
+  batch.set(assignmentRef, {
+    status: "cancelled",
+    cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+    cancelledBy: auth.uid,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  if (safeText(assignment.auditId)) {
+    batch.set(
+      db.doc(`tenants/${tenantId}/sites/${siteId}/audits/${assignment.auditId}`),
+      {
+        status: "cancelled",
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        cancelledBy: auth.uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+  completeAction(
+    batch,
+    actionReference(tenantId, "audit_completion", assignmentId, assignment.assignedTo),
+    "cancelled",
+  );
+  await batch.commit();
+  return { status: "cancelled" };
 });
 
 const submitInternalAudit = onCall({ region }, async (request) => {
@@ -86,7 +341,7 @@ const submitInternalAudit = onCall({ region }, async (request) => {
   const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
   const siteId = cleanString(request.data?.siteId, "Site ID", 160);
   const auditId = cleanString(request.data?.auditId, "Audit ID", 160);
-  await requireSiteRole(tenantId, siteId, auth.uid, internalAuditRoles);
+  await requireSiteRole(tenantId, siteId, auth.uid, auditParticipantRoles);
 
   const auditRef = db.doc(`tenants/${tenantId}/sites/${siteId}/audits/${auditId}`);
   const auditSnap = await auditRef.get();
@@ -100,7 +355,10 @@ const submitInternalAudit = onCall({ region }, async (request) => {
       "Only an in-progress audit can be submitted.",
     );
   }
-  if (audit.startedBy !== auth.uid) {
+  if (
+    (audit.auditAssignmentId && audit.assignedTo !== auth.uid) ||
+    (!audit.auditAssignmentId && audit.startedBy !== auth.uid)
+  ) {
     throw new HttpsError(
       "permission-denied",
       "Only the person who started this audit can submit it.",
@@ -177,6 +435,8 @@ const submitInternalAudit = onCall({ region }, async (request) => {
       sourceReferenceId: auditId,
       sourceQuestionResponseId: question.id,
       auditId,
+      sourceTitleSnapshot: audit.templateNameSnapshot,
+      sourceOccurredAt: now,
       checklistTemplateId: template.id,
       checklistVersion: template.version,
       sectionLabel: question.sectionTitle,
@@ -258,6 +518,28 @@ const submitInternalAudit = onCall({ region }, async (request) => {
     createdViolationIds,
     updatedAt: now,
   }, { merge: true });
+  if (safeText(audit.auditAssignmentId)) {
+    const assignmentRef = db.doc(
+      `tenants/${tenantId}/sites/${siteId}/auditAssignments/${audit.auditAssignmentId}`,
+    );
+    batch.set(assignmentRef, {
+      status: "completed",
+      auditId,
+      completedAt: now,
+      completedBy: auth.uid,
+      updatedAt: now,
+    }, { merge: true });
+    completeAction(
+      batch,
+      actionReference(
+        tenantId,
+        "audit_completion",
+        audit.auditAssignmentId,
+        audit.assignedTo,
+      ),
+      "completed",
+    );
+  }
   batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
     internalAuditCountSnapshot: admin.firestore.FieldValue.increment(1),
     openViolationCountSnapshot:
@@ -277,5 +559,8 @@ const submitInternalAudit = onCall({ region }, async (request) => {
 
 module.exports = {
   createInternalAudit,
+  assignInternalAudit,
+  reassignInternalAudit,
+  cancelInternalAuditAssignment,
   submitInternalAudit,
 };

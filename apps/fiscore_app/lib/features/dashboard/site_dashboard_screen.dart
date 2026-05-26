@@ -7,10 +7,8 @@ class _SiteDashboardContent extends StatefulWidget {
     required this.site,
     required this.currentUserId,
     required this.canManageTraining,
-    required this.onOpenViolations,
-    required this.onOpenReviews,
-    required this.onOpenMyTraining,
-    required this.onOpenOverdueTraining,
+    required this.onOpenUnassignedViolations,
+    required this.onOpenActions,
     required this.onOpenAudits,
     required this.onAddSite,
     required this.onStartAudit,
@@ -22,10 +20,8 @@ class _SiteDashboardContent extends StatefulWidget {
   final Map<String, dynamic> site;
   final String currentUserId;
   final bool canManageTraining;
-  final VoidCallback onOpenViolations;
-  final ValueChanged<String?> onOpenReviews;
-  final VoidCallback onOpenMyTraining;
-  final VoidCallback onOpenOverdueTraining;
+  final VoidCallback onOpenUnassignedViolations;
+  final ValueChanged<String> onOpenActions;
   final VoidCallback onOpenAudits;
   final VoidCallback onAddSite;
   final VoidCallback onStartAudit;
@@ -37,7 +33,7 @@ class _SiteDashboardContent extends StatefulWidget {
 
 class _SiteDashboardContentState extends State<_SiteDashboardContent> {
   final ViolationRepository _violationRepository = ViolationRepository();
-  final TrainingRepository _trainingRepository = TrainingRepository();
+  final ActionItemRepository _actionItemRepository = ActionItemRepository();
   final InternalAuditRepository _internalAuditRepository =
       InternalAuditRepository();
 
@@ -45,9 +41,11 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final site = widget.site;
-    final latestInspectionDate = site['latestInspectionDateSnapshot'] as String?;
+    final latestInspectionDate =
+        site['latestInspectionDateSnapshot'] as String?;
     final latestGrade = site['latestInspectionGradeSnapshot'] as String?;
-    final latestScore = (site['latestInspectionScoreSnapshot'] as num?)?.toInt();
+    final latestScore = (site['latestInspectionScoreSnapshot'] as num?)
+        ?.toInt();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -75,57 +73,96 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
           ),
           builder: (context, snapshot) {
             final docs = snapshot.data?.docs ?? [];
-            final active = docs
-                .where((doc) {
-                  final status = doc.data()['status'];
-                  return status != 'closed' && status != 'pending_review';
-                })
-                .toList();
-            final reviews = docs
-                .where((doc) => doc.data()['status'] == 'pending_review')
-                .toList();
-
+            final active = docs.where((doc) {
+              final status = doc.data()['status'];
+              return status != 'closed' && status != 'pending_review';
+            }).toList();
+            final unassignedViolations = active
+                .where(
+                  (doc) => (doc.data()['assignedTo'] as String? ?? '').isEmpty,
+                )
+                .length;
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _trainingRepository.assignmentsStream(
+              stream: _actionItemRepository.myOpenActions(
                 tenantId: widget.tenantId,
-                siteId: widget.siteId,
                 userId: widget.currentUserId,
-                canAssign: widget.canManageTraining,
               ),
-              builder: (context, trainingSnapshot) {
-                final assignments = (trainingSnapshot.data?.docs ?? [])
-                    .where((doc) => doc.data()['siteId'] == widget.siteId)
+              builder: (context, myActionSnapshot) {
+                final myActions = (myActionSnapshot.data?.docs ?? [])
+                    .map((doc) => doc.data())
+                    .where((action) => action['siteId'] == widget.siteId)
                     .toList();
-                  final myOpenTraining = assignments.where((doc) {
-                    final data = doc.data();
-                    return data['assignedTo'] == widget.currentUserId &&
-                        data['status'] != 'completed' &&
-                        data['status'] != 'cancelled';
-                  }).length;
-                final overdueTraining = widget.canManageTraining
-                    ? assignments.where((doc) {
-                        final data = doc.data();
-                        return data['status'] != 'completed' &&
-                            data['status'] != 'cancelled' &&
-                            _isTrainingOverdue(data['dueDate']);
-                      }).length
-                    : 0;
-                return _NeedsActionCard(
-                  openViolationCount: active.length,
-                  reviewCount: reviews.length,
-                  myTrainingCount: myOpenTraining,
-                  overdueTrainingCount: overdueTraining,
-                  isLoading:
-                      snapshot.connectionState == ConnectionState.waiting ||
-                      trainingSnapshot.connectionState ==
-                          ConnectionState.waiting,
-                  showManagerActions: widget.canManageTraining,
-                  onOpenViolations: widget.onOpenViolations,
-                  onOpenReviews: () => widget.onOpenReviews(
-                    reviews.length == 1 ? reviews.first.id : null,
-                  ),
-                  onOpenMyTraining: widget.onOpenMyTraining,
-                  onOpenOverdueTraining: widget.onOpenOverdueTraining,
+                final myOpenTraining = myActions
+                    .where((action) => action['type'] == 'training_completion')
+                    .length;
+                final myChecks = myActions
+                    .where((action) => action['type'] == 'audit_completion')
+                    .length;
+                final reviews = myActions
+                    .where((action) => action['type'] == 'violation_review')
+                    .length;
+                final assignedFixes = myActions
+                    .where(
+                      (action) =>
+                          action['type'] == 'violation_resolution' ||
+                          action['type'] == 'violation_sent_back',
+                    )
+                    .length;
+                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: widget.canManageTraining
+                      ? _actionItemRepository.teamOpenActions(
+                          tenantId: widget.tenantId,
+                          siteId: widget.siteId,
+                        )
+                      : null,
+                  builder: (context, teamActionSnapshot) {
+                    final overdueTraining = widget.canManageTraining
+                        ? (teamActionSnapshot.data?.docs ?? [])
+                              .where(
+                                (doc) =>
+                                    doc.data()['type'] ==
+                                        'training_completion' &&
+                                    doc.data()['dueState'] == 'overdue',
+                              )
+                              .length
+                        : 0;
+                    final overdueChecks = widget.canManageTraining
+                        ? (teamActionSnapshot.data?.docs ?? [])
+                              .where(
+                                (doc) =>
+                                    doc.data()['type'] == 'audit_completion' &&
+                                    doc.data()['dueState'] == 'overdue',
+                              )
+                              .length
+                        : 0;
+                    return _NeedsActionCard(
+                      unassignedViolationCount: unassignedViolations,
+                      assignedFixCount: assignedFixes,
+                      reviewCount: reviews,
+                      myCheckCount: myChecks,
+                      myTrainingCount: myOpenTraining,
+                      overdueCheckCount: overdueChecks,
+                      overdueTrainingCount: overdueTraining,
+                      isLoading:
+                          snapshot.connectionState == ConnectionState.waiting ||
+                          myActionSnapshot.connectionState ==
+                              ConnectionState.waiting ||
+                          (widget.canManageTraining &&
+                              teamActionSnapshot.connectionState ==
+                                  ConnectionState.waiting),
+                      showManagerActions: widget.canManageTraining,
+                      onOpenViolations: widget.onOpenUnassignedViolations,
+                      onOpenAssignedFixes: () =>
+                          widget.onOpenActions('assigned_fixes'),
+                      onOpenMyChecks: () => widget.onOpenActions('checks'),
+                      onOpenReviews: () => widget.onOpenActions('review'),
+                      onOpenMyTraining: () => widget.onOpenActions('training'),
+                      onOpenOverdueChecks: () =>
+                          widget.onOpenActions('audit_overdue'),
+                      onOpenOverdueTraining: () =>
+                          widget.onOpenActions('training_overdue'),
+                    );
+                  },
                 );
               },
             );
@@ -158,10 +195,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
                   if (latestGrade != null && latestGrade.isNotEmpty)
                     _DashboardChip(label: 'Grade $latestGrade'),
                   if (latestScore != null)
-                    _DashboardChip(
-                      label: 'Score $latestScore',
-                      color: _green,
-                    ),
+                    _DashboardChip(label: 'Score $latestScore', color: _green),
                 ],
                 onTap: widget.onOpenAudits,
               ),
@@ -174,14 +208,15 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
                 builder: (context, snapshot) {
                   final audits = snapshot.data?.docs ?? [];
                   final audit = audits.isEmpty ? null : audits.first.data();
-                  final title = audit?['templateNameSnapshot'] as String? ??
+                  final title =
+                      audit?['templateNameSnapshot'] as String? ??
                       'Internal check';
                   final isComplete = audit?['status'] == 'completed';
                   final detail = audit == null
                       ? 'No internal check completed yet'
                       : isComplete
-                          ? 'Most recent check completed'
-                          : 'Check in progress';
+                      ? 'Most recent check completed'
+                      : 'Check in progress';
                   final score = audit?['scorePercentage'];
 
                   return _DashboardActivityRow(
@@ -236,27 +271,39 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
 
 class _NeedsActionCard extends StatelessWidget {
   const _NeedsActionCard({
-    required this.openViolationCount,
+    required this.unassignedViolationCount,
+    required this.assignedFixCount,
     required this.reviewCount,
+    required this.myCheckCount,
     required this.myTrainingCount,
+    required this.overdueCheckCount,
     required this.overdueTrainingCount,
     required this.isLoading,
     required this.showManagerActions,
     required this.onOpenViolations,
+    required this.onOpenAssignedFixes,
+    required this.onOpenMyChecks,
     required this.onOpenReviews,
     required this.onOpenMyTraining,
+    required this.onOpenOverdueChecks,
     required this.onOpenOverdueTraining,
   });
 
-  final int openViolationCount;
+  final int unassignedViolationCount;
+  final int assignedFixCount;
   final int reviewCount;
+  final int myCheckCount;
   final int myTrainingCount;
+  final int overdueCheckCount;
   final int overdueTrainingCount;
   final bool isLoading;
   final bool showManagerActions;
   final VoidCallback onOpenViolations;
+  final VoidCallback onOpenAssignedFixes;
+  final VoidCallback onOpenMyChecks;
   final VoidCallback onOpenReviews;
   final VoidCallback onOpenMyTraining;
+  final VoidCallback onOpenOverdueChecks;
   final VoidCallback onOpenOverdueTraining;
 
   @override
@@ -291,51 +338,118 @@ class _NeedsActionCard extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 22),
               child: CircularProgressIndicator(),
             )
+          else if (assignedFixCount == 0 &&
+              myCheckCount == 0 &&
+              myTrainingCount == 0 &&
+              (!showManagerActions ||
+                  (reviewCount == 0 &&
+                      unassignedViolationCount == 0 &&
+                      overdueCheckCount == 0 &&
+                      overdueTrainingCount == 0)))
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 16),
+              child: Text(
+                'Nothing needs attention right now.',
+                style: theme.textTheme.bodyMedium?.copyWith(color: _muted),
+              ),
+            )
           else ...[
-            _DashboardActionRow(
-              icon: Icons.report_problem_outlined,
-              color: const Color(0xFFD92D20),
-              count: openViolationCount,
-              title: 'Open violations',
-              detail: openViolationCount == 0
-                  ? 'No fixes need attention'
-                  : 'Resolve and submit completed fixes',
-              onTap: onOpenViolations,
-            ),
-            _DashboardActionRow(
-              icon: Icons.school_outlined,
-              color: const Color(0xFF2859C5),
-              count: myTrainingCount,
-              title: 'Training assigned to me',
-              detail: myTrainingCount == 0
-                  ? 'No assigned training due'
-                  : 'Complete assigned coaching',
-              onTap: onOpenMyTraining,
-            ),
-            if (showManagerActions)
+            if (assignedFixCount > 0 || myCheckCount > 0 || myTrainingCount > 0)
+              const _DashboardActionGroupLabel(label: 'My work'),
+            if (assignedFixCount > 0)
+              _DashboardActionRow(
+                icon: Icons.assignment_ind_outlined,
+                color: const Color(0xFF2859C5),
+                count: assignedFixCount,
+                title: 'Fixes assigned to me',
+                detail: 'Complete assigned resolutions',
+                onTap: onOpenAssignedFixes,
+              ),
+            if (myCheckCount > 0)
+              _DashboardActionRow(
+                icon: Icons.fact_check_outlined,
+                color: const Color(0xFF2859C5),
+                count: myCheckCount,
+                title: 'Checks assigned to me',
+                detail: 'Complete assigned checklists',
+                onTap: onOpenMyChecks,
+              ),
+            if (myTrainingCount > 0)
+              _DashboardActionRow(
+                icon: Icons.school_outlined,
+                color: const Color(0xFF2859C5),
+                count: myTrainingCount,
+                title: 'Training assigned to me',
+                detail: 'Complete assigned coaching',
+                onTap: onOpenMyTraining,
+              ),
+            if (showManagerActions &&
+                (reviewCount > 0 ||
+                    unassignedViolationCount > 0 ||
+                    overdueCheckCount > 0 ||
+                    overdueTrainingCount > 0))
+              const _DashboardActionGroupLabel(label: 'Team follow-up'),
+            if (showManagerActions && reviewCount > 0)
               _DashboardActionRow(
                 icon: Icons.verified_outlined,
                 color: _green,
                 count: reviewCount,
                 title: 'Fixes ready for review',
-                detail: reviewCount == 0
-                    ? 'No fixes waiting for review'
-                    : 'Approve or send back completed work',
+                detail: 'Approve or send back completed work',
                 onTap: onOpenReviews,
               ),
-            if (showManagerActions)
+            if (showManagerActions && unassignedViolationCount > 0)
+              _DashboardActionRow(
+                icon: Icons.report_problem_outlined,
+                color: const Color(0xFFD92D20),
+                count: unassignedViolationCount,
+                title: 'Unassigned violations',
+                detail: 'Assign follow-up responsibility',
+                onTap: onOpenViolations,
+              ),
+            if (showManagerActions && overdueCheckCount > 0)
+              _DashboardActionRow(
+                icon: Icons.fact_check_outlined,
+                color: const Color(0xFFB54708),
+                count: overdueCheckCount,
+                title: 'Overdue checks',
+                detail: 'Follow up with assigned staff',
+                onTap: onOpenOverdueChecks,
+              ),
+            if (showManagerActions && overdueTrainingCount > 0)
               _DashboardActionRow(
                 icon: Icons.schedule_outlined,
                 color: const Color(0xFFB54708),
                 count: overdueTrainingCount,
                 title: 'Staff training overdue',
-                detail: overdueTrainingCount == 0
-                    ? 'No overdue assignments'
-                    : 'Follow up on overdue assignments',
+                detail: 'Follow up on overdue assignments',
                 onTap: onOpenOverdueTraining,
               ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _DashboardActionGroupLabel extends StatelessWidget {
+  const _DashboardActionGroupLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 8, bottom: 3),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: _muted,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -504,9 +618,9 @@ class _DashboardChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -538,7 +652,9 @@ bool _isTrainingOverdue(Object? value) {
   }
   final due = value.toDate();
   final today = DateTime.now();
-  return DateTime(due.year, due.month, due.day).isBefore(
-    DateTime(today.year, today.month, today.day),
-  );
+  return DateTime(
+    due.year,
+    due.month,
+    due.day,
+  ).isBefore(DateTime(today.year, today.month, today.day));
 }

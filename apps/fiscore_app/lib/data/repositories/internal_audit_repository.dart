@@ -49,6 +49,21 @@ class InternalAuditRepository {
     ).orderBy('startedAt', descending: true).snapshots();
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> assignmentsForSite({
+    required String tenantId,
+    required String siteId,
+    required String currentUserId,
+    required bool canManage,
+  }) {
+    final assignments = FirestorePaths.auditAssignments(tenantId, siteId);
+    if (canManage) {
+      return assignments.snapshots();
+    }
+    return assignments
+        .where('assignedTo', isEqualTo: currentUserId)
+        .snapshots();
+  }
+
   Stream<DocumentSnapshot<Map<String, dynamic>>> auditStream({
     required String tenantId,
     required String siteId,
@@ -76,6 +91,63 @@ class InternalAuditRepository {
       'templateId': templateId,
     });
     return result['auditId'] as String;
+  }
+
+  Future<String> startAssignment({
+    required String tenantId,
+    required String siteId,
+    required String assignmentId,
+  }) async {
+    final result = await _functions.call('createInternalAudit', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'assignmentId': assignmentId,
+    });
+    return result['auditId'] as String;
+  }
+
+  Future<void> assignCheck({
+    required String tenantId,
+    required String siteId,
+    required String templateId,
+    required String assignedTo,
+    required DateTime dueDate,
+    String? note,
+  }) async {
+    await _functions.call('assignInternalAudit', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'templateId': templateId,
+      'assignedTo': assignedTo,
+      'dueDate': dueDate.toUtc().toIso8601String(),
+      'note': note?.trim() ?? '',
+    });
+  }
+
+  Future<void> reassignCheck({
+    required String tenantId,
+    required String siteId,
+    required String assignmentId,
+    required String assignedTo,
+  }) async {
+    await _functions.call('reassignInternalAudit', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'assignmentId': assignmentId,
+      'assignedTo': assignedTo,
+    });
+  }
+
+  Future<void> cancelAssignment({
+    required String tenantId,
+    required String siteId,
+    required String assignmentId,
+  }) async {
+    await _functions.call('cancelInternalAuditAssignment', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'assignmentId': assignmentId,
+    });
   }
 
   Future<void> saveResponse({

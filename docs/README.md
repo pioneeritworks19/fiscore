@@ -54,6 +54,8 @@ Use these documents as canonical unless a later doc explicitly replaces them:
   [product/BILLING_AND_SUBSCRIPTION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\BILLING_AND_SUBSCRIPTION_FLOW.md)
 - Notification triggers and behavior:
   [product/NOTIFICATION_FLOW.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\NOTIFICATION_FLOW.md)
+- Testing and release quality strategy:
+  [product/TEST_AND_RELEASE_QUALITY_STRATEGY.md](C:\Users\mkann\Documents\kannappan\fiscore\docs\product\TEST_AND_RELEASE_QUALITY_STRATEGY.md)
 - Device and platform support strategy:
   [product/DEVICE_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DEVICE_STRATEGY.md)
 - Content ownership and management model:

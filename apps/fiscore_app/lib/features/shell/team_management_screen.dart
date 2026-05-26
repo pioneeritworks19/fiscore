@@ -181,7 +181,8 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
     final confirmed = await _confirmTeamAction(
       context,
       title: 'Deactivate $name?',
-      body: 'They will lose access to this workspace. Their past activity will remain visible.',
+      body:
+          'They will lose access to this workspace. Their past activity will remain visible.',
       actionLabel: 'Deactivate',
       dismissLabel: 'Keep access',
     );
@@ -357,16 +358,19 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
           currentUserId: widget.currentMember['userId'] as String?,
           currentRole: widget.currentMember['role'] as String? ?? 'staff',
           canManage: _canManageTeam && !_isManaging,
-          onResendInvite:
-              _canManageTeam && !_isManaging ? _resendInviteLink : null,
-          onCancelInvite:
-              _canManageTeam && !_isManaging ? _cancelInvite : null,
-          onEditInvite:
-              _canManageTeam && !_isManaging ? _editInviteAccess : null,
-          onEditMember:
-              _canManageTeam && !_isManaging ? _editMemberAccess : null,
-          onDeactivateMember:
-              _canManageTeam && !_isManaging ? _deactivateMember : null,
+          onResendInvite: _canManageTeam && !_isManaging
+              ? _resendInviteLink
+              : null,
+          onCancelInvite: _canManageTeam && !_isManaging ? _cancelInvite : null,
+          onEditInvite: _canManageTeam && !_isManaging
+              ? _editInviteAccess
+              : null,
+          onEditMember: _canManageTeam && !_isManaging
+              ? _editMemberAccess
+              : null,
+          onDeactivateMember: _canManageTeam && !_isManaging
+              ? _deactivateMember
+              : null,
         ),
         if (_canManageTeam) ...[
           const SizedBox(height: 16),
@@ -435,12 +439,9 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
             },
           ),
           const SizedBox(height: 12),
-          if (_selectedRole == 'admin')
-            Text(
-              'Admins have access to all sites.',
-              style: theme.textTheme.bodySmall?.copyWith(color: _muted),
-            )
-          else
+          _RoleGuidanceCard(role: _selectedRole),
+          const SizedBox(height: 12),
+          if (_selectedRole != 'admin')
             SegmentedButton<String>(
               segments: const [
                 ButtonSegment(value: 'all', label: Text('All sites')),
@@ -522,10 +523,9 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
           ),
           child: Text(
             'This teammate previously had access. Accepting this invitation will reactivate them with the selected role and site access.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _muted,
-                  height: 1.4,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: _muted, height: 1.4),
           ),
         );
       },
@@ -555,7 +555,7 @@ class _TeamListCard extends StatelessWidget {
   final ValueChanged<String>? onResendInvite;
   final void Function(String inviteId, String email)? onCancelInvite;
   final void Function(String inviteId, Map<String, dynamic> invite)?
-      onEditInvite;
+  onEditInvite;
   final void Function(String userId, Map<String, dynamic> member)? onEditMember;
   final void Function(String userId, String name)? onDeactivateMember;
 
@@ -608,28 +608,26 @@ class _TeamListCard extends StatelessWidget {
                   if (activeMembers.isEmpty)
                     Text(
                       'No active members.',
-                      style: theme.textTheme.bodyMedium?.copyWith(color: _muted),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: _muted,
+                      ),
                     )
                   else
                     ...activeMembers.map(
                       (doc) => _TeamPersonRow(
                         data: doc.data(),
-                        onEdit: _canManagePerson(
-                                  data: doc.data(),
-                                  docId: doc.id,
-                                ) &&
+                        onEdit:
+                            _canManagePerson(data: doc.data(), docId: doc.id) &&
                                 onEditMember != null
                             ? () => onEditMember!(doc.id, doc.data())
                             : null,
-                        onDeactivate: _canManagePerson(
-                                  data: doc.data(),
-                                  docId: doc.id,
-                                ) &&
+                        onDeactivate:
+                            _canManagePerson(data: doc.data(), docId: doc.id) &&
                                 onDeactivateMember != null
                             ? () => onDeactivateMember!(
-                                  doc.id,
-                                  _displayTeamName(doc.data()),
-                                )
+                                doc.id,
+                                _displayTeamName(doc.data()),
+                              )
                             : null,
                       ),
                     ),
@@ -652,9 +650,7 @@ class _TeamListCard extends StatelessWidget {
                       final visibleInactiveMembers = inactiveMembers
                           .where(
                             (doc) => !reInvitedEmails.contains(
-                              _normalizedTeamEmail(
-                                doc.data()['emailSnapshot'],
-                              ),
+                              _normalizedTeamEmail(doc.data()['emailSnapshot']),
                             ),
                           )
                           .toList();
@@ -673,11 +669,13 @@ class _TeamListCard extends StatelessWidget {
                             const SizedBox(height: 6),
                             ...pendingInvites.map((doc) {
                               final invite = doc.data();
-                              final email =
-                                  _normalizedTeamEmail(invite['email']);
+                              final email = _normalizedTeamEmail(
+                                invite['email'],
+                              );
                               final inactiveMember = inactiveByEmail[email];
-                              final canManageInvite =
-                                  _canManagePerson(data: invite);
+                              final canManageInvite = _canManagePerson(
+                                data: invite,
+                              );
                               return _TeamPersonRow(
                                 data: {
                                   if (inactiveMember != null)
@@ -690,16 +688,17 @@ class _TeamListCard extends StatelessWidget {
                                 onEdit: canManageInvite && onEditInvite != null
                                     ? () => onEditInvite!(doc.id, invite)
                                     : null,
-                                onResendInvite:
-                                    canManageInvite ? onResendInvite : null,
+                                onResendInvite: canManageInvite
+                                    ? onResendInvite
+                                    : null,
                                 onCancelInvite:
                                     !canManageInvite || onCancelInvite == null
-                                  ? null
-                                  : () => onCancelInvite!(
-                                          doc.id,
-                                          invite['email'] as String? ??
-                                              'this teammate',
-                                        ),
+                                    ? null
+                                    : () => onCancelInvite!(
+                                        doc.id,
+                                        invite['email'] as String? ??
+                                            'this teammate',
+                                      ),
                               );
                             }),
                           ],
@@ -730,10 +729,7 @@ class _TeamListCard extends StatelessWidget {
     );
   }
 
-  bool _canManagePerson({
-    required Map<String, dynamic> data,
-    String? docId,
-  }) {
+  bool _canManagePerson({required Map<String, dynamic> data, String? docId}) {
     if (!canManage || docId == currentUserId) {
       return false;
     }
@@ -803,9 +799,7 @@ class _TeamActivityCardState extends State<_TeamActivityCard> {
                   style: theme.textTheme.bodyMedium?.copyWith(color: _muted),
                 )
               else
-                ...visible.map(
-                  (doc) => _TeamActivityRow(data: doc.data()),
-                ),
+                ...visible.map((doc) => _TeamActivityRow(data: doc.data())),
               if (activity.length > 5) ...[
                 const SizedBox(height: 4),
                 TextButton.icon(
@@ -842,7 +836,8 @@ class _TeamActivityRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final detail = _teamActivityDetail(data);
-    final actor = data['actorDisplayName'] as String? ??
+    final actor =
+        data['actorDisplayName'] as String? ??
         data['actorEmail'] as String? ??
         'FiScore';
     final time = _teamActivityTimeText(data['createdAt']);
@@ -851,9 +846,7 @@ class _TeamActivityRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: _line),
-        ),
+        border: Border(bottom: BorderSide(color: _line)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -915,15 +908,17 @@ class _TeamPersonRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final name = data['displayNameSnapshot'] as String?;
-    final email = (data['emailSnapshot'] as String?) ??
-        (data['email'] as String?);
+    final email =
+        (data['emailSnapshot'] as String?) ?? (data['email'] as String?);
     final role = _roleLabel(data['role'] as String? ?? 'staff');
     final status = invited
         ? reInvited
-            ? 'Re-invited'
-            : 'Invited'
+              ? 'Re-invited'
+              : 'Invited'
         : _statusLabel(data['status'] as String?);
-    final title = (name == null || name.isEmpty) ? email ?? 'Team member' : name;
+    final title = (name == null || name.isEmpty)
+        ? email ?? 'Team member'
+        : name;
     final accessMode = data['siteAccessMode'] as String? ?? 'all';
     final siteCount = (data['siteIds'] as List<dynamic>? ?? []).length;
     final accessText = accessMode == 'selected'
@@ -939,9 +934,7 @@ class _TeamPersonRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: invited
-                  ? const Color(0xFFFFF4E5)
-                  : _softGreen,
+              color: invited ? const Color(0xFFFFF4E5) : _softGreen,
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(
@@ -979,8 +972,7 @@ class _TeamPersonRow extends StatelessWidget {
           ),
           if (onEdit != null ||
               onDeactivate != null ||
-              (invited &&
-                  (onResendInvite != null || onCancelInvite != null)))
+              (invited && (onResendInvite != null || onCancelInvite != null)))
             PopupMenuButton<String>(
               tooltip: 'Manage teammate',
               icon: const Icon(Icons.more_horiz, color: _muted),
@@ -1004,7 +996,9 @@ class _TeamPersonRow extends StatelessWidget {
                 if (onEdit != null)
                   PopupMenuItem(
                     value: 'edit',
-                    child: Text(invited ? 'Edit invitation' : 'Edit role and access'),
+                    child: Text(
+                      invited ? 'Edit invitation' : 'Edit role and access',
+                    ),
                   ),
                 if (invited && email != null && onResendInvite != null)
                   const PopupMenuItem(
@@ -1040,7 +1034,8 @@ String _normalizedTeamEmail(Object? value) {
 }
 
 String _teamActivityTitle(Map<String, dynamic> data) {
-  final target = data['targetDisplayName'] as String? ??
+  final target =
+      data['targetDisplayName'] as String? ??
       data['targetEmail'] as String? ??
       'Teammate';
   switch (data['action']) {
@@ -1138,8 +1133,9 @@ Future<_TeamAccessUpdate?> _showTeamAccessEditor(
     return Future.value(null);
   }
   var siteAccessMode = data['siteAccessMode'] as String? ?? 'all';
-  final selectedSiteIds =
-      (data['siteIds'] as List<dynamic>? ?? []).whereType<String>().toSet();
+  final selectedSiteIds = (data['siteIds'] as List<dynamic>? ?? [])
+      .whereType<String>()
+      .toSet();
   String? error;
 
   return showModalBottomSheet<_TeamAccessUpdate>(
@@ -1162,17 +1158,17 @@ Future<_TeamAccessUpdate?> _showTeamAccessEditor(
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: _ink,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  color: _ink,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               if (subtitle.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: _muted,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: _muted),
                 ),
               ],
               const SizedBox(height: 18),
@@ -1203,17 +1199,17 @@ Future<_TeamAccessUpdate?> _showTeamAccessEditor(
               if (role == 'admin')
                 Text(
                   'Admins have access to all sites.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: _muted,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: _muted),
                 )
               else ...[
                 Text(
                   'Site access',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: _muted,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: _muted,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(
@@ -1259,8 +1255,8 @@ Future<_TeamAccessUpdate?> _showTeamAccessEditor(
                 Text(
                   error!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFFB42318),
-                      ),
+                    color: const Color(0xFFB42318),
+                  ),
                 ),
               ],
               const SizedBox(height: 18),
@@ -1280,8 +1276,9 @@ Future<_TeamAccessUpdate?> _showTeamAccessEditor(
                       context,
                       _TeamAccessUpdate(
                         role: role,
-                        siteAccessMode:
-                            role == 'admin' ? 'all' : siteAccessMode,
+                        siteAccessMode: role == 'admin'
+                            ? 'all'
+                            : siteAccessMode,
                         siteIds: role == 'admin' || siteAccessMode == 'all'
                             ? <String>[]
                             : selectedSiteIds.toList(),
@@ -1326,17 +1323,16 @@ Future<bool> _confirmTeamAction(
             Text(
               title,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: _ink,
-                    fontWeight: FontWeight.w800,
-                  ),
+                color: _ink,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               body,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: _muted,
-                    height: 1.4,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: _muted, height: 1.4),
             ),
             const SizedBox(height: 18),
             SizedBox(
@@ -1375,6 +1371,51 @@ String _roleLabel(String role) {
       return 'Staff';
     default:
       return role;
+  }
+}
+
+class _RoleGuidanceCard extends StatelessWidget {
+  const _RoleGuidanceCard({required this.role});
+
+  final String role;
+
+  @override
+  Widget build(BuildContext context) {
+    final description = switch (role) {
+      'admin' =>
+        'Manages team access, sites, assignments, reviews, and operational setup. Admins have access to all sites.',
+      'manager' =>
+        'Assigns and reviews fixes, checks, and training for permitted sites.',
+      'auditor' =>
+        'Can independently run internal checks and record findings at permitted sites.',
+      'staff' =>
+        'Completes assigned fixes, checks, and training at permitted sites.',
+      _ => 'Controls this teammate\'s access to FiScore work.',
+    };
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7FB),
+        border: Border.all(color: _line),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 18, color: _muted),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              description,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: _muted, height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -1,14 +1,16 @@
 part of '../../main.dart';
 
 class ViolationRepository {
+  ViolationRepository({CloudFunctionsService? functions})
+    : _functions = functions ?? CloudFunctionsService();
+
+  final CloudFunctionsService _functions;
+
   Stream<QuerySnapshot<Map<String, dynamic>>> streamForSite({
     required String tenantId,
     required String siteId,
   }) {
-    return FirestorePaths.violations(
-      tenantId,
-      siteId,
-    ).snapshots();
+    return FirestorePaths.violations(tenantId, siteId).snapshots();
   }
 
   Future<void> saveStructuredResponse({
@@ -86,9 +88,11 @@ class ViolationRepository {
       'updatedAt': now,
     };
 
-    await FirestorePaths.violationThreads(tenantId, siteId, violationId).add(
-      entry,
-    );
+    await FirestorePaths.violationThreads(
+      tenantId,
+      siteId,
+      violationId,
+    ).add(entry);
     final violationUpdate = <String, dynamic>{
       'latestThreadEntrySummary': body,
       'latestThreadEntryAt': now,
@@ -118,58 +122,80 @@ class ViolationRepository {
     String? reviewStatus,
     String? closureReason,
   }) async {
-    final now = FieldValue.serverTimestamp();
-    final data = <String, dynamic>{
-      'status': status,
-      'lifecycleStage': status,
-      'syncStatus': 'synced',
-      'updatedAt': now,
-    };
-    if (reviewStatus != null) {
-      data['reviewStatus'] = reviewStatus;
-    }
     if (status == 'pending_review') {
-      data['submittedForReviewAt'] = now;
-      data['requiresReview'] = true;
+      await _functions.call('submitViolationForReview', {
+        'tenantId': tenantId,
+        'siteId': siteId,
+        'violationId': violationId,
+      });
+      return;
     }
     if (status == 'closed') {
-      data['closedAt'] = now;
-      data['closureReason'] = closureReason ?? 'Closed by manager review.';
-      data['requiresReview'] = false;
-      data['reviewStatus'] = 'closed';
+      await _functions.call('closeViolation', {
+        'tenantId': tenantId,
+        'siteId': siteId,
+        'violationId': violationId,
+        'closureReason': closureReason,
+      });
+      return;
     }
-    if (status == 'open' || status == 'in_progress') {
-      data['closedAt'] = null;
-      data['closedBy'] = null;
-      data['requiresReview'] = false;
+    if (status == 'open') {
+      await _functions.call('reopenViolation', {
+        'tenantId': tenantId,
+        'siteId': siteId,
+        'violationId': violationId,
+      });
+      return;
     }
+    if (status == 'in_progress' && reviewStatus == 'needs_work') {
+      await sendBackForChanges(
+        tenantId: tenantId,
+        siteId: siteId,
+        violationId: violationId,
+        feedback: 'Please update the fix and submit it again.',
+      );
+      return;
+    }
+    throw StateError('Unsupported violation status transition: $status');
+  }
 
-    final violationRef = FirestorePaths.violation(
-      tenantId,
-      siteId,
-      violationId,
-    );
-    final siteRef = FirestorePaths.site(tenantId, siteId);
+  Future<void> sendBackForChanges({
+    required String tenantId,
+    required String siteId,
+    required String violationId,
+    required String feedback,
+  }) async {
+    await _functions.call('sendViolationBack', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'violationId': violationId,
+      'feedback': feedback,
+    });
+  }
 
-    await FirebaseFirestore.instance.runTransaction((transaction) async {
-      final current = await transaction.get(violationRef);
-      final oldStatus = current.data()?['status'] as String? ?? 'open';
-      transaction.set(violationRef, data, SetOptions(merge: true));
+  Future<void> assignViolation({
+    required String tenantId,
+    required String siteId,
+    required String violationId,
+    required String assignedTo,
+  }) async {
+    await _functions.call('assignViolation', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'violationId': violationId,
+      'assignedTo': assignedTo,
+    });
+  }
 
-      final openDelta =
-          (status == 'closed' ? 0 : 1) - (oldStatus == 'closed' ? 0 : 1);
-      final reviewDelta =
-          (status == 'pending_review' ? 1 : 0) -
-          (oldStatus == 'pending_review' ? 1 : 0);
-      if (openDelta != 0 || reviewDelta != 0) {
-        transaction.set(siteRef, {
-          if (openDelta != 0)
-            'openViolationCountSnapshot': FieldValue.increment(openDelta),
-          if (reviewDelta != 0)
-            'pendingReviewCountSnapshot': FieldValue.increment(reviewDelta),
-          'updatedAt': now,
-        }, SetOptions(merge: true));
-      }
+  Future<void> unassignViolation({
+    required String tenantId,
+    required String siteId,
+    required String violationId,
+  }) async {
+    await _functions.call('unassignViolation', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'violationId': violationId,
     });
   }
 }

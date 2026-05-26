@@ -553,6 +553,7 @@ class _InternalAuditCompletion extends StatelessWidget {
                   for (final doc in violations)
                     _InspectionFindingRow(
                       violation: doc.data(),
+                      rowContext: _ViolationRowContext.auditDetail,
                       onOpen: () => onOpenViolation(doc.id),
                     ),
                 ],

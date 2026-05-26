@@ -1,9 +1,8 @@
 part of '../../main.dart';
 
 class MasterRestaurantRepository {
-  MasterRestaurantRepository({
-    CloudFunctionsService? functions,
-  }) : _functions = functions ?? CloudFunctionsService();
+  MasterRestaurantRepository({CloudFunctionsService? functions})
+    : _functions = functions ?? CloudFunctionsService();
 
   final CloudFunctionsService _functions;
 
@@ -18,9 +17,9 @@ class MasterRestaurantRepository {
     final restaurants = result['restaurants'];
     return restaurants is List
         ? restaurants
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList()
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList()
         : [];
   }
 

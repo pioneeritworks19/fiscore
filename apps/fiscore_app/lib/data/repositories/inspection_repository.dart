@@ -20,9 +20,7 @@ class InspectionRepository {
       tenantId,
       siteId,
       inspectionId,
-    )
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+    ).orderBy('createdAt', descending: true).snapshots();
   }
 
   Future<void> uploadReportAttachment({
@@ -57,19 +55,21 @@ class InspectionRepository {
     final storagePath =
         'tenants/$tenantId/sites/$siteId/inspections/$inspectionId/attachments/${attachmentRef.id}/report.$extension';
 
-    await FirebaseStorage.instance.ref(storagePath).putData(
-      bytes,
-      SettableMetadata(
-        contentType: contentType,
-        customMetadata: {
-          'tenantId': tenantId,
-          'siteId': siteId,
-          'inspectionId': inspectionId,
-          'attachmentId': attachmentRef.id,
-          'type': 'inspection_report',
-        },
-      ),
-    );
+    await FirebaseStorage.instance
+        .ref(storagePath)
+        .putData(
+          bytes,
+          SettableMetadata(
+            contentType: contentType,
+            customMetadata: {
+              'tenantId': tenantId,
+              'siteId': siteId,
+              'inspectionId': inspectionId,
+              'attachmentId': attachmentRef.id,
+              'type': 'inspection_report',
+            },
+          ),
+        );
 
     final now = FieldValue.serverTimestamp();
     await attachmentRef.set({

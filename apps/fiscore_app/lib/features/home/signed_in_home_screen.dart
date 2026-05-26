@@ -24,10 +24,17 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
   bool _isLinkingRestaurant = false;
   bool _isAddingSite = false;
   bool _isManagingTeam = false;
+  bool _isShowingActionInbox = false;
+  bool _isSyncingMasterData = false;
+  String _actionInboxInitialFilter = 'all';
   int _selectedTabIndex = 1;
   String _violationInitialFilter = 'active';
   String? _violationInitialId;
+  String? _violationDetailBackLabel;
+  String? _violationReturnActionFilter;
   String _trainingInitialView = 'home';
+  String? _trainingInitialAssignmentId;
+  String? _auditInitialAssignmentId;
   bool _hasAppliedInitialLanding = false;
   String? _activeSiteId;
   String? _linkingRestaurantId;
@@ -36,6 +43,8 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
   String? _tenantError;
   String? _restaurantMessage;
   String? _restaurantError;
+  String? _moreMessage;
+  String? _moreError;
 
   @override
   void dispose() {
@@ -182,6 +191,35 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
     }
   }
 
+  Future<void> _refreshMasterData(String tenantId, String siteId) async {
+    setState(() {
+      _isSyncingMasterData = true;
+      _moreMessage = null;
+      _moreError = null;
+    });
+    try {
+      final result = await _masterRestaurantRepository.syncLinkedSiteMasterData(
+        tenantId: tenantId,
+        siteId: siteId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _moreMessage =
+            'Master data refreshed. ${result.importedInspectionCount} inspections and ${result.importedFindingCount} findings available.';
+      });
+    } on AppException catch (error) {
+      if (mounted) setState(() => _moreError = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _moreError = 'Could not refresh master data. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isSyncingMasterData = false);
+    }
+  }
+
   Widget _buildMainApp(
     String tenantId,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> sites,
@@ -259,64 +297,101 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
           );
         } else {
           final activeSiteId = activeSiteDoc.id;
-          content = _SiteDashboardContent(
-            tenantId: tenantId,
-            siteId: activeSiteId,
-            site: activeSiteDoc.data(),
-            currentUserId: widget.user.uid,
-            canManageTraining:
-                _canAssignTraining(currentMember['role'] as String?),
-            onOpenViolations: () {
-              setState(() {
-                _violationInitialFilter = 'active';
-                _violationInitialId = null;
-                _selectedTabIndex = 2;
-              });
-            },
-            onOpenMyTraining: () {
-              setState(() {
-                _trainingInitialView = 'home';
-                _selectedTabIndex = 4;
-              });
-            },
-            onOpenOverdueTraining: () {
-              setState(() {
-                _trainingInitialView = 'overdue';
-                _selectedTabIndex = 4;
-              });
-            },
-            onOpenReviews: (violationId) {
-              setState(() {
-                _violationInitialFilter = 'pending_review';
-                _violationInitialId = violationId;
-                _selectedTabIndex = 2;
-              });
-            },
-            onOpenAudits: () {
-              setState(() {
-                _selectedTabIndex = 3;
-              });
-            },
-            canStartAudit: const [
-              'tenant_owner',
-              'admin',
-              'manager',
-              'auditor',
-            ].contains(currentMember['role']),
-            onStartAudit: () {
-              setState(() {
-                _selectedTabIndex = 3;
-              });
-            },
-            onAddSite: () {
-              setState(() {
-                _isAddingSite = true;
-                _restaurantError = null;
-                _restaurantMessage = null;
-                _restaurantResults = [];
-              });
-            },
-          );
+          content = _isShowingActionInbox
+              ? _ActionInboxContent(
+                  tenantId: tenantId,
+                  siteId: activeSiteId,
+                  currentUserId: widget.user.uid,
+                  currentRole: currentMember['role'] as String? ?? 'staff',
+                  initialFilter: _actionInboxInitialFilter,
+                  onBack: () {
+                    setState(() {
+                      _isShowingActionInbox = false;
+                    });
+                  },
+                  onOpenViolation: (siteId, violationId, statusFilter) {
+                    setState(() {
+                      _activeSiteId = siteId;
+                      _isShowingActionInbox = false;
+                      _violationInitialFilter = statusFilter;
+                      _violationInitialId = violationId;
+                      _violationReturnActionFilter = _actionInboxInitialFilter;
+                      _violationDetailBackLabel =
+                          _actionInboxInitialFilter == 'review'
+                          ? 'Back to review queue'
+                          : 'Back to my fixes';
+                      _selectedTabIndex = 2;
+                    });
+                  },
+                  onOpenTraining: (siteId, assignmentId) {
+                    setState(() {
+                      _activeSiteId = siteId;
+                      _isShowingActionInbox = false;
+                      _trainingInitialView = 'home';
+                      _trainingInitialAssignmentId = assignmentId;
+                      _selectedTabIndex = 4;
+                    });
+                  },
+                  onOpenAudit: (siteId, assignmentId) {
+                    setState(() {
+                      _activeSiteId = siteId;
+                      _isShowingActionInbox = false;
+                      _auditInitialAssignmentId = assignmentId;
+                      _selectedTabIndex = 3;
+                    });
+                  },
+                )
+              : _SiteDashboardContent(
+                  tenantId: tenantId,
+                  siteId: activeSiteId,
+                  site: activeSiteDoc.data(),
+                  currentUserId: widget.user.uid,
+                  canManageTraining: _canAssignTraining(
+                    currentMember['role'] as String?,
+                  ),
+                  onOpenUnassignedViolations: () {
+                    setState(() {
+                      _violationInitialFilter = 'unassigned';
+                      _violationInitialId = null;
+                      _violationReturnActionFilter = null;
+                      _violationDetailBackLabel = null;
+                      _selectedTabIndex = 2;
+                    });
+                  },
+                  onOpenActions: (filter) {
+                    setState(() {
+                      _actionInboxInitialFilter = filter;
+                      _isShowingActionInbox = true;
+                    });
+                  },
+                  onOpenAudits: () {
+                    setState(() {
+                      _isShowingActionInbox = false;
+                      _selectedTabIndex = 3;
+                    });
+                  },
+                  canStartAudit: const [
+                    'tenant_owner',
+                    'admin',
+                    'manager',
+                    'auditor',
+                  ].contains(currentMember['role']),
+                  onStartAudit: () {
+                    setState(() {
+                      _isShowingActionInbox = false;
+                      _selectedTabIndex = 3;
+                    });
+                  },
+                  onAddSite: () {
+                    setState(() {
+                      _isShowingActionInbox = false;
+                      _isAddingSite = true;
+                      _restaurantError = null;
+                      _restaurantMessage = null;
+                      _restaurantResults = [];
+                    });
+                  },
+                );
         }
         break;
       case 2:
@@ -334,6 +409,20 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                 currentRole: currentMember['role'] as String? ?? 'staff',
                 initialStatusFilter: _violationInitialFilter,
                 initialViolationId: _violationInitialId,
+                detailBackLabel: _violationDetailBackLabel,
+                onBackFromDetail: _violationReturnActionFilter == null
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedTabIndex = 1;
+                          _actionInboxInitialFilter =
+                              _violationReturnActionFilter!;
+                          _isShowingActionInbox = true;
+                          _violationInitialId = null;
+                          _violationDetailBackLabel = null;
+                          _violationReturnActionFilter = null;
+                        });
+                      },
               );
         break;
       case 3:
@@ -348,6 +437,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                 tenantId: tenantId,
                 siteId: activeSiteDoc.id,
                 currentRole: currentMember['role'] as String? ?? 'staff',
+                initialAssignmentId: _auditInitialAssignmentId,
               );
         break;
       case 4:
@@ -362,6 +452,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                 siteId: activeSiteDoc.id,
                 currentMember: currentMember,
                 initialView: _trainingInitialView,
+                initialAssignmentId: _trainingInitialAssignmentId,
               );
         break;
       default:
@@ -377,6 +468,19 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                 },
               )
             : _MoreContent(
+                isSyncingMasterData: _isSyncingMasterData,
+                message: _moreMessage,
+                error: _moreError,
+                onRefreshMasterData:
+                    activeSiteDoc != null &&
+                        activeSiteDoc.data()['masterRestaurantId'] != null &&
+                        const [
+                          'tenant_owner',
+                          'admin',
+                          'manager',
+                        ].contains(currentMember['role'])
+                    ? () => _refreshMasterData(tenantId, activeSiteDoc!.id)
+                    : null,
                 onAddSite: () {
                   setState(() {
                     _isAddingSite = true;
@@ -414,12 +518,19 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
       onSelectedIndexChanged: (index) {
         setState(() {
           _selectedTabIndex = index;
+          _isShowingActionInbox = false;
           if (index == 2) {
             _violationInitialFilter = 'active';
             _violationInitialId = null;
+            _violationDetailBackLabel = null;
+            _violationReturnActionFilter = null;
           }
           if (index == 4) {
             _trainingInitialView = 'home';
+            _trainingInitialAssignmentId = null;
+          }
+          if (index == 3) {
+            _auditInitialAssignmentId = null;
           }
           if (index != 5) {
             _isManagingTeam = false;

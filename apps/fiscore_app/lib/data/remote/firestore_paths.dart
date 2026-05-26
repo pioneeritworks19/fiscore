@@ -32,6 +32,19 @@ class FirestorePaths {
     return tenant(tenantId).collection('teamActivity');
   }
 
+  static CollectionReference<Map<String, dynamic>> actionItems(
+    String tenantId,
+  ) {
+    return tenant(tenantId).collection('actionItems');
+  }
+
+  static DocumentReference<Map<String, dynamic>> actionItem(
+    String tenantId,
+    String actionItemId,
+  ) {
+    return actionItems(tenantId).doc(actionItemId);
+  }
+
   static CollectionReference<Map<String, dynamic>> sites(String tenantId) {
     return tenant(tenantId).collection('sites');
   }
@@ -99,6 +112,13 @@ class FirestorePaths {
     String auditId,
   ) {
     return internalAudit(tenantId, siteId, auditId).collection('attachments');
+  }
+
+  static CollectionReference<Map<String, dynamic>> auditAssignments(
+    String tenantId,
+    String siteId,
+  ) {
+    return site(tenantId, siteId).collection('auditAssignments');
   }
 
   static CollectionReference<Map<String, dynamic>> violations(

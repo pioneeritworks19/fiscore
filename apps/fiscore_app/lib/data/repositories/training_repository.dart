@@ -71,49 +71,16 @@ class TrainingRepository {
     String? linkedViolationId,
     String? linkedViolationTitle,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final now = FieldValue.serverTimestamp();
-    await FirestorePaths.trainingAssignments(tenantId).add({
-      'tenantId': tenantId,
-      'siteId': siteId,
-      'trainingId': training['_id'] ?? training['id'],
-      'trainingVersion': training['version'],
-      'trainingTitleSnapshot': training['title'],
-      'trainingDescriptionSnapshot': training['description'],
-      'trainingType': training['trainingType'],
-      'durationMinutes': training['durationMinutes'],
-      'trainingTopicsSnapshot': List<String>.from(
-        training['topicSummaries'] as List? ?? const [],
-      ),
-      'trainingSectionsSnapshot': List<Map<String, dynamic>>.from(
-        (training['sections'] as List? ?? const []).map(
-          (section) => Map<String, dynamic>.from(section as Map),
-        ),
-      ),
-      'trainingMediaAssetsSnapshot': Map<String, dynamic>.from(
-        training['mediaAssets'] as Map? ?? const {},
-      ),
-      'quickCheckQuestionsSnapshot': List<Map<String, dynamic>>.from(
-        (training['quickCheckQuestions'] as List? ?? const []).map(
-          (question) => Map<String, dynamic>.from(question as Map),
-        ),
-      ),
-      'hasQuickCheckSnapshot': training['hasQuickCheck'] == true,
-      'linkedRiskArea': training['riskArea'],
-      'assignedTo': assignedTo,
-      'assignedToNameSnapshot': assignedToName,
-      'assignedBy': user?.uid,
-      'assignedByNameSnapshot':
-          user?.displayName ?? user?.email ?? 'FiScore manager',
-      'dueDate': Timestamp.fromDate(dueDate),
-      'assignmentNote': note?.trim() ?? '',
-      'linkedViolationId': linkedViolationId,
-      'linkedViolationTitleSnapshot': linkedViolationTitle,
-      'status': 'assigned',
-      'progressPercent': 0,
-      'createdAt': now,
-      'updatedAt': now,
-    });
+    await createAssignments(
+      tenantId: tenantId,
+      siteId: siteId,
+      training: training,
+      assignees: {assignedTo: assignedToName},
+      dueDate: dueDate,
+      note: note,
+      linkedViolationId: linkedViolationId,
+      linkedViolationTitle: linkedViolationTitle,
+    );
   }
 
   Future<void> createAssignments({
@@ -126,54 +93,16 @@ class TrainingRepository {
     String? linkedViolationId,
     String? linkedViolationTitle,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final now = FieldValue.serverTimestamp();
-    final batch = FirebaseFirestore.instance.batch();
-    for (final assignee in assignees.entries) {
-      final reference = FirestorePaths.trainingAssignments(tenantId).doc();
-      batch.set(reference, {
-        'tenantId': tenantId,
-        'siteId': siteId,
-        'trainingId': training['_id'] ?? training['id'],
-        'trainingVersion': training['version'],
-        'trainingTitleSnapshot': training['title'],
-        'trainingDescriptionSnapshot': training['description'],
-        'trainingType': training['trainingType'],
-        'durationMinutes': training['durationMinutes'],
-        'trainingTopicsSnapshot': List<String>.from(
-          training['topicSummaries'] as List? ?? const [],
-        ),
-        'trainingSectionsSnapshot': List<Map<String, dynamic>>.from(
-          (training['sections'] as List? ?? const []).map(
-            (section) => Map<String, dynamic>.from(section as Map),
-          ),
-        ),
-        'trainingMediaAssetsSnapshot': Map<String, dynamic>.from(
-          training['mediaAssets'] as Map? ?? const {},
-        ),
-        'quickCheckQuestionsSnapshot': List<Map<String, dynamic>>.from(
-          (training['quickCheckQuestions'] as List? ?? const []).map(
-            (question) => Map<String, dynamic>.from(question as Map),
-          ),
-        ),
-        'hasQuickCheckSnapshot': training['hasQuickCheck'] == true,
-        'linkedRiskArea': training['riskArea'],
-        'assignedTo': assignee.key,
-        'assignedToNameSnapshot': assignee.value,
-        'assignedBy': user?.uid,
-        'assignedByNameSnapshot':
-            user?.displayName ?? user?.email ?? 'FiScore manager',
-        'dueDate': Timestamp.fromDate(dueDate),
-        'assignmentNote': note?.trim() ?? '',
-        'linkedViolationId': linkedViolationId,
-        'linkedViolationTitleSnapshot': linkedViolationTitle,
-        'status': 'assigned',
-        'progressPercent': 0,
-        'createdAt': now,
-        'updatedAt': now,
-      });
-    }
-    await batch.commit();
+    await _functions.call('assignTraining', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'trainingId': training['_id'] ?? training['id'],
+      'assignees': assignees,
+      'dueDate': dueDate.toUtc().toIso8601String(),
+      'note': note?.trim() ?? '',
+      'linkedViolationId': linkedViolationId,
+      'linkedViolationTitle': linkedViolationTitle,
+    });
   }
 
   Future<void> startAssignment({
@@ -194,31 +123,23 @@ class TrainingRepository {
     required int incorrectAnswerCount,
     required int completedTopicCount,
     required Map<String, dynamic> completionSummary,
-  }) {
-    return FirestorePaths.trainingAssignments(tenantId).doc(assignmentId).set({
-      'status': 'completed',
-      'progressPercent': 100,
+  }) async {
+    await _functions.call('completeTrainingAssignment', {
+      'tenantId': tenantId,
+      'assignmentId': assignmentId,
       'incorrectAnswerCount': incorrectAnswerCount,
-      'quickCheckCompletedAt': FieldValue.serverTimestamp(),
       'completedTopicCount': completedTopicCount,
-      'completionSummarySnapshot': completionSummary,
-      'completedAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+      'completionSummary': completionSummary,
+    });
   }
 
   Future<void> cancelAssignment({
     required String tenantId,
     required String assignmentId,
-  }) {
-    final user = FirebaseAuth.instance.currentUser;
-    return FirestorePaths.trainingAssignments(tenantId).doc(assignmentId).set({
-      'status': 'cancelled',
-      'cancelledAt': FieldValue.serverTimestamp(),
-      'cancelledBy': user?.uid,
-      'cancelledByNameSnapshot':
-          user?.displayName ?? user?.email ?? 'FiScore manager',
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  }) async {
+    await _functions.call('cancelTrainingAssignment', {
+      'tenantId': tenantId,
+      'assignmentId': assignmentId,
+    });
   }
 }

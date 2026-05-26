@@ -13,14 +13,15 @@ class SiteRepository {
   }) {
     final role = member?['role'] as String?;
     final accessMode = member?['siteAccessMode'] as String?;
-    final hasAllSiteAccess = role == 'tenant_owner' ||
+    final hasAllSiteAccess =
+        role == 'tenant_owner' ||
         role == 'admin' ||
         accessMode == null ||
         accessMode == 'all';
     if (hasAllSiteAccess) {
-      return FirestorePaths.sites(tenantId)
-          .where('status', isEqualTo: 'active')
-          .snapshots();
+      return FirestorePaths.sites(
+        tenantId,
+      ).where('status', isEqualTo: 'active').snapshots();
     }
 
     final siteIds = (member?['siteIds'] as List<dynamic>? ?? [])

@@ -47,6 +47,16 @@ service cloud.firestore {
         memberDoc(tenantId).data.role in ['tenant_owner', 'admin', 'manager'];
     }
 
+    function canEditViolationResolution(tenantId, assignedTo) {
+      return assignedTo == null ||
+        assignedTo == '' ||
+        assignedTo == request.auth.uid ||
+        (
+          isActiveTenantMember(tenantId) &&
+          memberDoc(tenantId).data.role in ['tenant_owner', 'admin', 'manager']
+        );
+    }
+
     function assignedMemberHasSiteAccess(tenantId, siteId, userId) {
       return exists(/databases/$(database)/documents/tenants/$(tenantId)/members/$(userId)) &&
         get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(userId)).data.status == 'active' &&
@@ -88,6 +98,25 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      match /actionItems/{actionItemId} {
+        allow read: if isActiveTenantMember(tenantId) &&
+          (
+            resource.data.recipientUserId == request.auth.uid ||
+            (
+              resource.data.managerVisible == true &&
+              canAssignTraining(tenantId) &&
+              hasSiteAccess(tenantId, resource.data.siteId)
+            )
+          );
+        allow update: if isActiveTenantMember(tenantId) &&
+          resource.data.recipientUserId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'readAt',
+            'updatedAt'
+          ]);
+        allow create, delete: if false;
+      }
+
       match /trainings/{trainingId} {
         allow read: if isActiveTenantMember(tenantId);
         allow create, update, delete: if false;
@@ -107,19 +136,8 @@ service cloud.firestore {
               hasSiteAccess(tenantId, resource.data.siteId)
             )
           );
-        allow create: if canAssignTraining(tenantId) &&
-          request.resource.data.assignedBy == request.auth.uid &&
-          hasSiteAccess(tenantId, request.resource.data.siteId) &&
-          assignedMemberHasSiteAccess(
-            tenantId,
-            request.resource.data.siteId,
-            request.resource.data.assignedTo
-          );
+        allow create: if false;
         allow update: if
-          (
-            canAssignTraining(tenantId) &&
-            hasSiteAccess(tenantId, resource.data.siteId)
-          ) ||
           (
             isActiveTenantMember(tenantId) &&
             resource.data.assignedTo == request.auth.uid &&
@@ -127,20 +145,119 @@ service cloud.firestore {
               'status',
               'progressPercent',
               'startedAt',
-              'incorrectAnswerCount',
-              'quickCheckCompletedAt',
-              'completedTopicCount',
-              'completionSummarySnapshot',
-              'completedAt',
               'updatedAt'
             ]) &&
-            request.resource.data.status in ['in_progress', 'completed']
+            request.resource.data.status == 'in_progress'
           );
         allow delete: if false;
       }
 
-      match /sites/{siteId}/{document=**} {
-        allow read, write: if hasSiteAccess(tenantId, siteId);
+      match /sites/{siteId} {
+        allow read: if hasSiteAccess(tenantId, siteId);
+        allow create, update, delete: if false;
+
+        match /inspections/{inspectionId} {
+          allow read, update: if hasSiteAccess(tenantId, siteId);
+          allow create, delete: if false;
+
+          match /attachments/{attachmentId} {
+            allow read, create, update: if hasSiteAccess(tenantId, siteId);
+            allow delete: if false;
+          }
+        }
+
+        match /audits/{auditId} {
+          allow read: if hasSiteAccess(tenantId, siteId);
+          allow create, update, delete: if false;
+
+          match /responses/{responseId} {
+            allow read, create, update: if hasSiteAccess(tenantId, siteId);
+            allow delete: if false;
+          }
+
+          match /attachments/{attachmentId} {
+            allow read, create, update: if hasSiteAccess(tenantId, siteId);
+            allow delete: if false;
+          }
+        }
+
+        match /auditAssignments/{assignmentId} {
+          allow read: if hasSiteAccess(tenantId, siteId) &&
+            (
+              resource.data.assignedTo == request.auth.uid ||
+              canAssignTraining(tenantId)
+            );
+          allow create, update, delete: if false;
+        }
+
+        match /violations/{violationId} {
+          allow read: if hasSiteAccess(tenantId, siteId);
+          allow create, delete: if false;
+          allow update: if hasSiteAccess(tenantId, siteId) &&
+            (
+              (
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                  'latestThreadEntrySummary',
+                  'latestThreadEntryAt',
+                  'syncStatus',
+                  'updatedAt'
+                ])
+              ) ||
+              (
+                canEditViolationResolution(tenantId, resource.data.get('assignedTo', null)) &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'responseGeneral',
+                'responseContainment',
+                'responseRootCause',
+                'responseCorrectiveAction',
+                'responsePreventiveAction',
+                'currentResponseType',
+                'syncStatus',
+                'updatedAt'
+                ])
+              ) ||
+              (
+                canEditViolationResolution(tenantId, resource.data.get('assignedTo', null)) &&
+                resource.data.status == 'open' &&
+                request.resource.data.status == 'in_progress' &&
+                request.resource.data.lifecycleStage == 'in_progress' &&
+                request.resource.data.reviewStatus == 'not_submitted' &&
+                request.resource.data.requiresReview == false &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                  'responseGeneral',
+                  'responseContainment',
+                  'responseRootCause',
+                  'responseCorrectiveAction',
+                  'responsePreventiveAction',
+                  'currentResponseType',
+                  'syncStatus',
+                  'status',
+                  'lifecycleStage',
+                  'reviewStatus',
+                  'requiresReview',
+                  'updatedAt'
+                ])
+              )
+            );
+
+          match /responses/{responseId} {
+            allow read: if hasSiteAccess(tenantId, siteId);
+            allow create, update: if hasSiteAccess(tenantId, siteId) &&
+              canEditViolationResolution(
+                tenantId,
+                get(/databases/$(database)/documents/tenants/$(tenantId)/sites/$(siteId)/violations/$(violationId)).data.get('assignedTo', null)
+              );
+            allow delete: if false;
+          }
+
+          match /threads/{threadId} {
+            allow read, create, update, delete: if hasSiteAccess(tenantId, siteId);
+          }
+
+          match /attachments/{attachmentId} {
+            allow read, create, update, delete: if hasSiteAccess(tenantId, siteId);
+          }
+        }
       }
 
       match /{document=**} {

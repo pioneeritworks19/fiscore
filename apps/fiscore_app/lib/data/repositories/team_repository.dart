@@ -1,9 +1,8 @@
 part of '../../main.dart';
 
 class TeamRepository {
-  TeamRepository({
-    CloudFunctionsService? functions,
-  }) : _functions = functions ?? CloudFunctionsService();
+  TeamRepository({CloudFunctionsService? functions})
+    : _functions = functions ?? CloudFunctionsService();
 
   final CloudFunctionsService _functions;
 
@@ -15,31 +14,31 @@ class TeamRepository {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> membersStream(String tenantId) {
-    return FirestorePaths.members(tenantId)
-        .orderBy('emailSnapshot')
-        .snapshots();
+    return FirestorePaths.members(
+      tenantId,
+    ).orderBy('emailSnapshot').snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> invitesStream(String tenantId) {
-    return FirestorePaths.invites(tenantId)
-        .orderBy('invitedAt', descending: true)
-        .snapshots();
+    return FirestorePaths.invites(
+      tenantId,
+    ).orderBy('invitedAt', descending: true).snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> activityStream(String tenantId) {
-    return FirestorePaths.teamActivity(tenantId)
-        .orderBy('createdAt', descending: true)
-        .limit(20)
-        .snapshots();
+    return FirestorePaths.teamActivity(
+      tenantId,
+    ).orderBy('createdAt', descending: true).limit(20).snapshots();
   }
 
   Future<List<Map<String, dynamic>>> listMyPendingInvites() async {
     final result = await _functions.call('listMyPendingInvites', {});
     return (result['invites'] as List<dynamic>? ?? [])
         .whereType<Map<dynamic, dynamic>>()
-        .map((invite) => invite.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ))
+        .map(
+          (invite) =>
+              invite.map((key, value) => MapEntry(key.toString(), value)),
+        )
         .toList();
   }
 

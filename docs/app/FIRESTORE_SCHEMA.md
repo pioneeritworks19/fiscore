@@ -802,7 +802,52 @@ Represents a specific audit execution for a site.
 - `checklistVersion` should represent the exact published version used when the audit was created
 - historical audit sessions should remain tied to that version even after newer checklist versions are published
 
-## 11A. Audit Schedules
+## 11A. Assigned Checks (Implemented MVP)
+
+### Collection
+
+`tenants/{tenantId}/sites/{siteId}/auditAssignments/{assignmentId}`
+
+### Purpose
+
+Stores one-time internal checks assigned to a teammate, without introducing
+recurring scheduling complexity.
+
+### Suggested fields
+
+- `templateId`
+- `templateVersion`
+- `templateNameSnapshot`
+- `templateSnapshot`
+- `assignedTo`
+- `assignedToNameSnapshot`
+- `assignedBy`
+- `dueDate`
+- `assignmentNote`
+- `status`
+- `auditId`
+- `startedAt`
+- `completedAt`
+- `cancelledAt`
+- `createdAt`
+- `updatedAt`
+
+### Suggested `status` values
+
+- `assigned`
+- `in_progress`
+- `completed`
+- `cancelled`
+
+### Notes
+
+- the assignment stores the checklist snapshot used when it was assigned
+- starting an assignment creates an audit session linked by `auditId`
+- ad-hoc `Start check` remains available independently of assignments
+- an assignee action item is created, completed, reassigned, cancelled, or
+  marked overdue through trusted Cloud Functions
+
+## 11B. Audit Schedules (Future)
 
 ### Collection
 
@@ -855,7 +900,7 @@ Stores one-time and recurring audit schedule definitions for sites.
 - recurring schedules can store a recurrence definition and generate child instances
 - schedules should be site-scoped in version 1
 
-## 11B. Audit Schedule Instances
+## 11C. Audit Schedule Instances (Future)
 
 ### Collection
 
@@ -1518,7 +1563,51 @@ Stores assignments of training to users for operational remediation or improveme
 - existing assignments should remain tied to their assigned version even if a newer training version becomes active later
 - library-linked training upgrades should affect future assignments only after the tenant adopts the newer tenant version
 
-## 20D. Training Progress
+## 20D. Action Items
+
+### Collection
+
+`tenants/{tenantId}/actionItems/{actionItemId}`
+
+### Purpose
+
+Stores read-optimized operational work items for the dashboard and action
+inbox. The linked violation or training assignment remains the authoritative
+workflow record.
+
+### Suggested fields
+
+- `type`
+- `status`
+- `priority`
+- `recipientUserId`
+- `recipientRoleSnapshot`
+- `siteId`
+- `siteNameSnapshot`
+- `targetType`
+- `targetId`
+- `targetPath`
+- `targetKey`
+- `title`
+- `detail`
+- `dueAt`
+- `dueState`
+- `managerVisible`
+- `readAt`
+- `completedAt`
+- `completionReason`
+- `createdAt`
+- `updatedAt`
+
+### Notes
+
+- Action items are server-owned and should not be created or completed by clients.
+- Callable Cloud Functions create and resolve items during workflow transitions.
+- Scheduled Cloud Functions may update due-state for overdue training and
+  assigned checks.
+- Draft responses, notes, and media remain direct collaborative writes and do not each create action items.
+
+## 20E. Training Progress
 
 ### Collection
 
@@ -1617,6 +1706,8 @@ The exact index set will depend on app screens, but likely needs include:
 - `trainingAssignments` by `assignedTo + status`
 - `trainingAssignments` by `siteId + status`
 - `trainingAssignments` by `status + dueDate`
+- `actionItems` by `recipientUserId + status + siteId`
+- `actionItems` by `managerVisible + status + siteId`
 - `violations` by `siteId + status`
 - `violations` by `status + assignedTo`
 - `violations` by `status + dueDate`

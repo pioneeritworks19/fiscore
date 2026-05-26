@@ -51,6 +51,8 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
   Map<String, dynamic>? _training;
   Map<String, String> _selectedAssignees = {};
   int _dueInDays = 7;
+  DateTime? _customDueDate;
+  int _duePickerVersion = 0;
   bool _isSaving = false;
   String? _error;
 
@@ -85,7 +87,8 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
         siteId: widget.siteId,
         training: _training!,
         assignees: _selectedAssignees,
-        dueDate: DateTime.now().add(Duration(days: _dueInDays)),
+        dueDate:
+            _customDueDate ?? DateTime.now().add(Duration(days: _dueInDays)),
         note: _noteController.text,
         linkedViolationId: widget.linkedViolationId,
         linkedViolationTitle: widget.linkedViolationTitle,
@@ -218,15 +221,53 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
+                key: ValueKey(
+                  'training-due-$_duePickerVersion-$_dueInDays-${_customDueDate?.millisecondsSinceEpoch}',
+                ),
                 initialValue: _dueInDays,
                 decoration: const InputDecoration(labelText: 'Due date'),
-                items: const [
-                  DropdownMenuItem(value: 3, child: Text('In 3 days')),
-                  DropdownMenuItem(value: 7, child: Text('In 1 week')),
-                  DropdownMenuItem(value: 14, child: Text('In 2 weeks')),
+                items: [
+                  const DropdownMenuItem(value: 1, child: Text('Tomorrow')),
+                  const DropdownMenuItem(value: 3, child: Text('In 3 days')),
+                  const DropdownMenuItem(value: 7, child: Text('In 1 week')),
+                  const DropdownMenuItem(value: 14, child: Text('In 2 weeks')),
+                  const DropdownMenuItem(value: 30, child: Text('In 1 month')),
+                  DropdownMenuItem(
+                    value: -1,
+                    child: Text(
+                      _customDueDate == null
+                          ? 'Choose date'
+                          : 'Choose date (${_customDueDate!.month}/${_customDueDate!.day})',
+                    ),
+                  ),
                 ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _dueInDays = value);
+                onChanged: (value) async {
+                  if (value == null) return;
+                  if (value != -1) {
+                    setState(() {
+                      _dueInDays = value;
+                      _customDueDate = null;
+                      _duePickerVersion += 1;
+                    });
+                    return;
+                  }
+                  final today = DateUtils.dateOnly(DateTime.now());
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate:
+                        _customDueDate ?? today.add(const Duration(days: 7)),
+                    firstDate: today,
+                    lastDate: today.add(const Duration(days: 365)),
+                  );
+                  if (date != null && mounted) {
+                    setState(() {
+                      _dueInDays = -1;
+                      _customDueDate = date;
+                      _duePickerVersion += 1;
+                    });
+                  } else if (mounted) {
+                    setState(() => _duePickerVersion += 1);
+                  }
                 },
               ),
               const SizedBox(height: 12),

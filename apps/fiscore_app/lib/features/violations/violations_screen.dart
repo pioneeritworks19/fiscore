@@ -8,6 +8,8 @@ class _ViolationsContent extends StatefulWidget {
     required this.currentRole,
     this.initialStatusFilter = 'active',
     this.initialViolationId,
+    this.detailBackLabel,
+    this.onBackFromDetail,
   });
 
   final String tenantId;
@@ -16,6 +18,8 @@ class _ViolationsContent extends StatefulWidget {
   final String currentRole;
   final String initialStatusFilter;
   final String? initialViolationId;
+  final String? detailBackLabel;
+  final VoidCallback? onBackFromDetail;
 
   @override
   State<_ViolationsContent> createState() => _ViolationsContentState();
@@ -187,8 +191,6 @@ class _ViolationsContentState extends State<_ViolationsContent> {
         context,
       ).showSnackBar(const SnackBar(content: Text('Submitted for review.')));
       setState(() {
-        _selectedViolationId = null;
-        _loadedViolationId = null;
         _message = 'Submitted for review.';
       });
     } catch (_) {
@@ -222,18 +224,11 @@ class _ViolationsContentState extends State<_ViolationsContent> {
     });
 
     try {
-      await _violationRepository.addThreadComment(
+      await _violationRepository.sendBackForChanges(
         tenantId: widget.tenantId,
         siteId: widget.siteId,
         violationId: violationId,
-        body: 'Review feedback: $feedback',
-      );
-      await _violationRepository.updateStatus(
-        tenantId: widget.tenantId,
-        siteId: widget.siteId,
-        violationId: violationId,
-        status: 'in_progress',
-        reviewStatus: 'needs_work',
+        feedback: feedback,
       );
       if (mounted) {
         setState(() {
@@ -255,6 +250,65 @@ class _ViolationsContentState extends State<_ViolationsContent> {
     }
   }
 
+  bool get _canManageAssignments =>
+      const ['tenant_owner', 'admin', 'manager'].contains(widget.currentRole);
+
+  Future<void> _manageAssignment(
+    String violationId,
+    Map<String, dynamic> violation,
+  ) async {
+    final choice = await showModalBottomSheet<_ViolationAssignmentChoice>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _ViolationAssignmentSheet(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        assignedTo: violation['assignedTo'] as String?,
+      ),
+    );
+    if (!mounted || choice == null) {
+      return;
+    }
+    setState(() {
+      _isSaving = true;
+      _message = null;
+      _error = null;
+    });
+    try {
+      if (choice.remove) {
+        await _violationRepository.unassignViolation(
+          tenantId: widget.tenantId,
+          siteId: widget.siteId,
+          violationId: violationId,
+        );
+        if (mounted) {
+          setState(() => _message = 'Assignment removed.');
+        }
+      } else {
+        await _violationRepository.assignViolation(
+          tenantId: widget.tenantId,
+          siteId: widget.siteId,
+          violationId: violationId,
+          assignedTo: choice.userId!,
+        );
+        if (mounted) {
+          setState(() => _message = 'Assigned to ${choice.name}.');
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not update the assignment. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _filteredViolations(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
@@ -265,6 +319,14 @@ class _ViolationsContentState extends State<_ViolationsContent> {
       return siteDocs.where((doc) {
         final status = doc.data()['status'] as String? ?? 'open';
         return status != 'closed' && status != 'pending_review';
+      }).toList();
+    }
+    if (_statusFilter == 'unassigned') {
+      return siteDocs.where((doc) {
+        final status = doc.data()['status'] as String? ?? 'open';
+        return status != 'closed' &&
+            status != 'pending_review' &&
+            (doc.data()['assignedTo'] as String? ?? '').isEmpty;
       }).toList();
     }
     if (_statusFilter == 'all') {
@@ -368,7 +430,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
                   icon: Icons.check_circle_outline,
                   title: 'No violations in this view',
                   body:
-                      'Refresh from master data or change the filter to see imported findings and historical items.',
+                      'Change the filter, or refresh public inspection data from More to import new findings.',
                 )
               else if (_viewMode == 'inspection')
                 _InspectionGroupedViolations(
@@ -412,7 +474,12 @@ class _ViolationsContentState extends State<_ViolationsContent> {
                     isSaving: _isSaving,
                     message: _message,
                     error: _error,
+                    backLabel: widget.detailBackLabel ?? 'Back to violations',
                     onBack: () {
+                      if (widget.onBackFromDetail != null) {
+                        widget.onBackFromDetail!();
+                        return;
+                      }
                       setState(() {
                         _selectedViolationId = null;
                         _loadedViolationId = null;
@@ -427,6 +494,15 @@ class _ViolationsContentState extends State<_ViolationsContent> {
                     onSubmitForReview: () =>
                         _submitResponseForReview(selectedViolationId),
                     onSendBack: () => _sendBackForChanges(selectedViolationId),
+                    onManageAssignment:
+                        _canManageAssignments &&
+                            selectedViolation['status'] != 'closed' &&
+                            selectedViolation['status'] != 'pending_review'
+                        ? () => _manageAssignment(
+                            selectedViolationId,
+                            selectedViolation,
+                          )
+                        : null,
                     onUpdateStatus: (status, {reviewStatus, closureReason}) =>
                         _updateViolationStatus(
                           selectedViolationId,
@@ -488,6 +564,7 @@ class _ViolationFilterChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final filters = [
       ('active', 'Active'),
+      if (value == 'unassigned') ('unassigned', 'Unassigned'),
       ('pending_review', reviewCount > 0 ? 'Review ($reviewCount)' : 'Review'),
       ('closed', 'Closed'),
       ('all', 'All'),
@@ -597,101 +674,142 @@ class _ViolationListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final status = violation['status'] as String? ?? 'open';
-    final title =
-        violation['title'] as String? ??
-        violation['summaryText'] as String? ??
-        'Violation finding';
-    final sourceType = violation['sourceType'] as String?;
-    final inspectionDate = _dateText(violation['inspectionDate']);
-    final clause = violation['clauseReference'] as String?;
+    return _ViolationListRow(
+      data: _ViolationRowData.fromViolation(
+        violation,
+        context: _ViolationRowContext.queue,
+      ),
+      onOpen: onOpen,
+    );
+  }
+}
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onOpen,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: _line),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0A071A4A),
-                blurRadius: 14,
-                offset: Offset(0, 6),
+class _ViolationAssignmentChoice {
+  const _ViolationAssignmentChoice.assign({
+    required this.userId,
+    required this.name,
+  }) : remove = false;
+
+  const _ViolationAssignmentChoice.remove()
+    : userId = null,
+      name = null,
+      remove = true;
+
+  final String? userId;
+  final String? name;
+  final bool remove;
+}
+
+class _ViolationAssignmentSheet extends StatelessWidget {
+  const _ViolationAssignmentSheet({
+    required this.tenantId,
+    required this.siteId,
+    required this.assignedTo,
+  });
+
+  final String tenantId;
+  final String siteId;
+  final String? assignedTo;
+
+  bool _canAccessSite(Map<String, dynamic> member) {
+    final role = member['role'] as String?;
+    if (role == 'tenant_owner' || role == 'admin') {
+      return true;
+    }
+    if (member['siteAccessMode'] != 'selected') {
+      return true;
+    }
+    return (member['siteIds'] as List<dynamic>? ?? const [])
+        .whereType<String>()
+        .contains(siteId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              assignedTo == null ? 'Assign violation' : 'Change assignment',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w800,
               ),
-            ],
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 3,
-                  decoration: BoxDecoration(
-                    color: _statusColor(status),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: _ink,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _SmallStatusBadge(status: status),
-                        ],
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        [
-                          _sourceLabel(sourceType),
-                          if (inspectionDate.isNotEmpty) inspectionDate,
-                        ].join(' / '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: _muted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (clause != null && clause.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          clause,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: _muted,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: _navy, size: 22),
-              ],
             ),
-          ),
+            const SizedBox(height: 5),
+            Text(
+              'Choose who owns the resolution and submission.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: _muted),
+            ),
+            const SizedBox(height: 12),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirestorePaths.members(tenantId).snapshots(),
+              builder: (context, snapshot) {
+                final members = (snapshot.data?.docs ?? []).where((doc) {
+                  final member = doc.data();
+                  return member['status'] == 'active' && _canAccessSite(member);
+                }).toList();
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final member in members)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.person_outline, color: _navy),
+                        title: Text(
+                          member.data()['displayNameSnapshot'] as String? ??
+                              member.data()['emailSnapshot'] as String? ??
+                              'Team member',
+                        ),
+                        subtitle: Text(
+                          _roleLabel(
+                            member.data()['role'] as String? ?? 'staff',
+                          ),
+                        ),
+                        trailing: member.id == assignedTo
+                            ? const Icon(Icons.check, color: _green)
+                            : null,
+                        onTap: () => Navigator.of(context).pop(
+                          _ViolationAssignmentChoice.assign(
+                            userId: member.id,
+                            name:
+                                member.data()['displayNameSnapshot']
+                                    as String? ??
+                                member.data()['emailSnapshot'] as String? ??
+                                'Team member',
+                          ),
+                        ),
+                      ),
+                    if (assignedTo != null && assignedTo!.isNotEmpty) ...[
+                      const Divider(),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.person_off_outlined),
+                        title: const Text('Remove assignment'),
+                        onTap: () => Navigator.of(
+                          context,
+                        ).pop(const _ViolationAssignmentChoice.remove()),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -716,6 +834,7 @@ class _ViolationDetailView extends StatelessWidget {
     required this.onSaveResponse,
     required this.onSubmitForReview,
     this.onSendBack,
+    this.onManageAssignment,
     required this.onUpdateStatus,
     this.backLabel = 'Back to violations',
   });
@@ -736,6 +855,7 @@ class _ViolationDetailView extends StatelessWidget {
   final VoidCallback onSaveResponse;
   final VoidCallback onSubmitForReview;
   final VoidCallback? onSendBack;
+  final VoidCallback? onManageAssignment;
   final String backLabel;
   final void Function(
     String status, {
@@ -784,6 +904,7 @@ class _ViolationDetailView extends StatelessWidget {
           correctiveController: correctiveController,
           preventiveController: preventiveController,
           isSaving: isSaving,
+          onManageAssignment: onManageAssignment,
           onSaveResponse: onSaveResponse,
           onSubmitForReview: onSubmitForReview,
         ),
@@ -1249,6 +1370,7 @@ class _ViolationWorkArea extends StatefulWidget {
     required this.isSaving,
     required this.onSaveResponse,
     required this.onSubmitForReview,
+    this.onManageAssignment,
   });
 
   final String tenantId;
@@ -1263,6 +1385,7 @@ class _ViolationWorkArea extends StatefulWidget {
   final bool isSaving;
   final VoidCallback onSaveResponse;
   final VoidCallback onSubmitForReview;
+  final VoidCallback? onManageAssignment;
 
   @override
   State<_ViolationWorkArea> createState() => _ViolationWorkAreaState();
@@ -1295,6 +1418,17 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
 
   @override
   Widget build(BuildContext context) {
+    final assignedTo = widget.violation['assignedTo'] as String?;
+    final isAssigned = assignedTo != null && assignedTo.trim().isNotEmpty;
+    final isAssignedToMe =
+        isAssigned && assignedTo == FirebaseAuth.instance.currentUser?.uid;
+    final canManageResolution = const [
+      'tenant_owner',
+      'admin',
+      'manager',
+    ].contains(widget.currentRole);
+    final canEditResolution =
+        !isAssigned || isAssignedToMe || canManageResolution;
     return SizedBox(
       width: double.infinity,
       child: Column(
@@ -1309,6 +1443,9 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
               correctiveController: widget.correctiveController,
               preventiveController: widget.preventiveController,
               isSaving: widget.isSaving,
+              violation: widget.violation,
+              canEdit: canEditResolution,
+              onManageAssignment: widget.onManageAssignment,
               onAddField: (field) {
                 setState(() {
                   _visibleResponseFields.add(field);
@@ -1341,14 +1478,13 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
               tenantId: widget.tenantId,
               siteId: widget.violation['siteId'] as String? ?? '',
               violationId: widget.violationId,
-              startWorkOnPost:
-                  (widget.violation['status'] as String? ?? 'open') == 'open',
+              startWorkOnPost: false,
             ),
           ),
           if ((widget.violation['status'] as String? ?? 'open') !=
                   'pending_review' &&
-              (widget.violation['status'] as String? ?? 'open') !=
-                  'closed') ...[
+              (widget.violation['status'] as String? ?? 'open') != 'closed' &&
+              canEditResolution) ...[
             const SizedBox(height: 18),
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: widget.correctiveController,
@@ -1361,6 +1497,15 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
                   onSubmitForReview: widget.onSubmitForReview,
                 );
               },
+            ),
+          ],
+          if (!canEditResolution) ...[
+            const SizedBox(height: 14),
+            _StatusMessage(
+              icon: Icons.person_outline,
+              color: _navy,
+              text:
+                  'This resolution is assigned to ${widget.violation['assignedToNameSnapshot'] as String? ?? 'another teammate'}. You can still add notes and proof.',
             ),
           ],
         ],
@@ -2015,6 +2160,9 @@ class _StructuredResponsePanel extends StatelessWidget {
     required this.correctiveController,
     required this.preventiveController,
     required this.isSaving,
+    required this.violation,
+    required this.canEdit,
+    this.onManageAssignment,
     required this.onAddField,
   });
 
@@ -2025,6 +2173,9 @@ class _StructuredResponsePanel extends StatelessWidget {
   final TextEditingController correctiveController;
   final TextEditingController preventiveController;
   final bool isSaving;
+  final Map<String, dynamic> violation;
+  final bool canEdit;
+  final VoidCallback? onManageAssignment;
   final ValueChanged<String> onAddField;
 
   @override
@@ -2070,22 +2221,33 @@ class _StructuredResponsePanel extends StatelessWidget {
           body: 'Capture the completed correction and any helpful details.',
         ),
         const SizedBox(height: 10),
+        _ResolutionAssignmentRow(
+          isAssigned:
+              (violation['assignedTo'] as String?)?.trim().isNotEmpty ?? false,
+          assignedToName: violation['assignedToNameSnapshot'] as String?,
+          isAssignedToMe:
+              violation['assignedTo'] == FirebaseAuth.instance.currentUser?.uid,
+          onManageAssignment: onManageAssignment,
+        ),
+        const SizedBox(height: 10),
         _ResponseField(
           controller: correctiveController,
           label: 'What was fixed?',
           hint: 'Describe the completed fix.',
+          enabled: canEdit,
         ),
         for (final field in activeFields)
           _ResponseField(
             controller: field.controller,
             label: field.label,
             hint: field.hint,
+            enabled: canEdit,
           ),
         if (inactiveFields.isNotEmpty)
           _InlineSectionAction(
             icon: Icons.add,
             label: 'Add response detail',
-            onPressed: isSaving
+            onPressed: isSaving || !canEdit
                 ? null
                 : () =>
                       _showFixDetailSheet(context, inactiveFields, onAddField),
@@ -2144,11 +2306,13 @@ class _ResponseField extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.hint,
+    this.enabled = true,
   });
 
   final TextEditingController controller;
   final String label;
   final String hint;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -2169,7 +2333,11 @@ class _ResponseField extends StatelessWidget {
               ),
             ),
           ),
-          _SubtleHintTextField(controller: controller, hint: hint),
+          _SubtleHintTextField(
+            controller: controller,
+            hint: hint,
+            enabled: enabled,
+          ),
         ],
       ),
     );
@@ -2177,15 +2345,21 @@ class _ResponseField extends StatelessWidget {
 }
 
 class _SubtleHintTextField extends StatelessWidget {
-  const _SubtleHintTextField({required this.controller, required this.hint});
+  const _SubtleHintTextField({
+    required this.controller,
+    required this.hint,
+    required this.enabled,
+  });
 
   final TextEditingController controller;
   final String hint;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       minLines: 2,
       maxLines: 5,
       style: Theme.of(
@@ -2198,6 +2372,52 @@ class _SubtleHintTextField extends StatelessWidget {
           vertical: 12,
         ),
       ),
+    );
+  }
+}
+
+class _ResolutionAssignmentRow extends StatelessWidget {
+  const _ResolutionAssignmentRow({
+    required this.isAssigned,
+    required this.assignedToName,
+    required this.isAssignedToMe,
+    required this.onManageAssignment,
+  });
+
+  final bool isAssigned;
+  final String? assignedToName;
+  final bool isAssignedToMe;
+  final VoidCallback? onManageAssignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.person_outline, size: 17, color: _muted),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            isAssigned
+                ? isAssignedToMe
+                      ? 'Assigned to you'
+                      : 'Assigned to ${assignedToName ?? 'team member'}'
+                : 'No owner assigned',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: isAssigned ? _ink : _muted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (onManageAssignment != null)
+          TextButton(
+            onPressed: onManageAssignment,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              minimumSize: const Size(0, 30),
+            ),
+            child: Text(isAssigned ? 'Change' : 'Assign'),
+          ),
+      ],
     );
   }
 }
@@ -3470,7 +3690,7 @@ String _sourceLabel(String? sourceType) {
     case 'health_department_inspection':
       return 'Public inspection';
     case 'internal_audit':
-      return 'Internal audit';
+      return 'Internal check';
     case 'manual':
       return 'Manual issue';
     default:

@@ -1,9 +1,8 @@
 part of '../../main.dart';
 
 class TenantRepository {
-  TenantRepository({
-    CloudFunctionsService? functions,
-  }) : _functions = functions ?? CloudFunctionsService();
+  TenantRepository({CloudFunctionsService? functions})
+    : _functions = functions ?? CloudFunctionsService();
 
   final CloudFunctionsService _functions;
 

@@ -136,8 +136,7 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
         context,
       ).showSnackBar(const SnackBar(content: Text('Submitted for review.')));
       setState(() {
-        _selectedViolationId = null;
-        _loadedViolationId = null;
+        _violationMessage = 'Submitted for review.';
       });
     } catch (_) {
       setState(() {
@@ -200,6 +199,57 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
     };
   }
 
+  bool get _canManageAssignments =>
+      const ['tenant_owner', 'admin', 'manager'].contains(widget.currentRole);
+
+  Future<void> _manageViolationAssignment(
+    String violationId,
+    Map<String, dynamic> violation,
+  ) async {
+    final choice = await showModalBottomSheet<_ViolationAssignmentChoice>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _ViolationAssignmentSheet(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        assignedTo: violation['assignedTo'] as String?,
+      ),
+    );
+    if (!mounted || choice == null) return;
+    setState(() {
+      _isSavingViolation = true;
+      _violationMessage = null;
+      _violationError = null;
+    });
+    try {
+      if (choice.remove) {
+        await _violationRepository.unassignViolation(
+          tenantId: widget.tenantId,
+          siteId: widget.siteId,
+          violationId: violationId,
+        );
+        if (mounted) setState(() => _violationMessage = 'Assignment removed.');
+      } else {
+        await _violationRepository.assignViolation(
+          tenantId: widget.tenantId,
+          siteId: widget.siteId,
+          violationId: violationId,
+          assignedTo: choice.userId!,
+        );
+        if (mounted) {
+          setState(() => _violationMessage = 'Assigned to ${choice.name}.');
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _violationError = 'Could not update the assignment.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingViolation = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -226,7 +276,7 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
             icon: Icons.fact_check_outlined,
             title: 'No inspections yet',
             body:
-                'Refresh from master data to import public inspection history for this site.',
+                'Refresh public inspection data from More to import history for this site.',
           );
         }
 
@@ -309,6 +359,16 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
                     ),
                     onSubmitForReview: () =>
                         _submitViolationForReview(selectedViolationDoc.id),
+                    onManageAssignment:
+                        _canManageAssignments &&
+                            selectedViolationDoc.data()['status'] != 'closed' &&
+                            selectedViolationDoc.data()['status'] !=
+                                'pending_review'
+                        ? () => _manageViolationAssignment(
+                            selectedViolationDoc.id,
+                            selectedViolationDoc.data(),
+                          )
+                        : null,
                     onUpdateStatus: (status, {reviewStatus, closureReason}) =>
                         _updateAuditViolationStatus(
                           selectedViolationDoc.id,
@@ -726,7 +786,7 @@ class _InspectionSourceCard extends StatelessWidget {
           icon: Icons.fact_check_outlined,
           facts: facts,
           emptyText:
-              'Inspection details will appear here after master-data sync.',
+              'Inspection details will appear here after a public data refresh.',
           collapsedSummary: _joinNonEmpty([
             _displayText(inspection['inspectionType']),
             _dateText(inspection['inspectionDate']),
@@ -980,101 +1040,21 @@ class _InspectionViolationGroup extends StatelessWidget {
 }
 
 class _InspectionFindingRow extends StatelessWidget {
-  const _InspectionFindingRow({required this.violation, required this.onOpen});
+  const _InspectionFindingRow({
+    required this.violation,
+    required this.onOpen,
+    this.rowContext = _ViolationRowContext.publicInspectionDetail,
+  });
 
   final Map<String, dynamic> violation;
   final VoidCallback onOpen;
+  final _ViolationRowContext rowContext;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final status = violation['status'] as String? ?? 'open';
-    final title =
-        violation['title'] as String? ??
-        violation['summaryText'] as String? ??
-        'Violation finding';
-    final comment = _firstAvailableText([
-      violation['auditorComments'],
-      violation['description'],
-      violation['clauseReference'],
-    ]);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: onOpen,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: _line),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 3,
-                  decoration: BoxDecoration(
-                    color: _statusColor(status),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: _ink,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _SmallStatusBadge(status: status),
-                        ],
-                      ),
-                      if (comment.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          comment,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: _muted,
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      Text(
-                        _severityLabel(violation['severity'] as String?),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: _muted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: _navy, size: 22),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return _ViolationListRow(
+      data: _ViolationRowData.fromViolation(violation, context: rowContext),
+      onOpen: onOpen,
     );
   }
 }

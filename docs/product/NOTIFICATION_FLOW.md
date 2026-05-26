@@ -353,6 +353,48 @@ Recommended capabilities:
 - show timestamp
 - group by actionable recency where useful
 
+### Action Item Implementation Boundary
+
+Operational inbox rows should be stored as action items at:
+
+`tenants/{tenantId}/actionItems/{actionItemId}`
+
+Business records remain authoritative. Action items are a read-optimized queue
+for dashboards and inbox screens, with fields such as:
+
+- `type`
+- `status`
+- `priority`
+- `recipientUserId`
+- `siteId`
+- `targetType`
+- `targetId`
+- `title`
+- `detail`
+- `dueAt`
+- `dueState`
+- `readAt`
+- `completedAt`
+
+Action items should be created and completed by trusted callable Cloud
+Functions at meaningful workflow transitions rather than by Firestore document
+triggers:
+
+- submitting a violation for review creates reviewer action items
+- sending a violation back completes review items and creates staff follow-up
+- closing a violation completes its open review action items
+- assigning training creates an assignee action item
+- completing or cancelling training completes its action item
+- a scheduled function marks incomplete training action items overdue
+- assigning a one-time internal check creates an assignee action item
+- starting, reassigning, completing, or cancelling that check updates its
+  action item
+- a scheduled function marks incomplete assigned-check action items overdue
+
+Frequent collaborative operations such as draft editing, discussion notes, and
+photo uploads remain direct app writes. Push delivery can later consume action
+items without changing workflow ownership.
+
 ## Delivery and Deep Linking Recommendations
 
 Notifications should deep link directly into the relevant workflow when possible.
@@ -362,8 +404,7 @@ Recommended targets:
 - violation detail
 - manager review view
 - assigned training detail
-- site audit list
-- scheduled audit instance
+- assigned check within the site audit workflow
 
 Avoid landing users on overly broad home screens when a more direct target exists.
 
@@ -373,7 +414,7 @@ Later enhancements may include:
 
 - digest summaries
 - notification preferences by category
-- escalation to manager for overdue staff training
+- escalation to manager for overdue staff training or assigned checks
 - mention notifications in violation threads
 - daily operational summaries by site
 
