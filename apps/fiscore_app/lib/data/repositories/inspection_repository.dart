@@ -4,11 +4,12 @@ class InspectionRepository {
   Stream<QuerySnapshot<Map<String, dynamic>>> streamForSite({
     required String tenantId,
     required String siteId,
+    int limit = 20,
   }) {
     return FirestorePaths.siteInspections(
       tenantId,
       siteId,
-    ).orderBy('inspectionDate', descending: true).snapshots();
+    ).orderBy('inspectionDate', descending: true).limit(limit).snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> streamReportAttachments({

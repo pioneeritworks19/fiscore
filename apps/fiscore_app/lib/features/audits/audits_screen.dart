@@ -29,6 +29,7 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
   bool _isSavingViolation = false;
   String? _violationMessage;
   String? _violationError;
+  int _inspectionLimit = 20;
 
   final _generalController = TextEditingController();
   final _containmentController = TextEditingController();
@@ -258,6 +259,7 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
       stream: _inspectionRepository.streamForSite(
         tenantId: widget.tenantId,
         siteId: widget.siteId,
+        limit: _inspectionLimit,
       ),
       builder: (context, inspectionSnapshot) {
         if (inspectionSnapshot.connectionState == ConnectionState.waiting) {
@@ -291,16 +293,13 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
         if (selectedInspection != null) {
           final selectedDoc = selectedInspection;
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: _violationRepository.streamForSite(
+            stream: _violationRepository.streamForInspection(
               tenantId: widget.tenantId,
               siteId: widget.siteId,
+              inspectionId: selectedDoc.id,
             ),
             builder: (context, violationSnapshot) {
-              final violations = (violationSnapshot.data?.docs ?? [])
-                  .where(
-                    (doc) => doc.data()['masterInspectionId'] == selectedDoc.id,
-                  )
-                  .toList();
+              final violations = (violationSnapshot.data?.docs ?? []).toList();
               violations.sort((a, b) {
                 final aStatus = _statusRank(
                   a.data()['status'] as String? ?? '',
@@ -439,6 +438,14 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
                   });
                   widget.onSubflowChanged?.call(true);
                 },
+              ),
+            if (inspections.length == _inspectionLimit)
+              Center(
+                child: TextButton(
+                  onPressed: () =>
+                      setState(() => _inspectionLimit += 20),
+                  child: const Text('Load more inspections'),
+                ),
               ),
           ],
         );

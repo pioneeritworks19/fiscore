@@ -118,6 +118,9 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
   String? _loadedViolationId;
   bool _selectingTemplate = false;
   bool _isAssignedCheckFlow = false;
+  int _auditLimit = 20;
+  int _assignmentLimit = 50;
+  bool _showCompletedHistory = false;
   bool _isWorking = false;
   bool _isSavingViolation = false;
   String? _error;
@@ -570,28 +573,23 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
   @override
   Widget build(BuildContext context) {
     if (_selectedViolationId != null) {
-      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _violationRepository.streamForSite(
+      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _violationRepository.streamViolation(
           tenantId: widget.tenantId,
           siteId: widget.siteId,
+          violationId: _selectedViolationId!,
         ),
         builder: (context, snapshot) {
-          QueryDocumentSnapshot<Map<String, dynamic>>? selectedViolation;
-          for (final doc in snapshot.data?.docs ?? []) {
-            if (doc.id == _selectedViolationId) {
-              selectedViolation = doc;
-              break;
-            }
-          }
+          final selectedViolation = snapshot.data?.data();
           if (selectedViolation == null) {
             return const Center(child: CircularProgressIndicator());
           }
-          final selectedDoc = selectedViolation;
-          _loadViolationResponse(selectedDoc.id, selectedDoc.data());
+          final selectedId = _selectedViolationId!;
+          _loadViolationResponse(selectedId, selectedViolation);
           return _ViolationDetailView(
             tenantId: widget.tenantId,
-            violationId: selectedDoc.id,
-            violation: selectedDoc.data(),
+            violationId: selectedId,
+            violation: selectedViolation,
             currentRole: widget.currentRole,
             generalController: _generalController,
             containmentController: _containmentController,
@@ -611,22 +609,20 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
               });
             },
             onSaveResponse: () => _saveViolationResponse(
-              selectedDoc.id,
-              selectedDoc.data()['status'] as String? ?? 'open',
+              selectedId,
+              selectedViolation['status'] as String? ?? 'open',
             ),
-            onSubmitForReview: () => _submitViolationForReview(selectedDoc.id),
+            onSubmitForReview: () => _submitViolationForReview(selectedId),
             onManageAssignment:
                 _canManageAssignments &&
-                    selectedDoc.data()['status'] != 'closed' &&
-                    selectedDoc.data()['status'] != 'pending_review'
-                ? () => _manageViolationAssignment(
-                    selectedDoc.id,
-                    selectedDoc.data(),
-                  )
+                    selectedViolation['status'] != 'closed' &&
+                    selectedViolation['status'] != 'pending_review'
+                ? () =>
+                      _manageViolationAssignment(selectedId, selectedViolation)
                 : null,
             onUpdateStatus: (status, {reviewStatus, closureReason}) =>
                 _updateViolationStatus(
-                  selectedDoc.id,
+                  selectedId,
                   status,
                   reviewStatus: reviewStatus,
                   closureReason: closureReason,
@@ -672,192 +668,229 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
       );
     }
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _repository.streamForSite(
+      stream: _repository.completedForSite(
         tenantId: widget.tenantId,
         siteId: widget.siteId,
+        limit: _auditLimit,
       ),
-      builder: (context, snapshot) {
-        final audits = snapshot.data?.docs ?? [];
-        final inProgress = audits
-            .where(
-              (doc) =>
-                  doc.data()['status'] == 'in_progress' &&
-                  doc.data()['auditAssignmentId'] == null,
-            )
-            .toList();
-        final completed = audits
-            .where((doc) => doc.data()['status'] == 'completed')
-            .toList();
+      builder: (context, completedSnapshot) {
+        final completed = completedSnapshot.data?.docs ?? [];
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _repository.assignmentsForSite(
+          stream: _repository.inProgressForSite(
             tenantId: widget.tenantId,
             siteId: widget.siteId,
-            currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
-            canManage: _canAssignChecks,
           ),
-          builder: (context, assignmentSnapshot) {
-            final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-            final assignments =
-                (assignmentSnapshot.data?.docs ?? []).where((doc) {
-                  final data = doc.data();
-                  if (data['status'] == 'completed' ||
-                      data['status'] == 'cancelled') {
-                    return false;
-                  }
-                  return _canAssignChecks ||
-                      data['assignedTo'] == currentUserId;
-                }).toList()..sort((a, b) {
-                  final aDue = a.data()['dueDate'] as Timestamp?;
-                  final bDue = b.data()['dueDate'] as Timestamp?;
-                  return (aDue?.millisecondsSinceEpoch ?? 0).compareTo(
-                    bDue?.millisecondsSinceEpoch ?? 0,
-                  );
-                });
-            final assignedChecks = assignments
-                .where(
-                  (doc) => doc.data()['assignmentSource'] != 'self_started',
-                )
+          builder: (context, inProgressSnapshot) {
+            final inProgress = (inProgressSnapshot.data?.docs ?? [])
+                .where((doc) => doc.data()['auditAssignmentId'] == null)
                 .toList();
-            final selfStartedChecks = assignments
-                .where(
-                  (doc) => doc.data()['assignmentSource'] == 'self_started',
-                )
-                .toList();
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_error != null) ...[
-                  _StatusMessage(
-                    icon: Icons.error_outline,
-                    color: Theme.of(context).colorScheme.error,
-                    text: _error!,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (_canConduct || _canAssignChecks)
-                  Row(
-                    children: [
-                      if (_canConduct)
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () =>
-                                _openSubflow(() => _selectingTemplate = true),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Start check'),
+            return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _repository.assignmentsForSite(
+                tenantId: widget.tenantId,
+                siteId: widget.siteId,
+                currentUserId: FirebaseAuth.instance.currentUser?.uid ?? '',
+                canManage: _canAssignChecks,
+                limit: _assignmentLimit,
+              ),
+              builder: (context, assignmentSnapshot) {
+                final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+                final assignments =
+                    (assignmentSnapshot.data?.docs ?? []).where((doc) {
+                      final data = doc.data();
+                      if (data['status'] == 'completed' ||
+                          data['status'] == 'cancelled') {
+                        return false;
+                      }
+                      return _canAssignChecks ||
+                          data['assignedTo'] == currentUserId;
+                    }).toList()..sort((a, b) {
+                      final aDue = a.data()['dueDate'] as Timestamp?;
+                      final bDue = b.data()['dueDate'] as Timestamp?;
+                      return (aDue?.millisecondsSinceEpoch ?? 0).compareTo(
+                        bDue?.millisecondsSinceEpoch ?? 0,
+                      );
+                    });
+                final assignedChecks = assignments
+                    .where(
+                      (doc) => doc.data()['assignmentSource'] != 'self_started',
+                    )
+                    .toList();
+                final selfStartedChecks = assignments
+                    .where(
+                      (doc) => doc.data()['assignmentSource'] == 'self_started',
+                    )
+                    .toList();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_error != null) ...[
+                      _StatusMessage(
+                        icon: Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                        text: _error!,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (_canConduct || _canAssignChecks)
+                      Row(
+                        children: [
+                          if (_canConduct)
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: () => _openSubflow(
+                                  () => _selectingTemplate = true,
+                                ),
+                                icon: const Icon(Icons.add),
+                                label: const Text('Start check'),
+                              ),
+                            ),
+                          if (_canConduct && _canAssignChecks)
+                            const SizedBox(width: 10),
+                          if (_canAssignChecks)
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _assignCheck,
+                                icon: const Icon(Icons.person_add_alt_outlined),
+                                label: const Text('Assign check'),
+                              ),
+                            ),
+                        ],
+                      ),
+                    if (completedSnapshot.connectionState ==
+                            ConnectionState.waiting ||
+                        inProgressSnapshot.connectionState ==
+                            ConnectionState.waiting ||
+                        assignmentSnapshot.connectionState ==
+                            ConnectionState.waiting) ...[
+                      const SizedBox(height: 18),
+                      const Center(child: CircularProgressIndicator()),
+                    ] else ...[
+                      if (assignedChecks.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        Text(
+                          _canAssignChecks
+                              ? 'Assigned checks'
+                              : 'Assigned to me',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: _ink,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 10),
+                        ...assignedChecks.map(
+                          (doc) => _AssignedAuditRow(
+                            assignment: doc.data(),
+                            isAssignee:
+                                doc.data()['assignedTo'] == currentUserId,
+                            canReassign: _canAssignChecks,
+                            canCancel: _canAssignChecks,
+                            onStart: () => _startAssignedAudit(doc.id),
+                            onReassign: () =>
+                                _reassignCheck(doc.id, doc.data()),
+                            onCancel: () => _cancelCheck(doc.id),
                           ),
                         ),
-                      if (_canConduct && _canAssignChecks)
-                        const SizedBox(width: 10),
-                      if (_canAssignChecks)
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _assignCheck,
-                            icon: const Icon(Icons.person_add_alt_outlined),
-                            label: const Text('Assign check'),
+                      ],
+                      if (selfStartedChecks.isNotEmpty ||
+                          inProgress.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        Text(
+                          'In progress',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: _ink,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(height: 10),
+                        ...selfStartedChecks.map(
+                          (doc) => _AssignedAuditRow(
+                            assignment: doc.data(),
+                            isAssignee:
+                                doc.data()['assignedTo'] == currentUserId,
+                            canReassign: false,
+                            canCancel:
+                                _canAssignChecks ||
+                                doc.data()['assignedTo'] == currentUserId,
+                            onStart: () => _startAssignedAudit(doc.id),
+                            onReassign: () {},
+                            onCancel: () =>
+                                _cancelCheck(doc.id, selfStarted: true),
                           ),
+                        ),
+                        ...inProgress.map(
+                          (doc) => _AssignedAuditRow(
+                            assignment: {
+                              'templateNameSnapshot': doc
+                                  .data()['templateNameSnapshot'],
+                              'assignedToNameSnapshot': doc
+                                  .data()['startedByDisplayNameSnapshot'],
+                              'status': 'in_progress',
+                            },
+                            isAssignee:
+                                doc.data()['startedBy'] == currentUserId,
+                            canReassign: false,
+                            canCancel: false,
+                            onStart: () =>
+                                _openSubflow(() => _activeAuditId = doc.id),
+                            onReassign: () {},
+                            onCancel: () {},
+                          ),
+                        ),
+                      ],
+                      if (assignments.length == _assignmentLimit)
+                        Center(
+                          child: TextButton(
+                            onPressed: () =>
+                                setState(() => _assignmentLimit += 50),
+                            child: const Text('Load more active checks'),
+                          ),
+                        ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Completed checks',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: _ink,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (completed.isEmpty)
+                        const _EmptyStateCard(
+                          icon: Icons.playlist_add_check_circle_outlined,
+                          title: 'No completed checks yet',
+                          body:
+                              'Run an internal check to identify issues before an inspection.',
+                        )
+                      else
+                        ...completed
+                            .take(_showCompletedHistory ? _auditLimit : 5)
+                            .map(
+                              (doc) => _InternalAuditRow(
+                                audit: doc.data(),
+                                actionLabel: 'View',
+                                onOpen: () =>
+                                    _openSubflow(() => _activeAuditId = doc.id),
+                              ),
+                            ),
+                      if (!_showCompletedHistory && completed.length > 5)
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => _showCompletedHistory = true),
+                          child: const Text('View more completed checks'),
+                        ),
+                      if (_showCompletedHistory &&
+                          completed.length == _auditLimit)
+                        TextButton(
+                          onPressed: () => setState(() => _auditLimit += 20),
+                          child: const Text('Load more completed checks'),
                         ),
                     ],
-                  ),
-                if (snapshot.connectionState == ConnectionState.waiting ||
-                    assignmentSnapshot.connectionState ==
-                        ConnectionState.waiting) ...[
-                  const SizedBox(height: 18),
-                  const Center(child: CircularProgressIndicator()),
-                ] else ...[
-                  if (assignedChecks.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    Text(
-                      _canAssignChecks ? 'Assigned checks' : 'Assigned to me',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: _ink,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ...assignedChecks.map(
-                      (doc) => _AssignedAuditRow(
-                        assignment: doc.data(),
-                        isAssignee: doc.data()['assignedTo'] == currentUserId,
-                        canReassign: _canAssignChecks,
-                        canCancel: _canAssignChecks,
-                        onStart: () => _startAssignedAudit(doc.id),
-                        onReassign: () => _reassignCheck(doc.id, doc.data()),
-                        onCancel: () => _cancelCheck(doc.id),
-                      ),
-                    ),
                   ],
-                  if (selfStartedChecks.isNotEmpty ||
-                      inProgress.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    Text(
-                      'In progress',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: _ink,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ...selfStartedChecks.map(
-                      (doc) => _AssignedAuditRow(
-                        assignment: doc.data(),
-                        isAssignee: doc.data()['assignedTo'] == currentUserId,
-                        canReassign: false,
-                        canCancel:
-                            _canAssignChecks ||
-                            doc.data()['assignedTo'] == currentUserId,
-                        onStart: () => _startAssignedAudit(doc.id),
-                        onReassign: () {},
-                        onCancel: () => _cancelCheck(doc.id, selfStarted: true),
-                      ),
-                    ),
-                    ...inProgress.map(
-                      (doc) => _AssignedAuditRow(
-                        assignment: {
-                          'templateNameSnapshot': doc
-                              .data()['templateNameSnapshot'],
-                          'assignedToNameSnapshot': doc
-                              .data()['startedByDisplayNameSnapshot'],
-                          'status': 'in_progress',
-                        },
-                        isAssignee: doc.data()['startedBy'] == currentUserId,
-                        canReassign: false,
-                        canCancel: false,
-                        onStart: () =>
-                            _openSubflow(() => _activeAuditId = doc.id),
-                        onReassign: () {},
-                        onCancel: () {},
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  Text(
-                    'Completed checks',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: _ink,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (completed.isEmpty)
-                    const _EmptyStateCard(
-                      icon: Icons.playlist_add_check_circle_outlined,
-                      title: 'No completed checks yet',
-                      body:
-                          'Run an internal check to identify issues before an inspection.',
-                    )
-                  else
-                    ...completed
-                        .take(5)
-                        .map(
-                          (doc) => _InternalAuditRow(
-                            audit: doc.data(),
-                            actionLabel: 'View',
-                            onOpen: () =>
-                                _openSubflow(() => _activeAuditId = doc.id),
-                          ),
-                        ),
-                ],
-              ],
+                );
+              },
             );
           },
         );

@@ -47,17 +47,68 @@ class TrainingRepository {
     return snapshot.data();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> assignmentsStream({
+  Stream<QuerySnapshot<Map<String, dynamic>>> activeAssignmentsStream({
     required String tenantId,
     required String siteId,
     required String userId,
     required bool canAssign,
+    int limit = 50,
   }) {
     final assignments = FirestorePaths.trainingAssignments(tenantId);
     if (canAssign) {
-      return assignments.where('siteId', isEqualTo: siteId).snapshots();
+      return assignments
+          .where('siteId', isEqualTo: siteId)
+          .where('status', whereIn: ['assigned', 'in_progress'])
+          .orderBy('dueDate')
+          .limit(limit)
+          .snapshots();
     }
-    return assignments.where('assignedTo', isEqualTo: userId).snapshots();
+    return assignments
+        .where('assignedTo', isEqualTo: userId)
+        .where('siteId', isEqualTo: siteId)
+        .where('status', whereIn: ['assigned', 'in_progress'])
+        .orderBy('dueDate')
+        .limit(limit)
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> historyAssignmentsStream({
+    required String tenantId,
+    required String siteId,
+    required String userId,
+    required bool canAssign,
+    int limit = 20,
+  }) {
+    final assignments = FirestorePaths.trainingAssignments(tenantId);
+    if (canAssign) {
+      return assignments
+          .where('siteId', isEqualTo: siteId)
+          .where('status', whereIn: ['completed', 'cancelled'])
+          .orderBy('updatedAt', descending: true)
+          .limit(limit)
+          .snapshots();
+    }
+    return assignments
+        .where('assignedTo', isEqualTo: userId)
+        .where('siteId', isEqualTo: siteId)
+        .where('status', whereIn: ['completed', 'cancelled'])
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> linkedAssignmentsStream({
+    required String tenantId,
+    required String siteId,
+    required String violationId,
+    int limit = 20,
+  }) {
+    return FirestorePaths.trainingAssignments(tenantId)
+        .where('siteId', isEqualTo: siteId)
+        .where('linkedViolationId', isEqualTo: violationId)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots();
   }
 
   Future<void> createAssignment({

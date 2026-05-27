@@ -6,11 +6,63 @@ class ViolationRepository {
 
   final CloudFunctionsService _functions;
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> streamForSite({
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamPageForSite({
     required String tenantId,
     required String siteId,
+    required String statusFilter,
+    int limit = 20,
   }) {
-    return FirestorePaths.violations(tenantId, siteId).snapshots();
+    Query<Map<String, dynamic>> query = FirestorePaths.violations(
+      tenantId,
+      siteId,
+    );
+    if (statusFilter == 'active') {
+      query = query.where('status', whereIn: ['open', 'in_progress']);
+    } else if (statusFilter == 'unassigned') {
+      query = query
+          .where('status', whereIn: ['open', 'in_progress'])
+          .where('assignmentStatus', isEqualTo: 'unassigned');
+    } else if (statusFilter != 'all') {
+      query = query.where('status', isEqualTo: statusFilter);
+    }
+    final orderField = switch (statusFilter) {
+      'pending_review' => 'submittedForReviewAt',
+      'closed' => 'closedAt',
+      _ => 'updatedAt',
+    };
+    return query.orderBy(orderField, descending: true).limit(limit).snapshots();
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> streamViolation({
+    required String tenantId,
+    required String siteId,
+    required String violationId,
+  }) {
+    return FirestorePaths.violation(tenantId, siteId, violationId).snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamForInspection({
+    required String tenantId,
+    required String siteId,
+    required String inspectionId,
+  }) {
+    return FirestorePaths.violations(tenantId, siteId)
+        .where('masterInspectionId', isEqualTo: inspectionId)
+        .orderBy('updatedAt', descending: true)
+        .limit(100)
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamForInternalAudit({
+    required String tenantId,
+    required String siteId,
+    required String auditId,
+  }) {
+    return FirestorePaths.violations(tenantId, siteId)
+        .where('auditId', isEqualTo: auditId)
+        .orderBy('updatedAt', descending: true)
+        .limit(100)
+        .snapshots();
   }
 
   Future<void> saveStructuredResponse({

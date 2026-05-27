@@ -114,18 +114,36 @@ class _TrainingAssignViewState extends State<_TrainingAssignView> {
 
 class _TrainingTeamProgressView extends StatefulWidget {
   const _TrainingTeamProgressView({
-    required this.assignments,
+    required this.activeAssignments,
+    required this.tenantId,
+    required this.siteId,
+    required this.userId,
+    required this.canAssign,
+    required this.repository,
+    required this.activeLimit,
     required this.initialFilter,
     required this.onBack,
     required this.onOpenAssignment,
     required this.onCancelAssignment,
+    required this.historyLimit,
+    required this.onLoadMoreActive,
+    required this.onLoadMore,
   });
 
-  final List<QueryDocumentSnapshot<Map<String, dynamic>>> assignments;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> activeAssignments;
+  final String tenantId;
+  final String siteId;
+  final String userId;
+  final bool canAssign;
+  final TrainingRepository repository;
+  final int activeLimit;
   final String initialFilter;
   final VoidCallback onBack;
   final void Function(String, Map<String, dynamic>) onOpenAssignment;
   final ValueChanged<String> onCancelAssignment;
+  final int historyLimit;
+  final VoidCallback onLoadMoreActive;
+  final VoidCallback onLoadMore;
 
   @override
   State<_TrainingTeamProgressView> createState() =>
@@ -143,111 +161,136 @@ class _TrainingTeamProgressViewState extends State<_TrainingTeamProgressView> {
 
   @override
   Widget build(BuildContext context) {
-    final open = widget.assignments
-        .where(
-          (doc) =>
-              doc.data()['status'] != 'completed' &&
-              doc.data()['status'] != 'cancelled',
-        )
-        .length;
-    final completed = widget.assignments
-        .where((doc) => doc.data()['status'] == 'completed')
-        .length;
-    final cancelled = widget.assignments
-        .where((doc) => doc.data()['status'] == 'cancelled')
-        .length;
-    final overdue = widget.assignments.where((doc) {
-      final data = doc.data();
-      return data['status'] != 'completed' &&
-          data['status'] != 'cancelled' &&
-          _isTrainingOverdue(data['dueDate']);
-    }).length;
-    final visible = widget.assignments.where((doc) {
-      final data = doc.data();
-      if (_filter == 'overdue') {
-        return data['status'] != 'completed' &&
-            data['status'] != 'cancelled' &&
-            _isTrainingOverdue(data['dueDate']);
-      }
-      if (_filter == 'completed') return data['status'] == 'completed';
-      if (_filter == 'cancelled') return data['status'] == 'cancelled';
-      if (_filter == 'all') return true;
-      return data['status'] != 'completed' && data['status'] != 'cancelled';
-    }).toList();
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: widget.repository.historyAssignmentsStream(
+        tenantId: widget.tenantId,
+        siteId: widget.siteId,
+        userId: widget.userId,
+        canAssign: widget.canAssign,
+        limit: widget.historyLimit,
+      ),
+      builder: (context, snapshot) {
+        final history = snapshot.data?.docs ?? [];
+        final assignments = [...widget.activeAssignments, ...history];
+        final open = widget.activeAssignments.length;
+        final completed = history
+            .where((doc) => doc.data()['status'] == 'completed')
+            .length;
+        final cancelled = history
+            .where((doc) => doc.data()['status'] == 'cancelled')
+            .length;
+        final overdue = widget.activeAssignments.where((doc) {
+          return _isTrainingOverdue(doc.data()['dueDate']);
+        }).length;
+        final visible = assignments.where((doc) {
+          final data = doc.data();
+          if (_filter == 'overdue') {
+            return data['status'] != 'completed' &&
+                data['status'] != 'cancelled' &&
+                _isTrainingOverdue(data['dueDate']);
+          }
+          if (_filter == 'completed') return data['status'] == 'completed';
+          if (_filter == 'cancelled') return data['status'] == 'cancelled';
+          if (_filter == 'all') return true;
+          return data['status'] != 'completed' && data['status'] != 'cancelled';
+        }).toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextButton.icon(
-          onPressed: widget.onBack,
-          icon: const Icon(Icons.chevron_left),
-          label: const Text('Back to training'),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Team progress',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            color: _ink,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          '$open open  |  $overdue overdue  |  $completed done',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: _muted),
-        ),
-        const SizedBox(height: 16),
-        Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final option in [
-              ('open', 'Open'),
-              ('overdue', 'Overdue'),
-              ('completed', 'Done'),
-            ]) ...[
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(option.$2),
-                    selected: _filter == option.$1,
-                    onSelected: (_) => setState(() => _filter = option.$1),
-                  ),
-                ),
+            TextButton.icon(
+              onPressed: widget.onBack,
+              icon: const Icon(Icons.chevron_left),
+              label: const Text('Back to training'),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Team progress',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w800,
               ),
-            ],
-            PopupMenuButton<String>(
-              tooltip: 'More filters',
-              icon: const Icon(Icons.filter_list_outlined, color: _navy),
-              onSelected: (value) => setState(() => _filter = value),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'cancelled',
-                  child: Text('Cancelled ($cancelled)'),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '$open open  |  $overdue overdue  |  $completed done',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: _muted),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                for (final option in [
+                  ('open', 'Open'),
+                  ('overdue', 'Overdue'),
+                  ('completed', 'Done'),
+                ]) ...[
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(option.$2),
+                        selected: _filter == option.$1,
+                        onSelected: (_) => setState(() => _filter = option.$1),
+                      ),
+                    ),
+                  ),
+                ],
+                PopupMenuButton<String>(
+                  tooltip: 'More filters',
+                  icon: const Icon(Icons.filter_list_outlined, color: _navy),
+                  onSelected: (value) => setState(() => _filter = value),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'cancelled',
+                      child: Text('Cancelled ($cancelled)'),
+                    ),
+                    const PopupMenuItem(value: 'all', child: Text('All')),
+                  ],
                 ),
-                const PopupMenuItem(value: 'all', child: Text('All')),
               ],
             ),
+            const SizedBox(height: 14),
+            if (visible.isEmpty)
+              const _EmptyStateCard(
+                icon: Icons.check_circle_outline,
+                title: 'Nothing in this view',
+                body: 'There are no training assignments to follow up on.',
+              )
+            else ...[
+              for (final doc in visible)
+                _TrainingAssignmentCard(
+                  assignment: doc.data(),
+                  onTap: () => widget.onOpenAssignment(doc.id, doc.data()),
+                  onCancel:
+                      doc.data()['status'] == 'completed' ||
+                          doc.data()['status'] == 'cancelled'
+                      ? null
+                      : () => widget.onCancelAssignment(doc.id),
+                ),
+              if ((_filter == 'completed' ||
+                      _filter == 'cancelled' ||
+                      _filter == 'all') &&
+                  history.length == widget.historyLimit)
+                Center(
+                  child: TextButton(
+                    onPressed: widget.onLoadMore,
+                    child: const Text('Load more assignments'),
+                  ),
+                ),
+              if ((_filter == 'open' || _filter == 'overdue') &&
+                  widget.activeAssignments.length == widget.activeLimit)
+                Center(
+                  child: TextButton(
+                    onPressed: widget.onLoadMoreActive,
+                    child: const Text('Load more active assignments'),
+                  ),
+                ),
+            ],
           ],
-        ),
-        const SizedBox(height: 14),
-        if (visible.isEmpty)
-          const _EmptyStateCard(
-            icon: Icons.check_circle_outline,
-            title: 'Nothing in this view',
-            body: 'There are no training assignments to follow up on.',
-          )
-        else
-          for (final doc in visible)
-            _TrainingAssignmentCard(
-              assignment: doc.data(),
-              onTap: () => widget.onOpenAssignment(doc.id, doc.data()),
-              onCancel:
-                  doc.data()['status'] == 'completed' ||
-                      doc.data()['status'] == 'cancelled'
-                  ? null
-                  : () => widget.onCancelAssignment(doc.id),
-            ),
-      ],
+        );
+      },
     );
   }
 }

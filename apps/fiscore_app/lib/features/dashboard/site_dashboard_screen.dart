@@ -32,7 +32,6 @@ class _SiteDashboardContent extends StatefulWidget {
 }
 
 class _SiteDashboardContentState extends State<_SiteDashboardContent> {
-  final ViolationRepository _violationRepository = ViolationRepository();
   final ActionItemRepository _actionItemRepository = ActionItemRepository();
   final InternalAuditRepository _internalAuditRepository =
       InternalAuditRepository();
@@ -67,102 +66,86 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
         ),
         const SizedBox(height: 16),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _violationRepository.streamForSite(
+          stream: _actionItemRepository.myOpenActions(
             tenantId: widget.tenantId,
+            userId: widget.currentUserId,
             siteId: widget.siteId,
           ),
-          builder: (context, snapshot) {
-            final docs = snapshot.data?.docs ?? [];
-            final active = docs.where((doc) {
-              final status = doc.data()['status'];
-              return status != 'closed' && status != 'pending_review';
-            }).toList();
-            final unassignedViolations = active
+          builder: (context, myActionSnapshot) {
+            final unassignedViolations =
+                (widget.site['unassignedActiveViolationCountSnapshot'] as num?)
+                    ?.toInt() ??
+                0;
+            final myActions = (myActionSnapshot.data?.docs ?? [])
+                .map((doc) => doc.data())
+                .toList();
+            final myOpenTraining = myActions
+                .where((action) => action['type'] == 'training_completion')
+                .length;
+            final myChecks = myActions
+                .where((action) => action['type'] == 'audit_completion')
+                .length;
+            final reviews = myActions
+                .where((action) => action['type'] == 'violation_review')
+                .length;
+            final assignedFixes = myActions
                 .where(
-                  (doc) => (doc.data()['assignedTo'] as String? ?? '').isEmpty,
+                  (action) =>
+                      action['type'] == 'violation_resolution' ||
+                      action['type'] == 'violation_sent_back',
                 )
                 .length;
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _actionItemRepository.myOpenActions(
-                tenantId: widget.tenantId,
-                userId: widget.currentUserId,
-              ),
-              builder: (context, myActionSnapshot) {
-                final myActions = (myActionSnapshot.data?.docs ?? [])
-                    .map((doc) => doc.data())
-                    .where((action) => action['siteId'] == widget.siteId)
-                    .toList();
-                final myOpenTraining = myActions
-                    .where((action) => action['type'] == 'training_completion')
-                    .length;
-                final myChecks = myActions
-                    .where((action) => action['type'] == 'audit_completion')
-                    .length;
-                final reviews = myActions
-                    .where((action) => action['type'] == 'violation_review')
-                    .length;
-                final assignedFixes = myActions
-                    .where(
-                      (action) =>
-                          action['type'] == 'violation_resolution' ||
-                          action['type'] == 'violation_sent_back',
+              stream: widget.canManageTraining
+                  ? _actionItemRepository.teamOpenActions(
+                      tenantId: widget.tenantId,
+                      siteId: widget.siteId,
                     )
-                    .length;
-                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: widget.canManageTraining
-                      ? _actionItemRepository.teamOpenActions(
-                          tenantId: widget.tenantId,
-                          siteId: widget.siteId,
-                        )
-                      : null,
-                  builder: (context, teamActionSnapshot) {
-                    final overdueTraining = widget.canManageTraining
-                        ? (teamActionSnapshot.data?.docs ?? [])
-                              .where(
-                                (doc) =>
-                                    doc.data()['type'] ==
-                                        'training_completion' &&
-                                    doc.data()['dueState'] == 'overdue',
-                              )
-                              .length
-                        : 0;
-                    final overdueChecks = widget.canManageTraining
-                        ? (teamActionSnapshot.data?.docs ?? [])
-                              .where(
-                                (doc) =>
-                                    doc.data()['type'] == 'audit_completion' &&
-                                    doc.data()['dueState'] == 'overdue',
-                              )
-                              .length
-                        : 0;
-                    return _NeedsActionCard(
-                      unassignedViolationCount: unassignedViolations,
-                      assignedFixCount: assignedFixes,
-                      reviewCount: reviews,
-                      myCheckCount: myChecks,
-                      myTrainingCount: myOpenTraining,
-                      overdueCheckCount: overdueChecks,
-                      overdueTrainingCount: overdueTraining,
-                      isLoading:
-                          snapshot.connectionState == ConnectionState.waiting ||
-                          myActionSnapshot.connectionState ==
-                              ConnectionState.waiting ||
-                          (widget.canManageTraining &&
-                              teamActionSnapshot.connectionState ==
-                                  ConnectionState.waiting),
-                      showManagerActions: widget.canManageTraining,
-                      onOpenViolations: widget.onOpenUnassignedViolations,
-                      onOpenAssignedFixes: () =>
-                          widget.onOpenActions('assigned_fixes'),
-                      onOpenMyChecks: () => widget.onOpenActions('checks'),
-                      onOpenReviews: () => widget.onOpenActions('review'),
-                      onOpenMyTraining: () => widget.onOpenActions('training'),
-                      onOpenOverdueChecks: () =>
-                          widget.onOpenActions('audit_overdue'),
-                      onOpenOverdueTraining: () =>
-                          widget.onOpenActions('training_overdue'),
-                    );
-                  },
+                  : null,
+              builder: (context, teamActionSnapshot) {
+                final overdueTraining = widget.canManageTraining
+                    ? (teamActionSnapshot.data?.docs ?? [])
+                          .where(
+                            (doc) =>
+                                doc.data()['type'] == 'training_completion' &&
+                                doc.data()['dueState'] == 'overdue',
+                          )
+                          .length
+                    : 0;
+                final overdueChecks = widget.canManageTraining
+                    ? (teamActionSnapshot.data?.docs ?? [])
+                          .where(
+                            (doc) =>
+                                doc.data()['type'] == 'audit_completion' &&
+                                doc.data()['dueState'] == 'overdue',
+                          )
+                          .length
+                    : 0;
+                return _NeedsActionCard(
+                  unassignedViolationCount: unassignedViolations,
+                  assignedFixCount: assignedFixes,
+                  reviewCount: reviews,
+                  myCheckCount: myChecks,
+                  myTrainingCount: myOpenTraining,
+                  overdueCheckCount: overdueChecks,
+                  overdueTrainingCount: overdueTraining,
+                  isLoading:
+                      myActionSnapshot.connectionState ==
+                          ConnectionState.waiting ||
+                      (widget.canManageTraining &&
+                          teamActionSnapshot.connectionState ==
+                              ConnectionState.waiting),
+                  showManagerActions: widget.canManageTraining,
+                  onOpenViolations: widget.onOpenUnassignedViolations,
+                  onOpenAssignedFixes: () =>
+                      widget.onOpenActions('assigned_fixes'),
+                  onOpenMyChecks: () => widget.onOpenActions('checks'),
+                  onOpenReviews: () => widget.onOpenActions('review'),
+                  onOpenMyTraining: () => widget.onOpenActions('training'),
+                  onOpenOverdueChecks: () =>
+                      widget.onOpenActions('audit_overdue'),
+                  onOpenOverdueTraining: () =>
+                      widget.onOpenActions('training_overdue'),
                 );
               },
             );
@@ -204,6 +187,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
                 stream: _internalAuditRepository.streamForSite(
                   tenantId: widget.tenantId,
                   siteId: widget.siteId,
+                  limit: 1,
                 ),
                 builder: (context, snapshot) {
                   final audits = snapshot.data?.docs ?? [];

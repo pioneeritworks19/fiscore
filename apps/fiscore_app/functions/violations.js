@@ -73,10 +73,15 @@ const submitViolationForReview = onCall({ region }, async (request) => {
     updatedAt: now,
   }, { merge: true });
   if (violation.status !== "pending_review") {
-    batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
+    const siteUpdate = {
       pendingReviewCountSnapshot: admin.firestore.FieldValue.increment(1),
       updatedAt: now,
-    }, { merge: true });
+    };
+    if (!safeText(violation.assignedTo)) {
+      siteUpdate.unassignedActiveViolationCountSnapshot =
+        admin.firestore.FieldValue.increment(-1);
+    }
+    batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), siteUpdate, { merge: true });
   }
   await completeActionsForTarget(batch, tenantId, "violation", violationId, "resubmitted");
   await createReviewActions(batch, { tenantId, siteId, violationId, violation });
@@ -121,10 +126,15 @@ const sendViolationBack = onCall({ region }, async (request) => {
     createdByDisplayNameSnapshot: request.auth.token.name || "FiScore reviewer",
     updatedAt: now,
   });
-  batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
+  const siteUpdate = {
     pendingReviewCountSnapshot: admin.firestore.FieldValue.increment(-1),
     updatedAt: now,
-  }, { merge: true });
+  };
+  if (!safeText(violation.assignedTo)) {
+    siteUpdate.unassignedActiveViolationCountSnapshot =
+      admin.firestore.FieldValue.increment(1);
+  }
+  batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), siteUpdate, { merge: true });
   await completeActionsForTarget(batch, tenantId, "violation", violationId, "sent_back");
   await createReturnedFixAction(batch, {
     tenantId,
@@ -170,6 +180,7 @@ const closeViolation = onCall({ region }, async (request) => {
   batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
     openViolationCountSnapshot: admin.firestore.FieldValue.increment(-1),
     pendingReviewCountSnapshot: admin.firestore.FieldValue.increment(-1),
+    closedViolationCountSnapshot: admin.firestore.FieldValue.increment(1),
     updatedAt: now,
   }, { merge: true });
   await completeActionsForTarget(batch, tenantId, "violation", violationId, "closed");
@@ -202,10 +213,16 @@ const reopenViolation = onCall({ region }, async (request) => {
       closedBy: null,
       updatedAt: now,
   }, { merge: true });
-  batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
+  const siteUpdate = {
       openViolationCountSnapshot: admin.firestore.FieldValue.increment(1),
+      closedViolationCountSnapshot: admin.firestore.FieldValue.increment(-1),
       updatedAt: now,
-  }, { merge: true });
+  };
+  if (!safeText(violation.assignedTo)) {
+    siteUpdate.unassignedActiveViolationCountSnapshot =
+      admin.firestore.FieldValue.increment(1);
+  }
+  batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), siteUpdate, { merge: true });
   if (safeText(violation.assignedTo)) {
     await createResolutionAction(batch, {
       tenantId,
@@ -267,6 +284,12 @@ const assignViolation = onCall({ region }, async (request) => {
     assignmentStatus: "assigned",
     updatedAt: now,
   }, { merge: true });
+  if (!previousAssignedTo) {
+    batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
+      unassignedActiveViolationCountSnapshot: admin.firestore.FieldValue.increment(-1),
+      updatedAt: now,
+    }, { merge: true });
+  }
   if (previousAssignedTo) {
     await completeActionsForTarget(
       batch,
@@ -316,6 +339,10 @@ const unassignViolation = onCall({ region }, async (request) => {
     updatedAt: now,
   }, { merge: true });
   if (previousAssignedTo) {
+    batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
+      unassignedActiveViolationCountSnapshot: admin.firestore.FieldValue.increment(1),
+      updatedAt: now,
+    }, { merge: true });
     await completeActionsForTarget(
       batch,
       tenantId,

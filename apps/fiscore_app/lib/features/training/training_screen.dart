@@ -31,6 +31,8 @@ class _TrainingContentState extends State<_TrainingContent> {
   String? _openedInitialAssignmentId;
   String? _message;
   String? _error;
+  int _activeAssignmentLimit = 50;
+  int _historyLimit = 20;
 
   String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
   bool get _canAssign =>
@@ -145,11 +147,12 @@ class _TrainingContentState extends State<_TrainingContent> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _repository.assignmentsStream(
+      stream: _repository.activeAssignmentsStream(
         tenantId: widget.tenantId,
         siteId: widget.siteId,
         userId: _userId,
         canAssign: _canAssign,
+        limit: _activeAssignmentLimit,
       ),
       builder: (context, snapshot) {
         final assignments =
@@ -173,9 +176,6 @@ class _TrainingContentState extends State<_TrainingContent> {
                   doc.data()['status'] != 'completed' &&
                   doc.data()['status'] != 'cancelled',
             )
-            .length;
-        final completedCount = assignments
-            .where((doc) => doc.data()['status'] == 'completed')
             .length;
         if (widget.initialAssignmentId != null &&
             widget.initialAssignmentId != _openedInitialAssignmentId) {
@@ -236,11 +236,21 @@ class _TrainingContentState extends State<_TrainingContent> {
         }
         if (_view == 'team' || _view == 'overdue') {
           return _TrainingTeamProgressView(
-            assignments: assignments,
+            activeAssignments: assignments,
+            tenantId: widget.tenantId,
+            siteId: widget.siteId,
+            userId: _userId,
+            canAssign: _canAssign,
+            repository: _repository,
+            activeLimit: _activeAssignmentLimit,
             initialFilter: _view == 'overdue' ? 'overdue' : 'open',
             onBack: () => setState(() => _view = 'home'),
             onOpenAssignment: _openAssignment,
             onCancelAssignment: _cancelAssignment,
+            historyLimit: _historyLimit,
+            onLoadMoreActive: () =>
+                setState(() => _activeAssignmentLimit += 50),
+            onLoadMore: () => setState(() => _historyLimit += 20),
           );
         }
 
@@ -281,6 +291,13 @@ class _TrainingContentState extends State<_TrainingContent> {
                   assignment: doc.data(),
                   onTap: () => _openAssignment(doc.id, doc.data()),
                 ),
+            if (!_canAssign && myAssignments.length == _activeAssignmentLimit)
+              Center(
+                child: TextButton(
+                  onPressed: () => setState(() => _activeAssignmentLimit += 50),
+                  child: const Text('Load more assigned training'),
+                ),
+              ),
             if (_canAssign) ...[
               const SizedBox(height: 20),
               const _TrainingSectionTitle(
@@ -297,7 +314,9 @@ class _TrainingContentState extends State<_TrainingContent> {
               _TrainingNavigationRow(
                 icon: Icons.groups_outlined,
                 title: 'Team progress',
-                detail: '$openCount open / $completedCount completed',
+                detail: openCount == _activeAssignmentLimit
+                    ? '$openCount+ open assignments'
+                    : '$openCount open assignments',
                 onTap: () => setState(() => _view = 'team'),
               ),
             ],

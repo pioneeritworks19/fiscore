@@ -458,7 +458,7 @@ class _AssignedAuditRow extends StatelessWidget {
                   Text(
                     [
                       if (ownerLabel.isNotEmpty) ownerLabel,
-                      if (due != null) due,
+                      ?due,
                       if (status == 'in_progress') 'In progress',
                     ].join(' / '),
                     style: Theme.of(

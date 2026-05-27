@@ -534,11 +534,13 @@ class _InternalAuditCompletion extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirestorePaths.violations(tenantId, siteId).snapshots(),
+            stream: ViolationRepository().streamForInternalAudit(
+              tenantId: tenantId,
+              siteId: siteId,
+              auditId: auditId,
+            ),
             builder: (context, snapshot) {
-              final violations = (snapshot.data?.docs ?? [])
-                  .where((doc) => doc.data()['auditId'] == auditId)
-                  .toList();
+              final violations = snapshot.data?.docs ?? [];
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }

@@ -312,6 +312,10 @@ This is the tenant-owned site record used by the app. It may be linked to the ma
 - `latestInspectionGrade`
 - `openViolationCount`
 - `pendingReviewViolationCount`
+- `openViolationCountSnapshot`
+- `pendingReviewCountSnapshot`
+- `closedViolationCountSnapshot`
+- `unassignedActiveViolationCountSnapshot`
 - `createdAt`
 - `updatedAt`
 
@@ -319,6 +323,9 @@ This is the tenant-owned site record used by the app. It may be linked to the ma
 
 - duplicate a few summary fields here to power site list screens efficiently
 - do not force the app to query many collections just to build the site dashboard
+- the implemented `*Snapshot` counters are maintained during server-owned
+  violation lifecycle changes and should power dashboard totals without
+  streaming every violation
 - this collection is also the foundation for a tenant-level sites overview screen
 - this collection should support both linked and manual sites
 
@@ -347,6 +354,7 @@ These fields are especially useful for a cross-restaurant landing page:
 - `latestInspectionGrade`
 - `openViolationCount`
 - `pendingReviewViolationCount`
+- `unassignedActiveViolationCountSnapshot`
 - `lastAuditDate` if available later
 - `draftAuditCount` if tracked later
 
@@ -1695,7 +1703,10 @@ The schema should support these common queries efficiently:
 - upcoming or overdue audit schedule instances
 - audits for a tenant filtered by site and status
 - violations for a tenant filtered by site, status, assignee, severity, and due date
-- latest public inspections for a site
+- active and review violations as bounded status-filtered pages, with closed history loaded incrementally
+- latest public inspections for a site, with older inspection history loaded incrementally
+- in-progress audits queried independently from bounded completed-audit history
+- active training assignments queried independently from bounded completed or cancelled history
 - findings for one public inspection
 - responses for one audit
 - responses and evidence for one violation
@@ -1714,12 +1725,18 @@ The exact index set will depend on app screens, but likely needs include:
 - `trainingAssignments` by `assignedTo + status`
 - `trainingAssignments` by `siteId + status`
 - `trainingAssignments` by `status + dueDate`
+- `trainingAssignments` by `siteId + status + dueDate`
+- `trainingAssignments` by `assignedTo + siteId + status + dueDate`
+- `trainingAssignments` by `siteId + status + updatedAt`
+- `trainingAssignments` by `siteId + linkedViolationId + updatedAt`
 - `actionItems` by `recipientUserId + status + siteId`
 - `actionItems` by `managerVisible + status + siteId`
 - `violations` by `siteId + status`
 - `violations` by `status + assignedTo`
 - `violations` by `status + dueDate`
-- `audits` by `siteId + status`
+- `violations` by `status + updatedAt`, `submittedForReviewAt`, or `closedAt`
+- `violations` by `auditId + updatedAt` or `masterInspectionId + updatedAt`
+- `audits` by `status + updatedAt` and `status + completedAt`
 - `audits` by `startedAt`
 - `publicInspections` by `inspectionDate`
 

@@ -36,7 +36,11 @@ class _ActionInboxContent extends StatelessWidget {
         _canManage;
     final stream = isTeamOverdue
         ? repository.teamOpenActions(tenantId: tenantId, siteId: siteId)
-        : repository.myOpenActions(tenantId: tenantId, userId: currentUserId);
+        : repository.myOpenActions(
+            tenantId: tenantId,
+            userId: currentUserId,
+            siteId: siteId,
+          );
     final title = switch (initialFilter) {
       'review' => 'Fixes ready for review',
       'assigned_fixes' => 'My assigned fixes',
@@ -95,7 +99,6 @@ class _ActionInboxContent extends StatelessWidget {
             final actions =
                 (snapshot.data?.docs ?? []).where((doc) {
                   final action = doc.data();
-                  if (action['siteId'] != siteId) return false;
                   return switch (initialFilter) {
                     'review' => action['type'] == 'violation_review',
                     'assigned_fixes' =>
@@ -270,7 +273,7 @@ class _ActionInboxRow extends StatelessWidget {
                     Text(
                       [
                         checkOwnershipLabel,
-                        if (dueText != null) dueText,
+                        ?dueText,
                       ].join(' / '),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: isOverdue ? color : _muted,

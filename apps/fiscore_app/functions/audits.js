@@ -497,6 +497,7 @@ const submitInternalAudit = onCall({ region }, async (request) => {
       violationType: "internal_audit_finding",
       status: "open",
       lifecycleStage: "open",
+      assignmentStatus: "unassigned",
       reviewStatus: "not_submitted",
       requiresReview: false,
       currentResponseType: null,
@@ -589,6 +590,8 @@ const submitInternalAudit = onCall({ region }, async (request) => {
   batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
     internalAuditCountSnapshot: admin.firestore.FieldValue.increment(1),
     openViolationCountSnapshot:
+      admin.firestore.FieldValue.increment(findings.length),
+    unassignedActiveViolationCountSnapshot:
       admin.firestore.FieldValue.increment(findings.length),
     updatedAt: now,
   }, { merge: true });

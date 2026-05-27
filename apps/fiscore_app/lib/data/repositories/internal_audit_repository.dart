@@ -42,11 +42,36 @@ class InternalAuditRepository {
   Stream<QuerySnapshot<Map<String, dynamic>>> streamForSite({
     required String tenantId,
     required String siteId,
+    int limit = 20,
   }) {
     return FirestorePaths.internalAudits(
       tenantId,
       siteId,
-    ).orderBy('startedAt', descending: true).snapshots();
+    ).orderBy('startedAt', descending: true).limit(limit).snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> inProgressForSite({
+    required String tenantId,
+    required String siteId,
+    int limit = 20,
+  }) {
+    return FirestorePaths.internalAudits(tenantId, siteId)
+        .where('status', isEqualTo: 'in_progress')
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> completedForSite({
+    required String tenantId,
+    required String siteId,
+    int limit = 20,
+  }) {
+    return FirestorePaths.internalAudits(tenantId, siteId)
+        .where('status', isEqualTo: 'completed')
+        .orderBy('completedAt', descending: true)
+        .limit(limit)
+        .snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> assignmentsForSite({
@@ -54,13 +79,21 @@ class InternalAuditRepository {
     required String siteId,
     required String currentUserId,
     required bool canManage,
+    int limit = 50,
   }) {
     final assignments = FirestorePaths.auditAssignments(tenantId, siteId);
     if (canManage) {
-      return assignments.snapshots();
+      return assignments
+          .where('status', whereIn: ['assigned', 'in_progress'])
+          .orderBy('dueDate')
+          .limit(limit)
+          .snapshots();
     }
     return assignments
         .where('assignedTo', isEqualTo: currentUserId)
+        .where('status', whereIn: ['assigned', 'in_progress'])
+        .orderBy('dueDate')
+        .limit(limit)
         .snapshots();
   }
 

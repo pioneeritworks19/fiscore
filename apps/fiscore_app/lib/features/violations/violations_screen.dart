@@ -29,6 +29,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
   final ViolationRepository _violationRepository = ViolationRepository();
   String _viewMode = 'queue';
   late String _statusFilter;
+  int _pageLimit = 20;
   String? _selectedViolationId;
   String? _loadedViolationId;
   bool _isSaving = false;
@@ -309,209 +310,174 @@ class _ViolationsContentState extends State<_ViolationsContent> {
     }
   }
 
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filteredViolations(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  Widget _buildViolationDetail(
+    String violationId,
+    Map<String, dynamic> violation,
   ) {
-    final siteDocs = docs
-        .where((doc) => doc.data()['siteId'] == widget.siteId)
-        .toList();
-    if (_statusFilter == 'active') {
-      return siteDocs.where((doc) {
-        final status = doc.data()['status'] as String? ?? 'open';
-        return status != 'closed' && status != 'pending_review';
-      }).toList();
-    }
-    if (_statusFilter == 'unassigned') {
-      return siteDocs.where((doc) {
-        final status = doc.data()['status'] as String? ?? 'open';
-        return status != 'closed' &&
-            status != 'pending_review' &&
-            (doc.data()['assignedTo'] as String? ?? '').isEmpty;
-      }).toList();
-    }
-    if (_statusFilter == 'all') {
-      return siteDocs;
-    }
-    return siteDocs
-        .where(
-          (doc) => (doc.data()['status'] as String? ?? 'open') == _statusFilter,
-        )
-        .toList();
+    _loadResponseFields(violationId, violation);
+    return _ViolationDetailView(
+      tenantId: widget.tenantId,
+      violationId: violationId,
+      violation: violation,
+      currentRole: widget.currentRole,
+      generalController: _generalController,
+      containmentController: _containmentController,
+      rootCauseController: _rootCauseController,
+      correctiveController: _correctiveController,
+      preventiveController: _preventiveController,
+      isSaving: _isSaving,
+      message: _message,
+      error: _error,
+      backLabel: widget.detailBackLabel ?? 'Back to violations',
+      onBack: () {
+        if (widget.onBackFromDetail != null) {
+          widget.onBackFromDetail!();
+          return;
+        }
+        setState(() {
+          _selectedViolationId = null;
+          _loadedViolationId = null;
+          _message = null;
+          _error = null;
+        });
+      },
+      onSaveResponse: () =>
+          _saveResponse(violationId, violation['status'] as String? ?? 'open'),
+      onSubmitForReview: () => _submitResponseForReview(violationId),
+      onSendBack: () => _sendBackForChanges(violationId),
+      onManageAssignment:
+          _canManageAssignments &&
+              violation['status'] != 'closed' &&
+              violation['status'] != 'pending_review'
+          ? () => _manageAssignment(violationId, violation)
+          : null,
+      onUpdateStatus: (status, {reviewStatus, closureReason}) =>
+          _updateViolationStatus(
+            violationId,
+            status,
+            reviewStatus: reviewStatus,
+            closureReason: closureReason,
+          ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (_selectedViolationId != null) {
+      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _violationRepository.streamViolation(
+          tenantId: widget.tenantId,
+          siteId: widget.siteId,
+          violationId: _selectedViolationId!,
+        ),
+        builder: (context, snapshot) {
+          final violation = snapshot.data?.data();
+          if (violation == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return _buildViolationDetail(_selectedViolationId!, violation);
+        },
+      );
+    }
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _violationRepository.streamForSite(
+      stream: _violationRepository.streamPageForSite(
         tenantId: widget.tenantId,
         siteId: widget.siteId,
+        statusFilter: _statusFilter,
+        limit: _pageLimit,
       ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final allViolations = snapshot.data?.docs ?? [];
-        allViolations.sort((a, b) {
-          final aData = a.data();
-          final bData = b.data();
-          final aStatus = _statusRank(aData['status'] as String? ?? 'open');
-          final bStatus = _statusRank(bData['status'] as String? ?? 'open');
-          if (aStatus != bStatus) {
-            return aStatus.compareTo(bStatus);
-          }
-          return _dateText(
-            bData['inspectionDate'],
-          ).compareTo(_dateText(aData['inspectionDate']));
-        });
-        final visibleViolations = _filteredViolations(allViolations);
-        QueryDocumentSnapshot<Map<String, dynamic>>? selectedDoc;
-        for (final doc in allViolations) {
-          if (doc.id == _selectedViolationId) {
-            selectedDoc = doc;
-            break;
-          }
-        }
-
-        if (selectedDoc != null) {
-          _loadResponseFields(selectedDoc.id, selectedDoc.data());
-        }
+        final visibleViolations = snapshot.data?.docs ?? [];
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (selectedDoc == null) ...[
-              Text(
-                'Violations',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: _ink,
-                ),
+            Text(
+              'Violations',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: _ink,
               ),
-              const SizedBox(height: 6),
-              _ViolationSummaryStrip(violations: allViolations),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _ViolationFilterChips(
-                      value: _statusFilter,
-                      reviewCount: allViolations
-                          .where(
-                            (doc) => doc.data()['status'] == 'pending_review',
-                          )
-                          .length,
-                      onChanged: (value) {
-                        setState(() {
-                          _statusFilter = value;
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _ViolationGroupButton(
-                    isGrouped: _viewMode == 'inspection',
-                    onPressed: () {
+            ),
+            const SizedBox(height: 6),
+            _ViolationSummaryStrip(site: widget.site),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _ViolationFilterChips(
+                    value: _statusFilter,
+                    reviewCount:
+                        (widget.site['pendingReviewCountSnapshot'] as num?)
+                            ?.toInt() ??
+                        0,
+                    onChanged: (value) {
                       setState(() {
-                        _viewMode = _viewMode == 'inspection'
-                            ? 'queue'
-                            : 'inspection';
+                        _statusFilter = value;
+                        _pageLimit = 20;
                       });
                     },
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (visibleViolations.isEmpty)
-                const _EmptyStateCard(
-                  icon: Icons.check_circle_outline,
-                  title: 'No violations in this view',
-                  body:
-                      'Change the filter, or refresh public inspection data from More to import new findings.',
-                )
-              else if (_viewMode == 'inspection')
-                _InspectionGroupedViolations(
-                  violations: visibleViolations,
-                  onOpenViolation: (id) {
+                ),
+                const SizedBox(width: 8),
+                _ViolationGroupButton(
+                  isGrouped: _viewMode == 'inspection',
+                  onPressed: () {
                     setState(() {
-                      _selectedViolationId = id;
+                      _viewMode = _viewMode == 'inspection'
+                          ? 'queue'
+                          : 'inspection';
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (visibleViolations.isEmpty)
+              const _EmptyStateCard(
+                icon: Icons.check_circle_outline,
+                title: 'No violations in this view',
+                body:
+                    'Change the filter, or refresh public inspection data from More to import new findings.',
+              )
+            else if (_viewMode == 'inspection')
+              _InspectionGroupedViolations(
+                violations: visibleViolations,
+                onOpenViolation: (id) {
+                  setState(() {
+                    _selectedViolationId = id;
+                    _message = null;
+                    _error = null;
+                  });
+                },
+              )
+            else
+              ...visibleViolations.map(
+                (doc) => _ViolationListCard(
+                  violation: doc.data(),
+                  onOpen: () {
+                    setState(() {
+                      _selectedViolationId = doc.id;
                       _message = null;
                       _error = null;
                     });
                   },
-                )
-              else
-                ...visibleViolations.map(
-                  (doc) => _ViolationListCard(
-                    violation: doc.data(),
-                    onOpen: () {
-                      setState(() {
-                        _selectedViolationId = doc.id;
-                        _message = null;
-                        _error = null;
-                      });
-                    },
-                  ),
                 ),
-            ] else ...[
-              Builder(
-                builder: (context) {
-                  final selectedViolationId = selectedDoc!.id;
-                  final selectedViolation = selectedDoc.data();
-                  return _ViolationDetailView(
-                    tenantId: widget.tenantId,
-                    violationId: selectedViolationId,
-                    violation: selectedViolation,
-                    currentRole: widget.currentRole,
-                    generalController: _generalController,
-                    containmentController: _containmentController,
-                    rootCauseController: _rootCauseController,
-                    correctiveController: _correctiveController,
-                    preventiveController: _preventiveController,
-                    isSaving: _isSaving,
-                    message: _message,
-                    error: _error,
-                    backLabel: widget.detailBackLabel ?? 'Back to violations',
-                    onBack: () {
-                      if (widget.onBackFromDetail != null) {
-                        widget.onBackFromDetail!();
-                        return;
-                      }
-                      setState(() {
-                        _selectedViolationId = null;
-                        _loadedViolationId = null;
-                        _message = null;
-                        _error = null;
-                      });
-                    },
-                    onSaveResponse: () => _saveResponse(
-                      selectedViolationId,
-                      selectedViolation['status'] as String? ?? 'open',
-                    ),
-                    onSubmitForReview: () =>
-                        _submitResponseForReview(selectedViolationId),
-                    onSendBack: () => _sendBackForChanges(selectedViolationId),
-                    onManageAssignment:
-                        _canManageAssignments &&
-                            selectedViolation['status'] != 'closed' &&
-                            selectedViolation['status'] != 'pending_review'
-                        ? () => _manageAssignment(
-                            selectedViolationId,
-                            selectedViolation,
-                          )
-                        : null,
-                    onUpdateStatus: (status, {reviewStatus, closureReason}) =>
-                        _updateViolationStatus(
-                          selectedViolationId,
-                          status,
-                          reviewStatus: reviewStatus,
-                          closureReason: closureReason,
-                        ),
-                  );
-                },
+              ),
+            if (visibleViolations.length == _pageLimit) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () => setState(() => _pageLimit += 20),
+                  child: const Text('Load more'),
+                ),
               ),
             ],
           ],
@@ -522,21 +488,17 @@ class _ViolationsContentState extends State<_ViolationsContent> {
 }
 
 class _ViolationSummaryStrip extends StatelessWidget {
-  const _ViolationSummaryStrip({required this.violations});
+  const _ViolationSummaryStrip({required this.site});
 
-  final List<QueryDocumentSnapshot<Map<String, dynamic>>> violations;
-
-  int _count(String status) => violations
-      .where((doc) => (doc.data()['status'] as String? ?? 'open') == status)
-      .length;
+  final Map<String, dynamic> site;
 
   @override
   Widget build(BuildContext context) {
-    final open = _count('open');
-    final progress = _count('in_progress');
-    final review = _count('pending_review');
-    final closed = _count('closed');
-    final active = open + progress;
+    final unresolved =
+        (site['openViolationCountSnapshot'] as num?)?.toInt() ?? 0;
+    final review = (site['pendingReviewCountSnapshot'] as num?)?.toInt() ?? 0;
+    final closed = (site['closedViolationCountSnapshot'] as num?)?.toInt() ?? 0;
+    final active = (unresolved - review).clamp(0, unresolved);
     final theme = Theme.of(context);
 
     return Text(
@@ -2640,18 +2602,13 @@ class _ViolationTrainingSectionState extends State<_ViolationTrainingSection> {
   Widget build(BuildContext context) {
     if (widget.siteId.isEmpty) return const SizedBox.shrink();
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _repository.assignmentsStream(
+      stream: _repository.linkedAssignmentsStream(
         tenantId: widget.tenantId,
         siteId: widget.siteId,
-        userId: _userId,
-        canAssign: _canAssign,
+        violationId: widget.violationId,
       ),
       builder: (context, snapshot) {
-        final linked = (snapshot.data?.docs ?? [])
-            .where(
-              (doc) => doc.data()['linkedViolationId'] == widget.violationId,
-            )
-            .toList();
+        final linked = snapshot.data?.docs ?? [];
         if (linked.isEmpty && !_canAssign) return const SizedBox.shrink();
         return _WorkSectionCard(
           child: Column(

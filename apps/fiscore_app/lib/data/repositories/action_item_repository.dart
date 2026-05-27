@@ -4,11 +4,15 @@ class ActionItemRepository {
   Stream<QuerySnapshot<Map<String, dynamic>>> myOpenActions({
     required String tenantId,
     required String userId,
+    String? siteId,
   }) {
-    return FirestorePaths.actionItems(tenantId)
+    Query<Map<String, dynamic>> query = FirestorePaths.actionItems(tenantId)
         .where('recipientUserId', isEqualTo: userId)
-        .where('status', isEqualTo: 'open')
-        .snapshots();
+        .where('status', isEqualTo: 'open');
+    if (siteId != null) {
+      query = query.where('siteId', isEqualTo: siteId);
+    }
+    return query.limit(50).snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> teamOpenActions({
@@ -19,6 +23,7 @@ class ActionItemRepository {
         .where('managerVisible', isEqualTo: true)
         .where('status', isEqualTo: 'open')
         .where('siteId', isEqualTo: siteId)
+        .limit(100)
         .snapshots();
   }
 
