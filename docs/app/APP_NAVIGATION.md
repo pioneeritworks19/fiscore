@@ -353,6 +353,7 @@ This area should contain lower-frequency destinations and role-based management 
 - Tenant registration
 - Site setup prompt
 - Add site from master restaurant list
+- Add restaurant manually when public records do not contain the location
 
 ## Main App
 
@@ -368,6 +369,7 @@ This area should contain lower-frequency destinations and role-based management 
 - Sites overview
 - Site detail entry point
 - Add site
+- Add site manually
 - Site switcher
 
 ## Dashboard Branch

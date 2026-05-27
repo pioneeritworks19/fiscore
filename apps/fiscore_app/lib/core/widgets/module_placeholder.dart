@@ -44,4 +44,3 @@ class _ModulePlaceholderContent extends StatelessWidget {
     );
   }
 }
-

@@ -16,7 +16,8 @@ class _ActiveSiteHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final name = site['name'] as String? ?? 'Restaurant';
     final address = _formatSiteAddress(site);
-    final isLinked = site['linkStatus'] == 'linked' ||
+    final isLinked =
+        site['linkStatus'] == 'linked' ||
         site['masterLinkStatus'] == 'linked_to_master' ||
         site['masterRestaurantId'] != null;
 
@@ -27,16 +28,11 @@ class _ActiveSiteHeader extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            _navy,
-            Color(0xFF102762),
-          ],
+          colors: [_navy, Color(0xFF102762)],
         ),
         border: Border(
           top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
-          bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.10),
-          ),
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
         ),
       ),
       child: Row(
@@ -61,9 +57,7 @@ class _ActiveSiteHeader extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.16),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
               ),
               child: const Icon(
                 Icons.storefront_outlined,
@@ -124,4 +118,3 @@ class _ActiveSiteHeader extends StatelessWidget {
     );
   }
 }
-

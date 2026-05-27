@@ -3,6 +3,7 @@ part of '../../main.dart';
 class _MoreContent extends StatelessWidget {
   const _MoreContent({
     required this.onAddSite,
+    required this.canAddSite,
     required this.onManageTeam,
     required this.isSyncingMasterData,
     required this.message,
@@ -11,11 +12,37 @@ class _MoreContent extends StatelessWidget {
   });
 
   final VoidCallback onAddSite;
+  final bool canAddSite;
   final VoidCallback? onManageTeam;
   final bool isSyncingMasterData;
   final String? message;
   final String? error;
   final VoidCallback? onRefreshMasterData;
+
+  Future<void> _confirmRefreshPublicData(BuildContext context) async {
+    final shouldRefresh = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Refresh public inspection data?'),
+        content: const Text(
+          'FiScore will check for the latest public inspections and findings for this restaurant.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Refresh'),
+          ),
+        ],
+      ),
+    );
+    if (shouldRefresh == true) {
+      onRefreshMasterData?.call();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,16 +92,20 @@ class _MoreContent extends StatelessWidget {
             body:
                 'Pull the latest available public inspection history and findings into this location.',
             enabled: !isSyncingMasterData,
-            onTap: isSyncingMasterData ? null : onRefreshMasterData,
+            trailingIcon: Icons.sync_outlined,
+            onTap: isSyncingMasterData
+                ? null
+                : () => _confirmRefreshPublicData(context),
           ),
-        _ActionRow(
-          icon: Icons.add_business_outlined,
-          title: 'Add another restaurant',
-          body:
-              'Search the master restaurant database and link another site to this workspace.',
-          enabled: true,
-          onTap: onAddSite,
-        ),
+        if (canAddSite)
+          _ActionRow(
+            icon: Icons.add_business_outlined,
+            title: 'Add another restaurant',
+            body:
+                'Search the master restaurant database and link another site to this workspace.',
+            enabled: true,
+            onTap: onAddSite,
+          ),
         _ActionRow(
           icon: Icons.groups_outlined,
           title: 'Team management',

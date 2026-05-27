@@ -1,10 +1,7 @@
 part of '../../main.dart';
 
 class _GuidancePanel extends StatelessWidget {
-  const _GuidancePanel({
-    required this.icon,
-    required this.text,
-  });
+  const _GuidancePanel({required this.icon, required this.text});
 
   final IconData icon;
   final String text;
@@ -23,11 +20,7 @@ class _GuidancePanel extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: _green,
-            size: 22,
-          ),
+          Icon(icon, color: _green, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -43,4 +36,3 @@ class _GuidancePanel extends StatelessWidget {
     );
   }
 }
-

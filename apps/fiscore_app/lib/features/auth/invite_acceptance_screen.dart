@@ -91,11 +91,11 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
         final invites = widget.reactivationTenantId == null
             ? allInvites
             : allInvites
-                .where(
-                  (invite) =>
-                      invite['tenantId'] == widget.reactivationTenantId,
-                )
-                .toList();
+                  .where(
+                    (invite) =>
+                        invite['tenantId'] == widget.reactivationTenantId,
+                  )
+                  .toList();
         if (isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -238,8 +238,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
               final tenantName =
                   invite['tenantName'] as String? ?? 'FiScore workspace';
               final role = _roleLabel(invite['role'] as String? ?? 'staff');
-              final accessMode =
-                  invite['siteAccessMode'] as String? ?? 'all';
+              final accessMode = invite['siteAccessMode'] as String? ?? 'all';
               final siteCount =
                   (invite['siteIds'] as List<dynamic>? ?? []).length;
               final isAccepting = _acceptingInviteId == inviteId;
@@ -276,8 +275,9 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed:
-                            isAccepting ? null : () => _acceptInvite(invite),
+                        onPressed: isAccepting
+                            ? null
+                            : () => _acceptInvite(invite),
                         icon: isAccepting
                             ? const SizedBox(
                                 width: 18,
@@ -291,8 +291,8 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
                           isAccepting
                               ? 'Restoring access...'
                               : widget.reactivationTenantId == null
-                                  ? 'Join team'
-                                  : 'Restore access',
+                              ? 'Join team'
+                              : 'Restore access',
                         ),
                       ),
                     ),

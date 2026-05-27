@@ -36,15 +36,7 @@ class _FiScoreSetupScaffold extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const FiScoreLogoMark(size: 40),
-                      const SizedBox(width: 12),
-                      Text(
-                        'FiScore',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: _navy,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      const FiScoreHeaderBrand(),
                       const Spacer(),
                       PopupMenuButton<String>(
                         tooltip: 'Account',
@@ -56,8 +48,9 @@ class _FiScoreSetupScaffold extends StatelessWidget {
                           } else if (value == 'profile') {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content:
-                                    Text('Profile settings are coming soon.'),
+                                content: Text(
+                                  'Profile settings are coming soon.',
+                                ),
                               ),
                             );
                           }
@@ -113,14 +106,14 @@ class _FiScoreSetupScaffold extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: _softGreen,
                             borderRadius: BorderRadius.circular(19),
-                            border:
-                                Border.all(color: const Color(0xFFCFEBDD)),
+                            border: Border.all(color: const Color(0xFFCFEBDD)),
                           ),
                           child: CircleAvatar(
                             radius: 18,
                             backgroundColor: _softGreen,
-                            foregroundImage:
-                                hasPhoto ? NetworkImage(photoUrl) : null,
+                            foregroundImage: hasPhoto
+                                ? NetworkImage(photoUrl)
+                                : null,
                             onForegroundImageError: hasPhoto
                                 ? (exception, stackTrace) {
                                     // Keep the initial visible when the
@@ -160,4 +153,3 @@ class _FiScoreSetupScaffold extends StatelessWidget {
     );
   }
 }
-

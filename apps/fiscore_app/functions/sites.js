@@ -5,6 +5,7 @@ const {
   db,
   storageBucket,
   region,
+  tenantAdminRoles,
   siteActionRoles,
   requireAuth,
   cleanString,
@@ -414,7 +415,7 @@ const searchMasterRestaurants = onCall({ region }, async (request) => {
     throw new HttpsError("invalid-argument", "Enter at least 2 characters.");
   }
 
-  await requireTenantRole(tenantId, auth.uid, siteActionRoles);
+  await requireTenantRole(tenantId, auth.uid, tenantAdminRoles);
 
   const params = new URLSearchParams({
     q: query,
@@ -441,7 +442,7 @@ const linkMasterRestaurantSite = onCall({ region }, async (request) => {
   );
   const now = admin.firestore.FieldValue.serverTimestamp();
 
-  await requireTenantRole(tenantId, auth.uid, siteActionRoles);
+  await requireTenantRole(tenantId, auth.uid, tenantAdminRoles);
 
   const detail = await callApi(`/app/master-restaurants/${masterRestaurantId}`);
   const restaurant = detail?.restaurant;
@@ -580,7 +581,7 @@ const createSite = onCall({ region }, async (request) => {
     typeof request.data?.phone === "string" ? request.data.phone.trim() : "";
   const now = admin.firestore.FieldValue.serverTimestamp();
 
-  await requireTenantRole(tenantId, auth.uid, siteActionRoles);
+  await requireTenantRole(tenantId, auth.uid, tenantAdminRoles);
 
   const tenantRef = db.doc(`tenants/${tenantId}`);
   const siteRef = tenantRef.collection("sites").doc();
@@ -600,6 +601,19 @@ const createSite = onCall({ region }, async (request) => {
       phone: phone || null,
       siteType,
       status: "active",
+      masterRestaurantId: null,
+      linkStatus: "manual_unlinked",
+      linkMethod: "manual_entry",
+      manuallyCreated: true,
+      manualEntrySource: "workspace_setup",
+      publicInspectionAvailability: "unavailable_until_linked",
+      inspectionCountSnapshot: 0,
+      importedInspectionCountSnapshot: 0,
+      importedFindingCountSnapshot: 0,
+      openViolationCountSnapshot: 0,
+      closedViolationCountSnapshot: 0,
+      pendingReviewCountSnapshot: 0,
+      unassignedActiveViolationCountSnapshot: 0,
       createdBy: auth.uid,
       createdAt: now,
       updatedAt: now,

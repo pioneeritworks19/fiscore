@@ -19,9 +19,7 @@ class _OperationalBanner extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _softGreen,
-        border: Border.all(
-          color: const Color(0xFFC8E6D2),
-        ),
+        border: Border.all(color: const Color(0xFFC8E6D2)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -56,4 +54,3 @@ class _OperationalBanner extends StatelessWidget {
     );
   }
 }
-

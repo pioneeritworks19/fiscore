@@ -72,4 +72,3 @@ class _FiScoreBottomNav extends StatelessWidget {
     );
   }
 }
-

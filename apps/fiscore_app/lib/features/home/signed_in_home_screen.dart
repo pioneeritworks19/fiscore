@@ -19,9 +19,20 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
   final TextEditingController _tenantNameController = TextEditingController();
   final TextEditingController _restaurantSearchController =
       TextEditingController();
+  final TextEditingController _manualSiteNameController =
+      TextEditingController();
+  final TextEditingController _manualAddressController =
+      TextEditingController();
+  final TextEditingController _manualCityController = TextEditingController();
+  final TextEditingController _manualStateController = TextEditingController();
+  final TextEditingController _manualPostalCodeController =
+      TextEditingController();
   bool _isCreatingTenant = false;
   bool _isSearchingRestaurants = false;
   bool _isLinkingRestaurant = false;
+  bool _isCreatingManualSite = false;
+  bool _isEnteringManualSite = false;
+  bool _hasCompletedRestaurantSearch = false;
   bool _isAddingSite = false;
   bool _isManagingTeam = false;
   bool _isShowingActionInbox = false;
@@ -51,11 +62,24 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
   void dispose() {
     _tenantNameController.dispose();
     _restaurantSearchController.dispose();
+    _manualSiteNameController.dispose();
+    _manualAddressController.dispose();
+    _manualCityController.dispose();
+    _manualStateController.dispose();
+    _manualPostalCodeController.dispose();
     super.dispose();
   }
 
   Future<void> _signOut() async {
     await _authService.signOut();
+  }
+
+  void _clearManualSiteForm() {
+    _manualSiteNameController.clear();
+    _manualAddressController.clear();
+    _manualCityController.clear();
+    _manualStateController.clear();
+    _manualPostalCodeController.clear();
   }
 
   Future<void> _createTenant() async {
@@ -109,12 +133,14 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
             'Enter a restaurant name, city, ZIP code, or license number.';
         _restaurantMessage = null;
         _restaurantResults = [];
+        _hasCompletedRestaurantSearch = false;
       });
       return;
     }
 
     setState(() {
       _isSearchingRestaurants = true;
+      _hasCompletedRestaurantSearch = false;
       _restaurantError = null;
       _restaurantMessage = null;
     });
@@ -126,9 +152,8 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
       );
       setState(() {
         _restaurantResults = restaurants;
-        _restaurantMessage = _restaurantResults.isEmpty
-            ? 'No matching restaurants found. Try a different name, city, ZIP, or license number.'
-            : null;
+        _hasCompletedRestaurantSearch = true;
+        _restaurantMessage = null;
       });
     } on AppException catch (error) {
       setState(() {
@@ -165,9 +190,12 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
         masterRestaurantId: masterRestaurantId,
       );
       setState(() {
+        _clearManualSiteForm();
         _restaurantMessage =
             '$restaurantName is linked to this workspace. Site ID: $siteId';
         _restaurantResults = [];
+        _hasCompletedRestaurantSearch = false;
+        _isEnteringManualSite = false;
         _isAddingSite = false;
         if (siteId is String) {
           _activeSiteId = siteId;
@@ -189,6 +217,79 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
           _linkingRestaurantId = null;
         });
       }
+    }
+  }
+
+  Future<void> _createManualSite(String tenantId) async {
+    final siteName = _manualSiteNameController.text.trim();
+    final address = _manualAddressController.text.trim();
+    final city = _manualCityController.text.trim();
+    final state = _manualStateController.text.trim();
+    final postalCode = _manualPostalCodeController.text.trim();
+    if ([
+      siteName,
+      address,
+      city,
+      state,
+      postalCode,
+    ].any((value) => value.isEmpty)) {
+      setState(() {
+        _restaurantError = 'Enter the restaurant name and complete address.';
+        _restaurantMessage = null;
+      });
+      return;
+    }
+    if (!_usStateCodes.contains(state.toUpperCase())) {
+      setState(() {
+        _restaurantError = 'Select a state.';
+        _restaurantMessage = null;
+      });
+      return;
+    }
+    if (!RegExp(r'^\d{5}(-\d{4})?$').hasMatch(postalCode)) {
+      setState(() {
+        _restaurantError = 'Enter a valid ZIP code.';
+        _restaurantMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCreatingManualSite = true;
+      _restaurantError = null;
+      _restaurantMessage = null;
+    });
+
+    try {
+      final siteId = await _siteRepository.createManualSite(
+        tenantId: tenantId,
+        siteName: siteName,
+        addressLine1: address,
+        city: city,
+        state: state,
+        postalCode: postalCode,
+      );
+      if (!mounted) return;
+      setState(() {
+        _clearManualSiteForm();
+        _activeSiteId = siteId;
+        _isAddingSite = false;
+        _isEnteringManualSite = false;
+        _selectedTabIndex = 1;
+        _restaurantResults = [];
+        _hasCompletedRestaurantSearch = false;
+        _restaurantSearchController.clear();
+      });
+    } on AppException catch (error) {
+      if (mounted) setState(() => _restaurantError = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _restaurantError = 'Could not add this restaurant. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isCreatingManualSite = false);
     }
   }
 
@@ -226,6 +327,8 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
     List<QueryDocumentSnapshot<Map<String, dynamic>>> sites,
     Map<String, dynamic> currentMember,
   ) {
+    final currentRole = currentMember['role'] as String? ?? 'staff';
+    final canAddSite = const ['tenant_owner', 'admin'].contains(currentRole);
     if (sites.length == 1 && _selectedTabIndex == 0) {
       _selectedTabIndex = 1;
     }
@@ -255,6 +358,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
       case 0:
         content = _SitesOverviewContent(
           sites: sites,
+          canAddSite: canAddSite,
           onOpenSite: (siteId) {
             setState(() {
               _activeSiteId = siteId;
@@ -263,10 +367,13 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
           },
           onAddSite: () {
             setState(() {
+              _clearManualSiteForm();
               _isAddingSite = true;
+              _isEnteringManualSite = false;
               _restaurantError = null;
               _restaurantMessage = null;
               _restaurantResults = [];
+              _hasCompletedRestaurantSearch = false;
             });
           },
         );
@@ -274,23 +381,47 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
       case 1:
         if (activeSiteDoc == null) {
           content = _SiteSetupContent(
-            tenantId: tenantId,
             searchController: _restaurantSearchController,
             isSearching: _isSearchingRestaurants,
             isLinking: _isLinkingRestaurant,
+            isCreatingManualSite: _isCreatingManualSite,
+            isEnteringManualSite: _isEnteringManualSite,
             linkingRestaurantId: _linkingRestaurantId,
             results: _restaurantResults,
+            hasCompletedSearch: _hasCompletedRestaurantSearch,
             message: _restaurantMessage,
             error: _restaurantError,
+            manualSiteNameController: _manualSiteNameController,
+            manualAddressController: _manualAddressController,
+            manualCityController: _manualCityController,
+            manualStateController: _manualStateController,
+            manualPostalCodeController: _manualPostalCodeController,
             onSearch: () => _searchRestaurants(tenantId),
+            onShowManualEntry: () {
+              setState(() {
+                _isEnteringManualSite = true;
+                _restaurantError = null;
+                _restaurantMessage = null;
+              });
+            },
+            onHideManualEntry: () {
+              setState(() {
+                _isEnteringManualSite = false;
+                _restaurantError = null;
+              });
+            },
+            onCreateManualSite: () => _createManualSite(tenantId),
             onCancel: sites.isEmpty
                 ? null
                 : () {
                     setState(() {
+                      _clearManualSiteForm();
                       _isAddingSite = false;
+                      _isEnteringManualSite = false;
                       _restaurantError = null;
                       _restaurantMessage = null;
                       _restaurantResults = [];
+                      _hasCompletedRestaurantSearch = false;
                     });
                   },
             onLinkRestaurant: (masterRestaurantId, restaurantName) =>
@@ -390,13 +521,17 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                   },
                   onAddSite: () {
                     setState(() {
+                      _clearManualSiteForm();
                       _isShowingActionInbox = false;
                       _isAddingSite = true;
+                      _isEnteringManualSite = false;
                       _restaurantError = null;
                       _restaurantMessage = null;
                       _restaurantResults = [];
+                      _hasCompletedRestaurantSearch = false;
                     });
                   },
+                  canAddSite: canAddSite,
                 );
         }
         break;
@@ -488,6 +623,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                 },
               )
             : _MoreContent(
+                canAddSite: canAddSite,
                 isSyncingMasterData: _isSyncingMasterData,
                 message: _moreMessage,
                 error: _moreError,
@@ -503,11 +639,14 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                     : null,
                 onAddSite: () {
                   setState(() {
+                    _clearManualSiteForm();
                     _isAddingSite = true;
+                    _isEnteringManualSite = false;
                     _isManagingTeam = false;
                     _restaurantError = null;
                     _restaurantMessage = null;
                     _restaurantResults = [];
+                    _hasCompletedRestaurantSearch = false;
                   });
                 },
                 onManageTeam:
@@ -651,23 +790,47 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                     user: widget.user,
                     onSignOut: _signOut,
                     child: _SiteSetupContent(
-                      tenantId: tenantId,
                       searchController: _restaurantSearchController,
                       isSearching: _isSearchingRestaurants,
                       isLinking: _isLinkingRestaurant,
+                      isCreatingManualSite: _isCreatingManualSite,
+                      isEnteringManualSite: _isEnteringManualSite,
                       linkingRestaurantId: _linkingRestaurantId,
                       results: _restaurantResults,
+                      hasCompletedSearch: _hasCompletedRestaurantSearch,
                       message: _restaurantMessage,
                       error: _restaurantError,
+                      manualSiteNameController: _manualSiteNameController,
+                      manualAddressController: _manualAddressController,
+                      manualCityController: _manualCityController,
+                      manualStateController: _manualStateController,
+                      manualPostalCodeController: _manualPostalCodeController,
                       onSearch: () => _searchRestaurants(tenantId),
+                      onShowManualEntry: () {
+                        setState(() {
+                          _isEnteringManualSite = true;
+                          _restaurantError = null;
+                          _restaurantMessage = null;
+                        });
+                      },
+                      onHideManualEntry: () {
+                        setState(() {
+                          _isEnteringManualSite = false;
+                          _restaurantError = null;
+                        });
+                      },
+                      onCreateManualSite: () => _createManualSite(tenantId),
                       onCancel: sites.isEmpty
                           ? null
                           : () {
                               setState(() {
+                                _clearManualSiteForm();
                                 _isAddingSite = false;
+                                _isEnteringManualSite = false;
                                 _restaurantError = null;
                                 _restaurantMessage = null;
                                 _restaurantResults = [];
+                                _hasCompletedRestaurantSearch = false;
                               });
                             },
                       onLinkRestaurant: (masterRestaurantId, restaurantName) =>

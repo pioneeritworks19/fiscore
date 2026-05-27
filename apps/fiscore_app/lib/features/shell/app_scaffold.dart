@@ -44,25 +44,12 @@ class _FiScoreAppScaffold extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: _line),
-                ),
+                border: Border(bottom: BorderSide(color: _line)),
               ),
               child: Row(
                 children: [
-                  const FiScoreLogoMark(size: 34),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'FiScore',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: _navy,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
+                  const FiScoreHeaderBrand(),
+                  const Spacer(),
                   PopupMenuButton<String>(
                     tooltip: 'Account',
                     position: PopupMenuPosition.under,
@@ -136,8 +123,9 @@ class _FiScoreAppScaffold extends StatelessWidget {
                         child: CircleAvatar(
                           radius: 18,
                           backgroundColor: _softGreen,
-                          foregroundImage:
-                              hasPhoto ? NetworkImage(photoUrl) : null,
+                          foregroundImage: hasPhoto
+                              ? NetworkImage(photoUrl)
+                              : null,
                           onForegroundImageError: hasPhoto
                               ? (exception, stackTrace) {
                                   // Keep the initial visible if the identity
@@ -204,4 +192,3 @@ class _FiScoreAppScaffold extends StatelessWidget {
     );
   }
 }
-

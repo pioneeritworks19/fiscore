@@ -1,10 +1,36 @@
 part of '../../main.dart';
 
 class SiteRepository {
+  SiteRepository({CloudFunctionsService? functions})
+    : _functions = functions ?? CloudFunctionsService();
+
+  final CloudFunctionsService _functions;
+
   Stream<DocumentSnapshot<Map<String, dynamic>>> userProfileStream(
     String userId,
   ) {
     return FirestorePaths.user(userId).snapshots();
+  }
+
+  Future<String?> createManualSite({
+    required String tenantId,
+    required String siteName,
+    required String addressLine1,
+    required String city,
+    required String state,
+    required String postalCode,
+  }) async {
+    final result = await _functions.call('createSite', {
+      'tenantId': tenantId,
+      'siteName': siteName,
+      'addressLine1': addressLine1,
+      'city': city,
+      'state': state,
+      'postalCode': postalCode,
+      'siteType': 'restaurant',
+    });
+    final siteId = result['siteId'];
+    return siteId is String ? siteId : null;
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> activeSitesStream(

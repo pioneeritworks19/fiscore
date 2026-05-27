@@ -418,8 +418,8 @@ class _AssignedAuditRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = assignment['status'] as String? ?? 'assigned';
-    final assignee =
-        (assignment['assignedToNameSnapshot'] as String? ?? '').trim();
+    final assignee = (assignment['assignedToNameSnapshot'] as String? ?? '')
+        .trim();
     final selfStarted = assignment['assignmentSource'] == 'self_started';
     final ownerLabel = selfStarted
         ? isAssignee

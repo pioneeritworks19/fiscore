@@ -58,4 +58,3 @@ class _DashboardSection extends StatelessWidget {
     );
   }
 }
-

@@ -43,6 +43,7 @@ class _InternalAuditReview extends StatelessWidget {
         (question) => _internalAuditQuestionComplete(question, responses),
       );
     }).length;
+    final canContinue = missingAnswers == 0 && missingNotes == 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -130,15 +131,16 @@ class _InternalAuditReview extends StatelessWidget {
             icon: Icons.info_outline,
             color: const Color(0xFFB42318),
             text:
-                'Add issue descriptions for $missingNotes item(s) before submitting.',
+                'Add issue descriptions for $missingNotes item(s) before continuing.',
           ),
         ],
         if (missingAnswers > 0) ...[
           const SizedBox(height: 10),
           _StatusMessage(
             icon: Icons.info_outline,
-            color: _muted,
-            text: 'Answer $missingAnswers remaining item(s) before submitting.',
+            color: const Color(0xFFB42318),
+            text:
+                'Complete $missingAnswers unanswered item(s) before continuing.',
           ),
         ],
         if (error != null) ...[
@@ -153,9 +155,9 @@ class _InternalAuditReview extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: onContinue,
+            onPressed: canContinue ? onContinue : null,
             icon: const Icon(Icons.arrow_forward),
-            label: const Text('Continue'),
+            label: Text(canContinue ? 'Continue' : 'Complete missing items'),
           ),
         ),
       ],

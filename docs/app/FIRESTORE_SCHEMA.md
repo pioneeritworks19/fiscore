@@ -328,6 +328,9 @@ This is the tenant-owned site record used by the app. It may be linked to the ma
   streaming every violation
 - this collection is also the foundation for a tenant-level sites overview screen
 - this collection should support both linked and manual sites
+- manual site creation is available from restaurant setup when public-record
+  search does not locate the restaurant; manual sites enter the standard site
+  dashboard immediately and can begin internal checks without imported history
 
 ### Suggested `masterLinkStatus` values
 

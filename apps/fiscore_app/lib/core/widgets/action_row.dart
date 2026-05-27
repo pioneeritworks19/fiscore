@@ -7,6 +7,7 @@ class _ActionRow extends StatelessWidget {
     required this.body,
     required this.enabled,
     this.toneColor,
+    this.trailingIcon,
     this.onTap,
   });
 
@@ -15,6 +16,7 @@ class _ActionRow extends StatelessWidget {
   final String body;
   final bool enabled;
   final Color? toneColor;
+  final IconData? trailingIcon;
   final VoidCallback? onTap;
 
   @override
@@ -27,9 +29,7 @@ class _ActionRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: _line.withValues(alpha: 0.7)),
-        ),
+        border: Border(top: BorderSide(color: _line.withValues(alpha: 0.7))),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,7 +68,9 @@ class _ActionRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Icon(
-            enabled ? Icons.chevron_right : Icons.hourglass_empty,
+            enabled
+                ? trailingIcon ?? Icons.chevron_right
+                : Icons.hourglass_empty,
             color: iconColor,
           ),
         ],
@@ -87,4 +89,3 @@ class _ActionRow extends StatelessWidget {
     );
   }
 }
-

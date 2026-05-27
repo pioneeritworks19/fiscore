@@ -1,11 +1,7 @@
 part of '../../main.dart';
 
 class FiScoreLogoMark extends StatelessWidget {
-  const FiScoreLogoMark({
-    super.key,
-    this.size = 40,
-    this.onDark = false,
-  });
+  const FiScoreLogoMark({super.key, this.size = 40, this.onDark = false});
 
   final double size;
   final bool onDark;
@@ -34,8 +30,9 @@ class FiScoreLogoLockup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final crossAxisAlignment =
-        centered ? CrossAxisAlignment.center : CrossAxisAlignment.start;
+    final crossAxisAlignment = centered
+        ? CrossAxisAlignment.center
+        : CrossAxisAlignment.start;
     final textAlign = centered ? TextAlign.center : TextAlign.start;
 
     return Column(
@@ -66,6 +63,56 @@ class FiScoreLogoLockup extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class FiScoreHeaderBrand extends StatelessWidget {
+  const FiScoreHeaderBrand({
+    super.key,
+    this.markSize = 40,
+    this.wordmarkHeight = 28,
+  });
+
+  final double markSize;
+  final double wordmarkHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(
+          'assets/branding/fiscore_mark.png',
+          width: markSize,
+          height: markSize,
+          fit: BoxFit.contain,
+          semanticLabel: 'FiScore',
+        ),
+        const SizedBox(width: 7),
+        Image.asset(
+          'assets/branding/fiscore_header.png',
+          height: wordmarkHeight,
+          fit: BoxFit.contain,
+          excludeFromSemantics: true,
+        ),
+      ],
+    );
+  }
+}
+
+class FiScoreAuthBrand extends StatelessWidget {
+  const FiScoreAuthBrand({super.key, this.width = 330});
+
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/branding/fiscore_lockup.png',
+      width: width,
+      fit: BoxFit.contain,
+      semanticLabel: 'FiScore. Safer Kitchens. Smarter Scores.',
     );
   }
 }
@@ -146,4 +193,3 @@ class _FiScoreLogoPainter extends CustomPainter {
     return oldDelegate.onDark != onDark;
   }
 }
-

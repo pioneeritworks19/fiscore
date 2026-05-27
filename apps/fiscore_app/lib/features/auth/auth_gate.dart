@@ -13,9 +13,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: FiScoreLogoLockup(markSize: 72),
-            ),
+            body: Center(child: FiScoreLogoLockup(markSize: 72)),
           );
         }
 
@@ -32,4 +30,3 @@ class AuthGate extends StatelessWidget {
     );
   }
 }
-

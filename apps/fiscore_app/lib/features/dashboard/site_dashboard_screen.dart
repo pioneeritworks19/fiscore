@@ -11,6 +11,7 @@ class _SiteDashboardContent extends StatefulWidget {
     required this.onOpenActions,
     required this.onOpenAudits,
     required this.onAddSite,
+    required this.canAddSite,
     required this.onStartAudit,
     required this.canStartAudit,
   });
@@ -24,6 +25,7 @@ class _SiteDashboardContent extends StatefulWidget {
   final ValueChanged<String> onOpenActions;
   final VoidCallback onOpenAudits;
   final VoidCallback onAddSite;
+  final bool canAddSite;
   final VoidCallback onStartAudit;
   final bool canStartAudit;
 
@@ -45,6 +47,10 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
     final latestGrade = site['latestInspectionGradeSnapshot'] as String?;
     final latestScore = (site['latestInspectionScoreSnapshot'] as num?)
         ?.toInt();
+    final isLinkedToMaster =
+        site['linkStatus'] == 'linked' ||
+        site['masterLinkStatus'] == 'linked_to_master' ||
+        site['masterRestaurantId'] != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -129,6 +135,11 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
                   myTrainingCount: myOpenTraining,
                   overdueCheckCount: overdueChecks,
                   overdueTrainingCount: overdueTraining,
+                  emptyMessage: isLinkedToMaster
+                      ? 'Nothing needs attention right now.'
+                      : widget.canStartAudit
+                      ? 'No items need attention yet. Start an internal check to build this site\'s safety record.'
+                      : 'Nothing needs attention right now.',
                   isLoading:
                       myActionSnapshot.connectionState ==
                           ConnectionState.waiting ||
@@ -168,20 +179,31 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
           ),
           child: Column(
             children: [
-              _DashboardActivityRow(
-                icon: Icons.fact_check_outlined,
-                title: 'Public inspection',
-                detail: latestInspectionDate == null
-                    ? 'No imported inspection yet'
-                    : _dashboardDateLabel(latestInspectionDate),
-                chips: [
-                  if (latestGrade != null && latestGrade.isNotEmpty)
-                    _DashboardChip(label: 'Grade $latestGrade'),
-                  if (latestScore != null)
-                    _DashboardChip(label: 'Score $latestScore', color: _green),
-                ],
-                onTap: widget.onOpenAudits,
-              ),
+              if (isLinkedToMaster)
+                _DashboardActivityRow(
+                  icon: Icons.fact_check_outlined,
+                  title: 'Public inspection',
+                  detail: latestInspectionDate == null
+                      ? 'No imported inspection yet'
+                      : _dashboardDateLabel(latestInspectionDate),
+                  chips: [
+                    if (latestGrade != null && latestGrade.isNotEmpty)
+                      _DashboardChip(label: 'Grade $latestGrade'),
+                    if (latestScore != null)
+                      _DashboardChip(
+                        label: 'Score $latestScore',
+                        color: _green,
+                      ),
+                  ],
+                  onTap: widget.onOpenAudits,
+                )
+              else
+                const _DashboardActivityRow(
+                  icon: Icons.fact_check_outlined,
+                  title: 'Public inspections',
+                  detail: 'Not linked to public records',
+                  chips: [],
+                ),
               const Divider(height: 1, indent: 16, endIndent: 16),
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _internalAuditRepository.streamForSite(
@@ -238,14 +260,16 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
                 label: const Text('View audits'),
               ),
             ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: TextButton.icon(
-                onPressed: widget.onAddSite,
-                icon: const Icon(Icons.add_business_outlined, size: 19),
-                label: const Text('Add site'),
+            if (widget.canAddSite) ...[
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: widget.onAddSite,
+                  icon: const Icon(Icons.add_business_outlined, size: 19),
+                  label: const Text('Add site'),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ],
@@ -262,6 +286,7 @@ class _NeedsActionCard extends StatelessWidget {
     required this.myTrainingCount,
     required this.overdueCheckCount,
     required this.overdueTrainingCount,
+    required this.emptyMessage,
     required this.isLoading,
     required this.showManagerActions,
     required this.onOpenViolations,
@@ -280,6 +305,7 @@ class _NeedsActionCard extends StatelessWidget {
   final int myTrainingCount;
   final int overdueCheckCount;
   final int overdueTrainingCount;
+  final String emptyMessage;
   final bool isLoading;
   final bool showManagerActions;
   final VoidCallback onOpenViolations;
@@ -333,7 +359,7 @@ class _NeedsActionCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 12, bottom: 16),
               child: Text(
-                'Nothing needs attention right now.',
+                emptyMessage,
                 style: theme.textTheme.bodyMedium?.copyWith(color: _muted),
               ),
             )
@@ -521,14 +547,14 @@ class _DashboardActivityRow extends StatelessWidget {
     required this.title,
     required this.detail,
     required this.chips,
-    required this.onTap,
+    this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String detail;
   final List<Widget> chips;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -574,10 +600,11 @@ class _DashboardActivityRow extends StatelessWidget {
                 ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.only(top: 7),
-              child: Icon(Icons.chevron_right, color: _navy, size: 20),
-            ),
+            if (onTap != null)
+              const Padding(
+                padding: EdgeInsets.only(top: 7),
+                child: Icon(Icons.chevron_right, color: _navy, size: 20),
+              ),
           ],
         ),
       ),

@@ -5,11 +5,13 @@ class _SitesOverviewContent extends StatelessWidget {
     required this.sites,
     required this.onOpenSite,
     required this.onAddSite,
+    required this.canAddSite,
   });
 
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> sites;
   final ValueChanged<String> onOpenSite;
   final VoidCallback onAddSite;
+  final bool canAddSite;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +48,10 @@ class _SitesOverviewContent extends StatelessWidget {
               (site['openViolationCountSnapshot'] as num?)?.toInt() ?? 0;
           final pendingReview =
               (site['pendingReviewCountSnapshot'] as num?)?.toInt() ?? 0;
+          final isLinkedToMaster =
+              site['linkStatus'] == 'linked' ||
+              site['masterLinkStatus'] == 'linked_to_master' ||
+              site['masterRestaurantId'] != null;
           return InkWell(
             onTap: () => onOpenSite(siteDoc.id),
             borderRadius: BorderRadius.circular(14),
@@ -105,8 +111,10 @@ class _SitesOverviewContent extends StatelessWidget {
                             ],
                             const SizedBox(height: 8),
                             Text(
-                              latestInspectionDate == null
-                                  ? 'Inspection history pending'
+                              !isLinkedToMaster
+                                  ? 'Manually added - ready for internal checks'
+                                  : latestInspectionDate == null
+                                  ? 'No public inspections imported yet'
                                   : '$openViolations open - $pendingReview review - latest $latestInspectionDate',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: _muted,
@@ -116,13 +124,15 @@ class _SitesOverviewContent extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        latestInspectionDate == null ? '-' : 'A',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: _green,
-                          fontWeight: FontWeight.w800,
+                      if (latestInspectionDate != null)
+                        Text(
+                          site['latestInspectionGradeSnapshot'] as String? ??
+                              '',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: _green,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -139,14 +149,15 @@ class _SitesOverviewContent extends StatelessWidget {
             ),
           );
         }),
-        const SizedBox(height: 14),
-        OutlinedButton.icon(
-          onPressed: onAddSite,
-          icon: const Icon(Icons.add_business_outlined),
-          label: const Text('Add site'),
-        ),
+        if (canAddSite) ...[
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: onAddSite,
+            icon: const Icon(Icons.add_business_outlined),
+            label: const Text('Add site'),
+          ),
+        ],
       ],
     );
   }
 }
-

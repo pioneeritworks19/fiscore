@@ -641,6 +641,9 @@ class _TrainingAssignmentCard extends StatelessWidget {
     final title = assignment['trainingTitleSnapshot'] as String? ?? 'Training';
     final assignee =
         assignment['assignedToNameSnapshot'] as String? ?? 'Team member';
+    final assignmentDateLabel = status == 'completed'
+        ? _trainingCompletionLabel(assignment['completedAt'])
+        : _trainingDueLabel(assignment['dueDate']);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -668,7 +671,7 @@ class _TrainingAssignmentCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    '$assignee - ${_trainingDueLabel(assignment['dueDate'])}',
+                    '$assignee - $assignmentDateLabel',
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: _muted),
@@ -701,6 +704,12 @@ class _TrainingAssignmentCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _trainingCompletionLabel(Object? value) {
+  if (value is! Timestamp) return 'Completed';
+  final date = value.toDate();
+  return 'Completed ${date.month}/${date.day}/${date.year}';
 }
 
 class _TrainingPill extends StatelessWidget {

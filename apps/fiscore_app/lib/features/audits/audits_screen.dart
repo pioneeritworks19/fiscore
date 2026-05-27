@@ -442,8 +442,7 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
             if (inspections.length == _inspectionLimit)
               Center(
                 child: TextButton(
-                  onPressed: () =>
-                      setState(() => _inspectionLimit += 20),
+                  onPressed: () => setState(() => _inspectionLimit += 20),
                   child: const Text('Load more inspections'),
                 ),
               ),
