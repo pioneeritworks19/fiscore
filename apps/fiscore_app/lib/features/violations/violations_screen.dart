@@ -80,6 +80,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
     String? reviewStatus,
     String? closureReason,
   }) async {
+    final strings = AppLocalizations.of(context);
     setState(() {
       _isSaving = true;
       _message = null;
@@ -96,11 +97,13 @@ class _ViolationsContentState extends State<_ViolationsContent> {
         closureReason: closureReason,
       );
       setState(() {
-        _message = 'Violation moved to ${_violationStatusLabel(status)}.';
+        _message = strings.violationMovedToStatus(
+          _violationStatusLabel(status, context: context),
+        );
       });
     } catch (_) {
       setState(() {
-        _error = 'Could not update the violation. Please try again.';
+        _error = strings.couldNotUpdateViolation;
       });
     } finally {
       if (mounted) {
@@ -112,6 +115,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
   }
 
   Future<void> _saveResponse(String violationId, String currentStatus) async {
+    final strings = AppLocalizations.of(context);
     setState(() {
       _isSaving = true;
       _error = null;
@@ -136,10 +140,10 @@ class _ViolationsContentState extends State<_ViolationsContent> {
       }
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Saved for later.')));
+        ..showSnackBar(SnackBar(content: Text(strings.savedForLater)));
     } catch (_) {
       setState(() {
-        _error = 'Could not save the response. Please try again.';
+        _error = strings.couldNotSaveResponse;
       });
     } finally {
       if (mounted) {
@@ -151,10 +155,11 @@ class _ViolationsContentState extends State<_ViolationsContent> {
   }
 
   Future<void> _submitResponseForReview(String violationId) async {
+    final strings = AppLocalizations.of(context);
     if (_correctiveController.text.trim().isEmpty) {
       setState(() {
         _message = null;
-        _error = 'Enter what was fixed before submitting for review.';
+        _error = strings.enterFixBeforeSubmit;
       });
       return;
     }
@@ -190,13 +195,13 @@ class _ViolationsContentState extends State<_ViolationsContent> {
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Submitted for review.')));
+      ).showSnackBar(SnackBar(content: Text(strings.submittedForReview)));
       setState(() {
-        _message = 'Submitted for review.';
+        _message = strings.submittedForReview;
       });
     } catch (_) {
       setState(() {
-        _error = 'Could not submit the response. Please try again.';
+        _error = strings.couldNotSubmitResponse;
       });
     } finally {
       if (mounted) {
@@ -476,7 +481,7 @@ class _ViolationsContentState extends State<_ViolationsContent> {
               Center(
                 child: TextButton(
                   onPressed: () => setState(() => _pageLimit += 20),
-                  child: const Text('Load more'),
+                  child: Text(AppLocalizations.of(context).loadMore),
                 ),
               ),
             ],
@@ -640,6 +645,7 @@ class _ViolationListCard extends StatelessWidget {
       data: _ViolationRowData.fromViolation(
         violation,
         context: _ViolationRowContext.queue,
+        buildContext: context,
       ),
       onOpen: onOpen,
     );
@@ -761,7 +767,9 @@ class _ViolationAssignmentSheet extends StatelessWidget {
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.person_off_outlined),
-                        title: const Text('Remove assignment'),
+                        title: Text(
+                          AppLocalizations.of(context).removeAssignment,
+                        ),
                         onTap: () => Navigator.of(
                           context,
                         ).pop(const _ViolationAssignmentChoice.remove()),
@@ -1480,14 +1488,15 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
       context: context,
       showDragHandle: true,
       builder: (context) {
+        final strings = AppLocalizations.of(context);
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
-                title: const Text('Take photo'),
-                subtitle: const Text('Processed after upload'),
+                title: Text(strings.takePhoto),
+                subtitle: Text(strings.processedAfterUpload),
                 onTap: () => Navigator.of(context).pop(
                   const _MediaSelection(
                     choice: _MediaChoice.image,
@@ -1497,8 +1506,8 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('Choose photo'),
-                subtitle: const Text('Processed after upload'),
+                title: Text(strings.choosePhoto),
+                subtitle: Text(strings.processedAfterUpload),
                 onTap: () => Navigator.of(context).pop(
                   const _MediaSelection(
                     choice: _MediaChoice.image,
@@ -1508,8 +1517,8 @@ class _ViolationWorkAreaState extends State<_ViolationWorkArea> {
               ),
               ListTile(
                 leading: const Icon(Icons.videocam_outlined),
-                title: const Text('Choose video'),
-                subtitle: const Text('Short clips only, capped before upload'),
+                title: Text(strings.chooseVideo),
+                subtitle: Text(strings.shortClipsOnly),
                 onTap: () => Navigator.of(context).pop(
                   const _MediaSelection(
                     choice: _MediaChoice.video,
@@ -1919,8 +1928,8 @@ class _DiscussionPanelState extends State<_DiscussionPanel> {
                       controller: _commentController,
                       minLines: 3,
                       maxLines: 5,
-                      decoration: const InputDecoration(
-                        hintText: 'Add a team update.',
+                      decoration: InputDecoration(
+                        hintText: AppLocalizations.of(context).addTeamUpdate,
                       ),
                     ),
                     if (_pendingAttachments.isNotEmpty) ...[
@@ -1948,13 +1957,13 @@ class _DiscussionPanelState extends State<_DiscussionPanel> {
                       children: [
                         _AttachmentIconButton(
                           icon: Icons.photo_camera_outlined,
-                          tooltip: 'Add photo',
+                          tooltip: AppLocalizations.of(context).addPhoto,
                           onPressed: _isPosting ? null : _attachImage,
                         ),
                         const SizedBox(width: 8),
                         _AttachmentIconButton(
                           icon: Icons.videocam_outlined,
-                          tooltip: 'Add video',
+                          tooltip: AppLocalizations.of(context).addVideo,
                           onPressed: _isPosting ? null : _attachVideo,
                         ),
                         const SizedBox(width: 10),
@@ -1970,7 +1979,7 @@ class _DiscussionPanelState extends State<_DiscussionPanel> {
                                     ),
                                   )
                                 : const Icon(Icons.send_outlined),
-                            label: const Text('Post note'),
+                            label: Text(AppLocalizations.of(context).postNote),
                           ),
                         ),
                       ],
@@ -2094,8 +2103,11 @@ class _ThreadEntryTile extends StatelessWidget {
                     );
                   }
                 },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'delete', child: Text('Delete post')),
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text(AppLocalizations.of(context).deletePost),
+                  ),
                 ],
               ),
             ],
@@ -2472,7 +2484,7 @@ class _ViolationBottomActions extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Enter what was fixed to submit for review.',
+              AppLocalizations.of(context).enterFixBeforeSubmit,
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: _muted, height: 1.35),
@@ -2484,7 +2496,7 @@ class _ViolationBottomActions extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: isSaving ? null : onSaveForLater,
                 icon: const Icon(Icons.bookmark_border_outlined),
-                label: const Text('Save for later'),
+                label: Text(AppLocalizations.of(context).saveForLater),
               ),
             ),
             const SizedBox(width: 10),
@@ -2493,7 +2505,7 @@ class _ViolationBottomActions extends StatelessWidget {
                 onPressed: isSaving || !canSubmit ? null : onSubmitForReview,
                 style: _greenFilledButtonStyle(),
                 icon: const Icon(Icons.outbox_outlined),
-                label: const Text('Submit for review'),
+                label: Text(AppLocalizations.of(context).submitForReview),
               ),
             ),
           ],
@@ -2564,8 +2576,10 @@ class _ViolationTrainingSectionState extends State<_ViolationTrainingSection> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Training assigned for this violation.'),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).trainingAssignedForViolation,
+            ),
           ),
         );
     }
@@ -3249,19 +3263,21 @@ void _showAttachmentPreview(
                           storagePath: storagePath,
                           fit: BoxFit.contain,
                         )
-                      : const Center(
+                      : Center(
                           child: Padding(
-                            padding: EdgeInsets.all(32),
+                            padding: const EdgeInsets.all(32),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.videocam_outlined,
                                   color: _navy,
                                   size: 42,
                                 ),
-                                SizedBox(height: 10),
-                                Text('Video attached'),
+                                const SizedBox(height: 10),
+                                Text(
+                                  AppLocalizations.of(context).videoAttached,
+                                ),
                               ],
                             ),
                           ),
@@ -3422,6 +3438,7 @@ class _ViolationActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     final actions = <Widget>[];
 
     if (status == 'pending_review') {
@@ -3429,7 +3446,7 @@ class _ViolationActions extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: isSaving ? null : onSendBack,
           icon: const Icon(Icons.undo),
-          label: const Text('Send back'),
+          label: Text(strings.sendBack),
         ),
         FilledButton.icon(
           onPressed: isSaving
@@ -3437,11 +3454,11 @@ class _ViolationActions extends StatelessWidget {
               : () => onUpdateStatus(
                   'closed',
                   reviewStatus: 'closed',
-                  closureReason: 'Closed after manager review.',
+                  closureReason: strings.closedAfterManagerReview,
                 ),
           style: _greenFilledButtonStyle(),
           icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Close violation'),
+          label: Text(strings.closeViolation),
         ),
       ]);
     } else if (status == 'closed') {
@@ -3451,7 +3468,7 @@ class _ViolationActions extends StatelessWidget {
               ? null
               : () => onUpdateStatus('open', reviewStatus: 'reopened'),
           icon: const Icon(Icons.replay),
-          label: const Text('Reopen'),
+          label: Text(strings.reopen),
         ),
       );
     }
@@ -3493,6 +3510,7 @@ class _SendBackSheetState extends State<_SendBackSheet> {
   @override
   Widget build(BuildContext context) {
     final feedback = _feedbackController.text.trim();
+    final strings = AppLocalizations.of(context);
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -3506,7 +3524,7 @@ class _SendBackSheetState extends State<_SendBackSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Send back for changes',
+              strings.sendBackForChanges,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: _ink,
                 fontWeight: FontWeight.w800,
@@ -3514,7 +3532,7 @@ class _SendBackSheetState extends State<_SendBackSheet> {
             ),
             const SizedBox(height: 5),
             Text(
-              'Tell the team what needs to be corrected.',
+              strings.sendBackHelp,
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: _muted),
@@ -3525,9 +3543,7 @@ class _SendBackSheetState extends State<_SendBackSheet> {
               minLines: 3,
               maxLines: 5,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Add review feedback.',
-              ),
+              decoration: InputDecoration(hintText: strings.addReviewFeedback),
             ),
             const SizedBox(height: 14),
             Row(
@@ -3535,7 +3551,7 @@ class _SendBackSheetState extends State<_SendBackSheet> {
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+                    child: Text(strings.cancel),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -3544,7 +3560,7 @@ class _SendBackSheetState extends State<_SendBackSheet> {
                     onPressed: feedback.isEmpty
                         ? null
                         : () => Navigator.of(context).pop(feedback),
-                    child: const Text('Send back'),
+                    child: Text(strings.sendBack),
                   ),
                 ),
               ],
@@ -3571,7 +3587,7 @@ class _SmallStatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        _violationStatusLabel(status),
+        _violationStatusLabel(status, context: context),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: color,
           fontWeight: FontWeight.w900,
@@ -3613,18 +3629,19 @@ int _statusRank(String status) {
   }
 }
 
-String _violationStatusLabel(String status) {
+String _violationStatusLabel(String status, {BuildContext? context}) {
+  final strings = context == null ? null : AppLocalizations.of(context);
   switch (status) {
     case 'open':
-      return 'Open';
+      return strings?.statusOpen ?? 'Open';
     case 'in_progress':
-      return 'Working';
+      return strings?.statusWorking ?? 'Working';
     case 'pending_review':
-      return 'Review';
+      return strings?.statusReview ?? 'Review';
     case 'closed':
-      return 'Closed';
+      return strings?.statusClosed ?? 'Closed';
     default:
-      return status;
+      return status.isEmpty ? strings?.statusUnknown ?? 'Unknown' : status;
   }
 }
 
@@ -3642,16 +3659,17 @@ Color _statusColor(String? status) {
   }
 }
 
-String _sourceLabel(String? sourceType) {
+String _sourceLabel(String? sourceType, {BuildContext? context}) {
+  final strings = context == null ? null : AppLocalizations.of(context);
   switch (sourceType) {
     case 'health_department_inspection':
-      return 'Public inspection';
+      return strings?.sourcePublicInspection ?? 'Public inspection';
     case 'internal_audit':
-      return 'Internal check';
+      return strings?.sourceInternalCheck ?? 'Internal check';
     case 'manual':
-      return 'Manual issue';
+      return strings?.sourceManualIssue ?? 'Manual issue';
     default:
-      return 'Violation';
+      return strings?.sourceViolation ?? 'Violation';
   }
 }
 
@@ -3678,18 +3696,19 @@ Future<ImageSource?> _showPhotoSourcePicker(BuildContext context) {
     context: context,
     showDragHandle: true,
     builder: (context) {
+      final strings = AppLocalizations.of(context);
       return SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Take photo'),
+              title: Text(strings.takePhoto),
               onTap: () => Navigator.of(context).pop(ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose photo'),
+              title: Text(strings.choosePhoto),
               onTap: () => Navigator.of(context).pop(ImageSource.gallery),
             ),
           ],
@@ -3740,7 +3759,7 @@ Future<bool> _confirmDestructiveAction(
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancel'),
+                      child: Text(AppLocalizations.of(context).cancel),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -3765,22 +3784,23 @@ Future<bool> _confirmDestructiveAction(
   return confirmed ?? false;
 }
 
-String _severityLabel(String? severity) {
+String _severityLabel(String? severity, {BuildContext? context}) {
+  final strings = context == null ? null : AppLocalizations.of(context);
   final normalized = (severity ?? '').trim().toLowerCase();
   switch (normalized) {
     case 'critical':
-      return 'Critical';
+      return strings?.severityCritical ?? 'Critical';
     case 'major':
-      return 'Major';
+      return strings?.severityMajor ?? 'Major';
     case 'minor':
-      return 'Minor';
+      return strings?.severityMinor ?? 'Minor';
     case 'informational':
-      return 'Informational';
+      return strings?.severityInformational ?? 'Informational';
     case 'not critical':
-      return 'Minor';
+      return strings?.severityMinor ?? 'Minor';
     case 'unknown':
     case '':
-      return 'Severity unknown';
+      return strings?.severityUnknown ?? 'Severity unknown';
     default:
       return severity!.trim();
   }
@@ -3793,14 +3813,19 @@ bool _shouldShowSeverity(String? severity) {
 Color _severityColor(String severity) {
   switch (severity.trim().toLowerCase()) {
     case 'critical':
+    case 'critica':
       return const Color(0xFFDC2626);
     case 'major':
+    case 'mayor':
       return const Color(0xFFF59E0B);
     case 'minor':
+    case 'menor':
       return const Color(0xFF2563EB);
     case 'informational':
+    case 'informativa':
       return const Color(0xFF64748B);
     case 'severity unknown':
+    case 'severidad desconocida':
     default:
       return const Color(0xFF64748B);
   }

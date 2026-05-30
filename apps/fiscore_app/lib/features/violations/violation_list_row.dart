@@ -15,7 +15,11 @@ class _ViolationRowData {
   factory _ViolationRowData.fromViolation(
     Map<String, dynamic> violation, {
     required _ViolationRowContext context,
+    BuildContext? buildContext,
   }) {
+    final strings = buildContext == null
+        ? null
+        : AppLocalizations.of(buildContext);
     final sourceType = violation['sourceType'] as String?;
     final title = _firstAvailableText([
       violation['title'],
@@ -23,17 +27,24 @@ class _ViolationRowData {
       'Violation finding',
     ]);
     final status = violation['status'] as String? ?? 'open';
-    final severity = _severityLabel(violation['severity'] as String?);
+    final severity = _severityLabel(
+      violation['severity'] as String?,
+      context: buildContext,
+    );
     final assignedTo = _displayText(violation['assignedTo']);
     final assignedName = _displayText(violation['assignedToNameSnapshot']);
     final isAssignedToMe =
         assignedTo.isNotEmpty &&
         assignedTo == FirebaseAuth.instance.currentUser?.uid;
+    final fallbackAssignee = assignedName.isEmpty
+        ? strings?.teamMember ?? 'team member'
+        : assignedName;
     final assignmentText = assignedTo.isEmpty
         ? null
         : isAssignedToMe
-        ? 'Assigned to you'
-        : 'Assigned to ${assignedName.isEmpty ? 'team member' : assignedName}';
+        ? strings?.assignedToYou ?? 'Assigned to you'
+        : strings?.assignedTo(fallbackAssignee) ??
+              'Assigned to $fallbackAssignee';
     if (context == _ViolationRowContext.auditDetail) {
       final observation = _firstAvailableText([
         violation['auditorComments'],
@@ -42,7 +53,9 @@ class _ViolationRowData {
       return _ViolationRowData(
         title: title,
         status: status,
-        contextText: observation.isEmpty ? null : 'Observed: $observation',
+        contextText: observation.isEmpty
+            ? null
+            : strings?.observed(observation) ?? 'Observed: $observation',
         severityText: severity,
         assignmentText: assignmentText,
       );
@@ -61,7 +74,7 @@ class _ViolationRowData {
         title: title,
         status: status,
         contextText: _joinNonEmpty([
-          'Internal check',
+          strings?.sourceInternalCheck ?? 'Internal check',
           _displayText(violation['sourceTitleSnapshot']),
           _violationSourceDate(violation['sourceOccurredAt']),
         ]),
@@ -73,7 +86,7 @@ class _ViolationRowData {
       title: title,
       status: status,
       contextText: _joinNonEmpty([
-        _sourceLabel(sourceType),
+        _sourceLabel(sourceType, context: buildContext),
         _dateText(violation['inspectionDate']),
       ]),
       supportingText: _displayText(violation['clauseReference']),
@@ -82,7 +95,13 @@ class _ViolationRowData {
     );
   }
 
-  factory _ViolationRowData.fromAction(Map<String, dynamic> action) {
+  factory _ViolationRowData.fromAction(
+    Map<String, dynamic> action, {
+    BuildContext? buildContext,
+  }) {
+    final strings = buildContext == null
+        ? null
+        : AppLocalizations.of(buildContext);
     final type = action['type'] as String? ?? '';
     final title = _firstAvailableText([action['detail'], 'Violation']);
     final sourceLabel = _displayText(action['sourceLabelSnapshot']);
@@ -94,9 +113,11 @@ class _ViolationRowData {
       _ => 'in_progress',
     };
     final workflowText = switch (type) {
-      'violation_review' => 'Ready for your review',
-      'violation_sent_back' => 'Sent back for an update',
-      _ => 'Assigned to you',
+      'violation_review' =>
+        strings?.readyForYourReview ?? 'Ready for your review',
+      'violation_sent_back' =>
+        strings?.sentBackForUpdate ?? 'Sent back for an update',
+      _ => strings?.assignedToYou ?? 'Assigned to you',
     };
     return _ViolationRowData(
       title: title,
@@ -107,7 +128,9 @@ class _ViolationRowData {
         sourceDate,
         workflowText,
       ]),
-      severityText: severity.isEmpty ? null : _severityLabel(severity),
+      severityText: severity.isEmpty
+          ? null
+          : _severityLabel(severity, context: buildContext),
     );
   }
 

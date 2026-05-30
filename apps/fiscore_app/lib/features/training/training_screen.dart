@@ -69,7 +69,7 @@ class _TrainingContentState extends State<_TrainingContent> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not add this training. Please try again.';
+        _error = AppLocalizations.of(context).couldNotAddTraining;
         _message = null;
       });
     }
@@ -83,30 +83,30 @@ class _TrainingContentState extends State<_TrainingContent> {
       initialTraining: training,
     );
     if (!mounted || created != true) return;
+    final strings = AppLocalizations.of(context);
     setState(() {
       _view = 'team';
     });
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Training assigned.')));
+      ..showSnackBar(SnackBar(content: Text(strings.trainingAssignedMessage)));
   }
 
   Future<void> _cancelAssignment(String assignmentId) async {
+    final strings = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Cancel this assignment?'),
-        content: const Text(
-          'The team member will no longer be expected to complete this training. The assignment stays in history.',
-        ),
+        title: Text(strings.cancelThisAssignmentQuestion),
+        content: Text(strings.cancelTrainingAssignmentBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep assignment'),
+            child: Text(strings.keepAssignment),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Cancel assignment'),
+            child: Text(strings.cancelAssignment),
           ),
         ],
       ),
@@ -124,12 +124,12 @@ class _TrainingContentState extends State<_TrainingContent> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Training assignment cancelled.')),
+          SnackBar(content: Text(strings.trainingAssignmentCancelledMessage)),
         );
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not cancel training. Please try again.';
+        _error = strings.couldNotCancelTraining;
         _message = null;
       });
     }
@@ -146,6 +146,7 @@ class _TrainingContentState extends State<_TrainingContent> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _repository.activeAssignmentsStream(
         tenantId: widget.tenantId,
@@ -280,10 +281,10 @@ class _TrainingContentState extends State<_TrainingContent> {
             ),
             const SizedBox(height: 8),
             if (myAssignments.isEmpty)
-              const _EmptyStateCard(
+              _EmptyStateCard(
                 icon: Icons.school_outlined,
-                title: 'No training assigned',
-                body: 'Assigned learning will appear here.',
+                title: strings.noTrainingAssigned,
+                body: strings.assignedLearningWillAppear,
               )
             else
               for (final doc in myAssignments)
@@ -295,19 +296,19 @@ class _TrainingContentState extends State<_TrainingContent> {
               Center(
                 child: TextButton(
                   onPressed: () => setState(() => _activeAssignmentLimit += 50),
-                  child: const Text('Load more assigned training'),
+                  child: Text(strings.loadMoreAssignedTraining),
                 ),
               ),
             if (_canAssign) ...[
               const SizedBox(height: 20),
-              const _TrainingSectionTitle(
-                title: 'For managers',
-                body: 'Assign coaching and monitor completion.',
+              _TrainingSectionTitle(
+                title: strings.forManagers,
+                body: strings.assignAndMonitorTrainingHelp,
               ),
               const SizedBox(height: 8),
               _TrainingNavigationRow(
                 icon: Icons.person_add_alt_outlined,
-                title: 'Assign training',
+                title: strings.assignTraining,
                 detail: 'Browse the training library',
                 onTap: () => setState(() => _view = 'assign'),
               ),

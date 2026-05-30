@@ -15,6 +15,7 @@ class _SitesOverviewContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     return Column(
@@ -141,7 +142,7 @@ class _SitesOverviewContent extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () => onOpenSite(siteDoc.id),
                       icon: const Icon(Icons.chevron_right, size: 18),
-                      label: const Text('Open site'),
+                      label: Text(strings.openSite),
                     ),
                   ),
                 ],
@@ -154,7 +155,7 @@ class _SitesOverviewContent extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onAddSite,
             icon: const Icon(Icons.add_business_outlined),
-            label: const Text('Add site'),
+            label: Text(strings.addSite),
           ),
         ],
       ],

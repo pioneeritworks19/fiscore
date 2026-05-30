@@ -24,6 +24,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _signInWithGoogle() async {
+    final strings = AppLocalizations.of(context);
     setState(() {
       _isSigningIn = true;
       _errorMessage = null;
@@ -41,7 +42,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       });
     } catch (error) {
       setState(() {
-        _errorMessage = 'Sign-in failed. Please try again.';
+        _errorMessage = strings.requestFailed;
       });
     } finally {
       if (mounted) {
@@ -53,10 +54,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _sendEmailLink() async {
+    final strings = AppLocalizations.of(context);
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       setState(() {
-        _errorMessage = 'Enter a valid email address.';
+        _errorMessage = strings.checkInformationAndTryAgain;
       });
       return;
     }
@@ -81,7 +83,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Could not send sign-in link. Please try again.';
+        _errorMessage = strings.requestFailed;
       });
     } finally {
       if (mounted) {
@@ -106,6 +108,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final strings = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -138,7 +141,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           const Center(child: FiScoreAuthBrand(width: 370)),
                           const SizedBox(height: 20),
                           Text(
-                            'Review inspections, run checks, and keep corrective work on track.',
+                            strings.signInIntro,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               color: _muted,
@@ -158,7 +161,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     ),
                                   )
                                 : const Icon(Icons.login),
-                            label: const Text('Continue with Google'),
+                            label: Text(strings.continueWithGoogle),
                           ),
                           const SizedBox(height: 12),
                           // TODO: Enable Apple sign-in after Apple Developer and
@@ -166,7 +169,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           OutlinedButton.icon(
                             onPressed: null,
                             icon: const Icon(Icons.apple),
-                            label: const Text('Continue with Apple'),
+                            label: Text(strings.continueWithApple),
                           ),
                           const SizedBox(height: 20),
                           Row(
@@ -177,7 +180,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                   horizontal: 12,
                                 ),
                                 child: Text(
-                                  'or',
+                                  strings.or,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: _muted,
                                   ),
@@ -199,7 +202,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     });
                                   },
                             icon: const Icon(Icons.mail_outline),
-                            label: const Text('Continue with email'),
+                            label: Text(strings.continueWithEmail),
                           ),
                         ] else if (_hasSentEmailLink) ...[
                           Align(
@@ -208,7 +211,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               onPressed: _isEmailSending
                                   ? null
                                   : _returnToSignIn,
-                              child: const Text('Cancel'),
+                              child: Text(strings.cancel),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -221,7 +224,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            'Check your email',
+                            strings.checkYourEmail,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.headlineSmall?.copyWith(
                               color: _ink,
@@ -230,7 +233,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'We sent a secure sign-in link to',
+                            strings.secureLinkSentTo,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               color: _muted,
@@ -247,7 +250,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Open the link on this device to continue.',
+                            strings.openLinkOnDevice,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: _muted,
@@ -263,7 +266,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text('Resend link'),
+                                : Text(strings.resendLink),
                           ),
                           const SizedBox(height: 6),
                           TextButton(
@@ -277,7 +280,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                       _errorMessage = null;
                                     });
                                   },
-                            child: const Text('Use a different email'),
+                            child: Text(strings.useDifferentEmail),
                           ),
                         ] else ...[
                           Align(
@@ -287,14 +290,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                   ? null
                                   : _returnToSignIn,
                               icon: const Icon(Icons.chevron_left),
-                              label: const Text('Back'),
+                              label: Text(strings.back),
                             ),
                           ),
                           const SizedBox(height: 8),
                           const Center(child: FiScoreAuthBrand(width: 285)),
                           const SizedBox(height: 30),
                           Text(
-                            'Sign in with email',
+                            strings.signInWithEmail,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.headlineSmall?.copyWith(
                               color: _ink,
@@ -303,7 +306,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'We will email you a secure sign-in link. No password required.',
+                            strings.emailSignInHelp,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               color: _muted,
@@ -317,9 +320,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             autofillHints: const [AutofillHints.email],
                             textInputAction: TextInputAction.done,
                             onSubmitted: (_) => _sendEmailLink(),
-                            decoration: const InputDecoration(
-                              labelText: 'Email address',
-                              hintText: 'name@example.com',
+                            decoration: InputDecoration(
+                              labelText: strings.emailAddress,
+                              hintText: strings.emailAddressHint,
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -335,7 +338,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     ),
                                   )
                                 : const Icon(Icons.mail_outline),
-                            label: const Text('Email me a sign-in link'),
+                            label: Text(strings.emailMeSignInLink),
                           ),
                         ],
                         if (_errorMessage != null) ...[

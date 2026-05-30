@@ -42,17 +42,18 @@ class _TrainingAssignViewState extends State<_TrainingAssignView> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextButton.icon(
           onPressed: widget.onBack,
           icon: const Icon(Icons.chevron_left),
-          label: const Text('Back to training'),
+          label: Text(strings.backToTraining),
         ),
         const SizedBox(height: 4),
         Text(
-          'Assign training',
+          strings.assignTraining,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w800,
@@ -61,8 +62,8 @@ class _TrainingAssignViewState extends State<_TrainingAssignView> {
         const SizedBox(height: 5),
         Text(
           _libraryView == 'my'
-              ? 'Choose coaching from your library, then assign it.'
-              : 'Add curated FiScore training to your team library.',
+              ? strings.assignTrainingMyHelp
+              : strings.assignTrainingExploreHelp,
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: _muted),
@@ -75,17 +76,20 @@ class _TrainingAssignViewState extends State<_TrainingAssignView> {
         TextField(
           controller: _searchController,
           onChanged: (value) => setState(() => _query = value.trim()),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search),
-            hintText: 'Search training',
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            hintText: strings.searchTraining,
           ),
         ),
         const SizedBox(height: 16),
         SegmentedButton<String>(
           expandedInsets: EdgeInsets.zero,
-          segments: const [
-            ButtonSegment(value: 'my', label: Text('My Library')),
-            ButtonSegment(value: 'explore', label: Text('Explore FiScore')),
+          segments: [
+            ButtonSegment(value: 'my', label: Text(strings.myLibrary)),
+            ButtonSegment(
+              value: 'explore',
+              label: Text(strings.exploreFiScore),
+            ),
           ],
           selected: {_libraryView},
           onSelectionChanged: (value) =>
@@ -161,6 +165,7 @@ class _TrainingTeamProgressViewState extends State<_TrainingTeamProgressView> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: widget.repository.historyAssignmentsStream(
         tenantId: widget.tenantId,
@@ -201,11 +206,11 @@ class _TrainingTeamProgressViewState extends State<_TrainingTeamProgressView> {
             TextButton.icon(
               onPressed: widget.onBack,
               icon: const Icon(Icons.chevron_left),
-              label: const Text('Back to training'),
+              label: Text(strings.backToTraining),
             ),
             const SizedBox(height: 4),
             Text(
-              'Team progress',
+              strings.teamProgress,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: _ink,
                 fontWeight: FontWeight.w800,
@@ -213,7 +218,7 @@ class _TrainingTeamProgressViewState extends State<_TrainingTeamProgressView> {
             ),
             const SizedBox(height: 5),
             Text(
-              '$open open  |  $overdue overdue  |  $completed done',
+              strings.teamProgressSummary(open, overdue, completed),
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: _muted),
@@ -222,9 +227,9 @@ class _TrainingTeamProgressViewState extends State<_TrainingTeamProgressView> {
             Row(
               children: [
                 for (final option in [
-                  ('open', 'Open'),
-                  ('overdue', 'Overdue'),
-                  ('completed', 'Done'),
+                  ('open', strings.openStatus),
+                  ('overdue', strings.overdue),
+                  ('completed', strings.done),
                 ]) ...[
                   Expanded(
                     child: Padding(
@@ -238,25 +243,25 @@ class _TrainingTeamProgressViewState extends State<_TrainingTeamProgressView> {
                   ),
                 ],
                 PopupMenuButton<String>(
-                  tooltip: 'More filters',
+                  tooltip: strings.moreFilters,
                   icon: const Icon(Icons.filter_list_outlined, color: _navy),
                   onSelected: (value) => setState(() => _filter = value),
                   itemBuilder: (context) => [
                     PopupMenuItem(
                       value: 'cancelled',
-                      child: Text('Cancelled ($cancelled)'),
+                      child: Text(strings.cancelledCount(cancelled)),
                     ),
-                    const PopupMenuItem(value: 'all', child: Text('All')),
+                    PopupMenuItem(value: 'all', child: Text(strings.all)),
                   ],
                 ),
               ],
             ),
             const SizedBox(height: 14),
             if (visible.isEmpty)
-              const _EmptyStateCard(
+              _EmptyStateCard(
                 icon: Icons.check_circle_outline,
-                title: 'Nothing in this view',
-                body: 'There are no training assignments to follow up on.',
+                title: strings.nothingInThisView,
+                body: strings.noTrainingAssignmentsToFollowUp,
               )
             else ...[
               for (final doc in visible)
@@ -276,7 +281,7 @@ class _TrainingTeamProgressViewState extends State<_TrainingTeamProgressView> {
                 Center(
                   child: TextButton(
                     onPressed: widget.onLoadMore,
-                    child: const Text('Load more assignments'),
+                    child: Text(strings.loadMoreAssignments),
                   ),
                 ),
               if ((_filter == 'open' || _filter == 'overdue') &&
@@ -284,7 +289,7 @@ class _TrainingTeamProgressViewState extends State<_TrainingTeamProgressView> {
                 Center(
                   child: TextButton(
                     onPressed: widget.onLoadMoreActive,
-                    child: const Text('Load more active assignments'),
+                    child: Text(strings.loadMoreActiveAssignments),
                   ),
                 ),
             ],
@@ -365,6 +370,7 @@ class _TrainingLibraryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: repository.trainingsStream(tenantId),
       builder: (context, snapshot) {
@@ -389,10 +395,10 @@ class _TrainingLibraryList extends StatelessWidget {
                 ),
               );
         if (trainings.isEmpty && searchText.isNotEmpty) {
-          return const _EmptyStateCard(
+          return _EmptyStateCard(
             icon: Icons.search_off_outlined,
-            title: 'No matching training',
-            body: 'Try a different search term.',
+            title: strings.noMatchingTraining,
+            body: strings.tryDifferentSearchTerm,
           );
         }
         if (trainings.isEmpty) {
@@ -407,7 +413,7 @@ class _TrainingLibraryList extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'No training in My Library',
+                  strings.noTrainingInMyLibrary,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: _ink,
                     fontWeight: FontWeight.w800,
@@ -415,7 +421,7 @@ class _TrainingLibraryList extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Explore FiScore Library to add coaching for your team.',
+                  strings.exploreTrainingLibraryHelp,
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: _muted),
@@ -424,7 +430,7 @@ class _TrainingLibraryList extends StatelessWidget {
                 TextButton.icon(
                   onPressed: onExplore,
                   icon: const Icon(Icons.explore_outlined, size: 18),
-                  label: const Text('Explore FiScore Library'),
+                  label: Text(strings.exploreFiScoreLibrary),
                 ),
               ],
             ),
@@ -459,6 +465,7 @@ class _FiScoreTrainingLibraryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: repository.fiScoreLibraryTrainings(tenantId),
       builder: (context, snapshot) {
@@ -466,10 +473,10 @@ class _FiScoreTrainingLibraryList extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return const _EmptyStateCard(
+          return _EmptyStateCard(
             icon: Icons.error_outline,
-            title: 'Could not load FiScore Library',
-            body: 'Please try again shortly.',
+            title: strings.couldNotLoadFiScoreLibrary,
+            body: strings.pleaseTryAgainShortly,
           );
         }
         final query = searchText.trim().toLowerCase();
@@ -480,10 +487,10 @@ class _FiScoreTrainingLibraryList extends StatelessWidget {
           return query.isEmpty || text.contains(query);
         }).toList();
         if (trainings.isEmpty) {
-          return const _EmptyStateCard(
+          return _EmptyStateCard(
             icon: Icons.search_off_outlined,
-            title: 'No matching training',
-            body: 'Try another search term.',
+            title: strings.noMatchingTraining,
+            body: strings.tryDifferentSearchTerm,
           );
         }
         return Column(
@@ -492,10 +499,10 @@ class _FiScoreTrainingLibraryList extends StatelessWidget {
               _TrainingLibraryCard(
                 training: training,
                 actionLabel: training['updateAvailable'] == true
-                    ? 'Update'
+                    ? strings.update
                     : training['inMyLibrary'] == true
-                    ? 'Added'
-                    : 'Add',
+                    ? strings.added
+                    : strings.add,
                 actionEnabled:
                     training['inMyLibrary'] != true ||
                     training['updateAvailable'] == true,
@@ -549,16 +556,20 @@ class _TrainingLibraryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     final isLibraryItem =
         training['trainingSource'] == 'library_synced' ||
         training['libraryTrainingId'] != null;
     final updateAvailable = training['updateAvailable'] == true;
     final sourceLabel = isLibraryItem
-        ? 'FiScore Library'
-        : 'Created by your team';
+        ? strings.exploreFiScoreLibrary
+        : strings.createdByYourTeam;
     final durationMinutes = training['durationMinutes'] as int? ?? 0;
     final contentLabel =
-        training['mediaSummary'] as String? ?? 'Micro-learning';
+        training['mediaSummary'] as String? ?? strings.microLearning;
+    final effectiveActionLabel = actionLabel == 'Assign'
+        ? strings.assign
+        : actionLabel;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -589,7 +600,7 @@ class _TrainingLibraryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '$sourceLabel  |  $durationMinutes min  |  $contentLabel',
+                  '$sourceLabel  |  $durationMinutes ${strings.minUnit}  |  $contentLabel',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: _muted,
                     fontWeight: FontWeight.w600,
@@ -604,14 +615,14 @@ class _TrainingLibraryCard extends StatelessWidget {
                       : Icons.add_circle_outline,
                   size: 18,
                 ),
-                label: Text(actionLabel),
+                label: Text(effectiveActionLabel),
               ),
             ],
           ),
           if (updateAvailable && actionLabel == 'Assign') ...[
             const SizedBox(height: 6),
             Text(
-              'Update available in FiScore Library',
+              strings.updateAvailableInFiScoreLibrary,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: const Color(0xFF2859C5),
                 fontWeight: FontWeight.w700,
@@ -637,13 +648,15 @@ class _TrainingAssignmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     final status = assignment['status'] as String? ?? 'assigned';
-    final title = assignment['trainingTitleSnapshot'] as String? ?? 'Training';
+    final title =
+        assignment['trainingTitleSnapshot'] as String? ?? strings.trainingLabel;
     final assignee =
-        assignment['assignedToNameSnapshot'] as String? ?? 'Team member';
+        assignment['assignedToNameSnapshot'] as String? ?? strings.teamMember;
     final assignmentDateLabel = status == 'completed'
-        ? _trainingCompletionLabel(assignment['completedAt'])
-        : _trainingDueLabel(assignment['dueDate']);
+        ? _trainingCompletionLabel(assignment['completedAt'], strings)
+        : _trainingDueLabel(assignment['dueDate'], strings);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -683,15 +696,15 @@ class _TrainingAssignmentCard extends StatelessWidget {
             _TrainingStatusPill(status: status),
             if (onCancel != null)
               PopupMenuButton<String>(
-                tooltip: 'Assignment actions',
+                tooltip: strings.assignmentActions,
                 icon: const Icon(Icons.more_horiz, size: 20, color: _muted),
                 onSelected: (value) {
                   if (value == 'cancel') onCancel!();
                 },
-                itemBuilder: (context) => const [
+                itemBuilder: (context) => [
                   PopupMenuItem(
                     value: 'cancel',
-                    child: Text('Cancel assignment'),
+                    child: Text(strings.cancelAssignment),
                   ),
                 ],
               )
@@ -706,10 +719,10 @@ class _TrainingAssignmentCard extends StatelessWidget {
   }
 }
 
-String _trainingCompletionLabel(Object? value) {
-  if (value is! Timestamp) return 'Completed';
+String _trainingCompletionLabel(Object? value, AppLocalizations strings) {
+  if (value is! Timestamp) return strings.completedLabel;
   final date = value.toDate();
-  return 'Completed ${date.month}/${date.day}/${date.year}';
+  return strings.completedShortDate('${date.month}/${date.day}/${date.year}');
 }
 
 class _TrainingPill extends StatelessWidget {

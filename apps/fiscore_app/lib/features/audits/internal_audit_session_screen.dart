@@ -94,23 +94,26 @@ class _InternalAuditSessionViewState extends State<_InternalAuditSessionView> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt_outlined),
-              title: const Text('Take photo'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose photo'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
+      builder: (context) {
+        final strings = AppLocalizations.of(context);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: Text(strings.takePhoto),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: Text(strings.choosePhoto),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        );
+      },
     );
     if (source == null) return;
     try {
@@ -331,7 +334,7 @@ class _InternalAuditSessionViewState extends State<_InternalAuditSessionView> {
                 ],
                 if (!canContinue && currentSection != null) ...[
                   Text(
-                    'You can continue now and finish open items from review.',
+                    AppLocalizations.of(context).continueAndFinishFromReview,
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: _muted),
@@ -346,12 +349,12 @@ class _InternalAuditSessionViewState extends State<_InternalAuditSessionView> {
                           () => _sectionIndex = safeSectionIndex - 1,
                         ),
                         icon: const Icon(Icons.chevron_left),
-                        label: const Text('Previous'),
+                        label: Text(AppLocalizations.of(context).previous),
                       )
                     else
                       TextButton(
                         onPressed: widget.onBack,
-                        child: const Text('Save & exit'),
+                        child: Text(AppLocalizations.of(context).saveAndExit),
                       ),
                     const Spacer(),
                     FilledButton.icon(
@@ -377,10 +380,10 @@ class _InternalAuditSessionViewState extends State<_InternalAuditSessionView> {
                       ),
                       label: Text(
                         _returnToReviewAfterEdit
-                            ? 'Done'
+                            ? AppLocalizations.of(context).done
                             : safeSectionIndex + 1 < sections.length
-                            ? 'Next'
-                            : 'Review',
+                            ? AppLocalizations.of(context).next
+                            : AppLocalizations.of(context).review,
                       ),
                     ),
                   ],
@@ -388,7 +391,7 @@ class _InternalAuditSessionViewState extends State<_InternalAuditSessionView> {
                 const SizedBox(height: 8),
                 Center(
                   child: Text(
-                    'Responses save automatically.',
+                    AppLocalizations.of(context).responsesSaveAutomatically,
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: _muted),
@@ -472,7 +475,7 @@ class _AuditObservationSheetState extends State<_AuditObservationSheet> {
               child: FilledButton(
                 onPressed: () =>
                     Navigator.pop(context, _controller.text.trim()),
-                child: const Text('Save'),
+                child: Text(AppLocalizations.of(context).save),
               ),
             ),
           ],
@@ -533,10 +536,19 @@ class _InternalQuestionCard extends StatelessWidget {
           const SizedBox(height: 10),
           SegmentedButton<String>(
             showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'pass', label: Text('Pass')),
-              ButtonSegment(value: 'needs_attention', label: Text('Attention')),
-              ButtonSegment(value: 'not_applicable', label: Text('N/A')),
+            segments: [
+              ButtonSegment(
+                value: 'pass',
+                label: Text(AppLocalizations.of(context).pass),
+              ),
+              ButtonSegment(
+                value: 'needs_attention',
+                label: Text(AppLocalizations.of(context).attention),
+              ),
+              ButtonSegment(
+                value: 'not_applicable',
+                label: Text(AppLocalizations.of(context).notApplicable),
+              ),
             ],
             selected: answer == null ? {} : {answer},
             emptySelectionAllowed: true,
@@ -547,7 +559,7 @@ class _InternalQuestionCard extends StatelessWidget {
           const SizedBox(height: 10),
           if (failed && note.isEmpty)
             Text(
-              'Describe this issue before submitting.',
+              AppLocalizations.of(context).describeIssueBeforeSubmitting,
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: const Color(0xFFB42318)),

@@ -24,10 +24,11 @@ class _EmailLinkCompletionScreenState
   }
 
   Future<void> _completeSignIn() async {
+    final strings = AppLocalizations.of(context);
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       setState(() {
-        _errorMessage = 'Enter the email address that received this link.';
+        _errorMessage = strings.checkInformationAndTryAgain;
       });
       return;
     }
@@ -45,15 +46,12 @@ class _EmailLinkCompletionScreenState
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            error.message ??
-            'This link could not be used. Request a new sign-in email.';
+        _errorMessage = error.message ?? strings.emailLinkCouldNotBeUsed;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            'This link could not be used. Request a new sign-in email.';
+        _errorMessage = strings.emailLinkCouldNotBeUsed;
       });
     } finally {
       if (mounted) {
@@ -67,6 +65,7 @@ class _EmailLinkCompletionScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -98,7 +97,7 @@ class _EmailLinkCompletionScreenState
                         const Center(child: FiScoreAuthBrand(width: 285)),
                         const SizedBox(height: 30),
                         Text(
-                          'Confirm your email',
+                          strings.confirmYourEmail,
                           textAlign: TextAlign.center,
                           style: theme.textTheme.headlineSmall?.copyWith(
                             color: _ink,
@@ -107,7 +106,7 @@ class _EmailLinkCompletionScreenState
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'For security, enter the email address that received this sign-in link.',
+                          strings.confirmEmailLinkHelp,
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: _muted,
@@ -121,9 +120,9 @@ class _EmailLinkCompletionScreenState
                           autofillHints: const [AutofillHints.email],
                           textInputAction: TextInputAction.done,
                           onSubmitted: (_) => _completeSignIn(),
-                          decoration: const InputDecoration(
-                            labelText: 'Email address',
-                            hintText: 'name@example.com',
+                          decoration: InputDecoration(
+                            labelText: strings.emailAddress,
+                            hintText: strings.emailAddressHint,
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -136,7 +135,7 @@ class _EmailLinkCompletionScreenState
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Continue'),
+                              : Text(strings.continueAction),
                         ),
                         if (_errorMessage != null) ...[
                           const SizedBox(height: 16),

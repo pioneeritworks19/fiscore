@@ -21,6 +21,7 @@ class _InternalAuditReview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     final failures = questions
         .where(
           (question) =>
@@ -50,10 +51,10 @@ class _InternalAuditReview extends StatelessWidget {
         TextButton.icon(
           onPressed: onBack,
           icon: const Icon(Icons.chevron_left),
-          label: const Text('Back to last section'),
+          label: Text(strings.backToLastSection),
         ),
         Text(
-          'Review checklist',
+          strings.reviewChecklist,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w800,
@@ -326,10 +327,10 @@ class _InternalAuditSubmitConfirmation extends StatelessWidget {
         TextButton.icon(
           onPressed: isSubmitting ? null : onBack,
           icon: const Icon(Icons.chevron_left),
-          label: const Text('Back to review'),
+          label: Text(AppLocalizations.of(context).backToReview),
         ),
         Text(
-          'Submit check',
+          AppLocalizations.of(context).submitCheck,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w800,
@@ -337,7 +338,8 @@ class _InternalAuditSubmitConfirmation extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          audit['templateNameSnapshot'] as String? ?? 'Internal check',
+          audit['templateNameSnapshot'] as String? ??
+              AppLocalizations.of(context).sourceInternalCheck,
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: _muted),

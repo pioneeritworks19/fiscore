@@ -628,9 +628,104 @@ const createSite = onCall({ region }, async (request) => {
   return { siteId: siteRef.id };
 });
 
+const updateManualSite = onCall({ region }, async (request) => {
+  const auth = requireAuth(request);
+  const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
+  const siteId = cleanString(request.data?.siteId, "Site ID", 160);
+  const siteName = cleanString(request.data?.siteName, "Site name", 120);
+  const addressLine1 = cleanString(request.data?.addressLine1, "Address", 160);
+  const city = cleanString(request.data?.city, "City", 80);
+  const state = cleanString(request.data?.state, "State", 40);
+  const postalCode = cleanString(request.data?.postalCode, "ZIP code", 20);
+  const siteType = cleanString(request.data?.siteType || "restaurant", "Site type", 40);
+  const phone =
+    typeof request.data?.phone === "string" ? request.data.phone.trim() : "";
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await requireTenantRole(tenantId, auth.uid, tenantAdminRoles);
+
+  const siteRef = db.doc(`tenants/${tenantId}/sites/${siteId}`);
+  const siteSnap = await siteRef.get();
+  if (!siteSnap.exists || siteSnap.data().status !== "active") {
+    throw new HttpsError("not-found", "Active site was not found.");
+  }
+
+  const site = siteSnap.data();
+  const isManualSite =
+    site.manuallyCreated === true ||
+    (site.linkStatus === "manual_unlinked" && !safeText(site.masterRestaurantId));
+  if (!isManualSite) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Only manually created sites can be edited from the admin console.",
+    );
+  }
+
+  await siteRef.update({
+    name: siteName,
+    addressLine1,
+    city,
+    state,
+    postalCode,
+    phone: phone || null,
+    siteType,
+    updatedBy: auth.uid,
+    updatedAt: now,
+  });
+
+  return { siteId };
+});
+
+const deleteSite = onCall({ region }, async (request) => {
+  const auth = requireAuth(request);
+  const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
+  const siteId = cleanString(request.data?.siteId, "Site ID", 160);
+  const confirmation = safeText(request.data?.confirmation);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  if (confirmation !== "DELETE") {
+    throw new HttpsError("invalid-argument", "Type DELETE to confirm site deletion.");
+  }
+
+  await requireTenantRole(tenantId, auth.uid, tenantAdminRoles);
+
+  const tenantRef = db.doc(`tenants/${tenantId}`);
+  const siteRef = tenantRef.collection("sites").doc(siteId);
+  const siteSnap = await siteRef.get();
+  if (!siteSnap.exists) {
+    throw new HttpsError("not-found", "Site was not found.");
+  }
+
+  const site = siteSnap.data();
+  await storageBucket().deleteFiles({
+    prefix: `tenants/${tenantId}/sites/${siteId}/`,
+    force: true,
+  }).catch((error) => {
+    console.warn("Could not delete all site storage files", {
+      tenantId,
+      siteId,
+      error,
+    });
+  });
+
+  await db.recursiveDelete(siteRef);
+
+  if (site.status === "active") {
+    await tenantRef.update({
+      activeSiteCount: admin.firestore.FieldValue.increment(-1),
+      updatedBy: auth.uid,
+      updatedAt: now,
+    });
+  }
+
+  return { tenantId, siteId };
+});
+
 module.exports = {
   searchMasterRestaurants,
   linkMasterRestaurantSite,
   syncLinkedSiteMasterData,
   createSite,
+  updateManualSite,
+  deleteSite,
 };

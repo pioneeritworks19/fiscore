@@ -47,20 +47,21 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
       : const ['manager', 'auditor', 'staff'];
 
   Future<void> _sendInvite() async {
+    final strings = AppLocalizations.of(context);
     final email = _emailController.text.trim().toLowerCase();
     final siteIds = _siteAccessMode == 'selected'
         ? _selectedSiteIds.toList()
         : <String>[];
     if (email.isEmpty || !email.contains('@')) {
       setState(() {
-        _error = 'Enter a valid staff email.';
+        _error = strings.enterValidStaffEmail;
         _message = null;
       });
       return;
     }
     if (_siteAccessMode == 'selected' && siteIds.isEmpty) {
       setState(() {
-        _error = 'Choose at least one site for this invite.';
+        _error = strings.chooseAtLeastOneSiteForInvite;
         _message = null;
       });
       return;
@@ -83,7 +84,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
       await _authService.sendEmailSignInLink(email);
       if (!mounted) return;
       setState(() {
-        _message = 'Invite sent to $email.';
+        _message = strings.inviteSentTo(email);
         _emailController.clear();
         _selectedRole = 'staff';
         _siteAccessMode = 'all';
@@ -97,14 +98,16 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       setState(() {
-        _error =
-            'Invite saved, but the email could not be sent. ${error.message ?? ''}'
-                .trim();
+        final detail = error.message ?? '';
+        _error = [
+          strings.inviteSavedEmailFailed,
+          detail,
+        ].where((part) => part.trim().isNotEmpty).join(' ');
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not create the invite. Please try again.';
+        _error = strings.couldNotCreateInvite;
       });
     } finally {
       if (mounted) {
@@ -116,6 +119,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
   }
 
   Future<void> _resendInviteLink(String email) async {
+    final strings = AppLocalizations.of(context);
     setState(() {
       _message = null;
       _error = null;
@@ -124,28 +128,29 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
       await _authService.sendEmailSignInLink(email);
       if (!mounted) return;
       setState(() {
-        _message = 'Sign-in link resent to $email.';
+        _message = strings.signInLinkResentTo(email);
       });
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = error.message ?? 'Could not resend the sign-in link.';
+        _error = error.message ?? strings.couldNotResendSignInLink;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not resend the sign-in link.';
+        _error = strings.couldNotResendSignInLink;
       });
     }
   }
 
   Future<void> _cancelInvite(String inviteId, String email) async {
+    final strings = AppLocalizations.of(context);
     final confirmed = await _confirmTeamAction(
       context,
-      title: 'Cancel invitation?',
-      body: '$email will no longer be able to join using this invitation.',
-      actionLabel: 'Cancel invite',
-      dismissLabel: 'Keep invitation',
+      title: strings.cancelInvitationQuestion,
+      body: strings.cancelInvitationBody(email),
+      actionLabel: strings.cancelInvite,
+      dismissLabel: strings.keepInvitation,
     );
     if (!confirmed || !mounted) return;
 
@@ -161,7 +166,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
       );
       if (!mounted) return;
       setState(() {
-        _message = 'Invitation canceled for $email.';
+        _message = strings.invitationCanceledFor(email);
       });
     } on AppException catch (error) {
       if (!mounted) return;
@@ -178,13 +183,13 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
   }
 
   Future<void> _deactivateMember(String userId, String name) async {
+    final strings = AppLocalizations.of(context);
     final confirmed = await _confirmTeamAction(
       context,
-      title: 'Deactivate $name?',
-      body:
-          'They will lose access to this workspace. Their past activity will remain visible.',
-      actionLabel: 'Deactivate',
-      dismissLabel: 'Keep access',
+      title: strings.deactivateMemberQuestion(name),
+      body: strings.deactivateMemberBody,
+      actionLabel: strings.deactivate,
+      dismissLabel: strings.keepAccess,
     );
     if (!confirmed || !mounted) return;
 
@@ -200,7 +205,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
       );
       if (!mounted) return;
       setState(() {
-        _message = '$name has been deactivated.';
+        _message = strings.memberDeactivated(name);
       });
     } on AppException catch (error) {
       if (!mounted) return;
@@ -220,9 +225,10 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
     String userId,
     Map<String, dynamic> member,
   ) async {
+    final strings = AppLocalizations.of(context);
     final update = await _showTeamAccessEditor(
       context,
-      title: 'Edit ${_displayTeamName(member)}',
+      title: strings.editMember(_displayTeamName(member)),
       subtitle: member['emailSnapshot'] as String? ?? '',
       data: member,
       sites: widget.sites,
@@ -244,7 +250,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
       );
       if (!mounted) return;
       setState(() {
-        _message = 'Access updated for ${_displayTeamName(member)}.';
+        _message = strings.accessUpdatedFor(_displayTeamName(member));
       });
     } on AppException catch (error) {
       if (!mounted) return;
@@ -264,10 +270,11 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
     String inviteId,
     Map<String, dynamic> invite,
   ) async {
-    final email = invite['email'] as String? ?? 'this teammate';
+    final strings = AppLocalizations.of(context);
+    final email = invite['email'] as String? ?? strings.teamMember;
     final update = await _showTeamAccessEditor(
       context,
-      title: 'Edit invitation',
+      title: strings.editInvitation,
       subtitle: email,
       data: invite,
       sites: widget.sites,
@@ -289,7 +296,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
       );
       if (!mounted) return;
       setState(() {
-        _message = 'Invitation updated for $email.';
+        _message = strings.invitationUpdatedFor(email);
       });
     } on AppException catch (error) {
       if (!mounted) return;
@@ -308,6 +315,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,11 +323,11 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
         TextButton.icon(
           onPressed: widget.onBack,
           icon: const Icon(Icons.chevron_left),
-          label: const Text('Back to more'),
+          label: Text(strings.backToMore),
         ),
         const SizedBox(height: 8),
         Text(
-          'Team',
+          strings.team,
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w800,
             color: _ink,
@@ -327,7 +335,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Invite staff and control which sites they can access.',
+          strings.teamIntro,
           style: theme.textTheme.bodyLarge?.copyWith(
             color: _muted,
             height: 1.45,
@@ -385,6 +393,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
 
   Widget _inviteTeamCard() {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -396,7 +405,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Invite teammate',
+            strings.inviteTeammate,
             style: theme.textTheme.titleMedium?.copyWith(
               color: _ink,
               fontWeight: FontWeight.w800,
@@ -408,9 +417,9 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              hintText: 'name@example.com',
+            decoration: InputDecoration(
+              labelText: strings.email,
+              hintText: strings.emailAddressHint,
             ),
           ),
           _reactivationNotice(),
@@ -418,7 +427,7 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
           DropdownButtonFormField<String>(
             key: ValueKey(_selectedRole),
             initialValue: _selectedRole,
-            decoration: const InputDecoration(labelText: 'Role'),
+            decoration: InputDecoration(labelText: strings.role),
             items: _assignableRoles
                 .map(
                   (role) => DropdownMenuItem(
@@ -443,9 +452,9 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
           const SizedBox(height: 12),
           if (_selectedRole != 'admin')
             SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'all', label: Text('All sites')),
-                ButtonSegment(value: 'selected', label: Text('Selected')),
+              segments: [
+                ButtonSegment(value: 'all', label: Text(strings.allSites)),
+                ButtonSegment(value: 'selected', label: Text(strings.selected)),
               ],
               selected: {_siteAccessMode},
               onSelectionChanged: (selection) {
@@ -489,7 +498,9 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.send_outlined),
-              label: Text(_isInviting ? 'Creating invite...' : 'Send invite'),
+              label: Text(
+                _isInviting ? strings.creatingInvite : strings.sendInvite,
+              ),
             ),
           ),
         ],
@@ -1001,19 +1012,19 @@ class _TeamPersonRow extends StatelessWidget {
                     ),
                   ),
                 if (invited && email != null && onResendInvite != null)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'resend',
-                    child: Text('Resend invite link'),
+                    child: Text(AppLocalizations.of(context).resendInviteLink),
                   ),
                 if (invited && onCancelInvite != null)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'cancel',
-                    child: Text('Cancel invite'),
+                    child: Text(AppLocalizations.of(context).cancelInvite),
                   ),
                 if (!invited && onDeactivate != null)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'deactivate',
-                    child: Text('Deactivate access'),
+                    child: Text(AppLocalizations.of(context).deactivateAccess),
                   ),
               ],
             ),
@@ -1213,9 +1224,15 @@ Future<_TeamAccessUpdate?> _showTeamAccessEditor(
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'all', label: Text('All sites')),
-                    ButtonSegment(value: 'selected', label: Text('Selected')),
+                  segments: [
+                    ButtonSegment(
+                      value: 'all',
+                      label: Text(AppLocalizations.of(context).allSites),
+                    ),
+                    ButtonSegment(
+                      value: 'selected',
+                      label: Text(AppLocalizations.of(context).selected),
+                    ),
                   ],
                   selected: {siteAccessMode},
                   onSelectionChanged: (selection) {
@@ -1285,14 +1302,14 @@ Future<_TeamAccessUpdate?> _showTeamAccessEditor(
                       ),
                     );
                   },
-                  child: const Text('Save changes'),
+                  child: Text(AppLocalizations.of(context).saveChanges),
                 ),
               ),
               SizedBox(
                 width: double.infinity,
                 child: TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child: Text(AppLocalizations.of(context).cancel),
                 ),
               ),
             ],

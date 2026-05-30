@@ -118,8 +118,10 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Could not update the Training library.'),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context).couldNotUpdateTrainingLibrary,
+            ),
           ),
         );
     } finally {
@@ -271,7 +273,7 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
         TextButton.icon(
           onPressed: widget.onBack,
           icon: const Icon(Icons.chevron_left),
-          label: const Text('Back to training'),
+          label: Text(AppLocalizations.of(context).backToTraining),
         ),
         const SizedBox(height: 6),
         ...children,
@@ -305,15 +307,15 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
             icon: Icons.info_outline,
             color: _navy,
             text: widget.canManage
-                ? 'This assignment uses content that is not currently in My Library. Add its FiScore lesson, then reopen it or assign a new version.'
-                : 'This training is not available yet. Please contact your manager.',
+                ? AppLocalizations.of(context).trainingUnavailableManagerHelp
+                : AppLocalizations.of(context).trainingUnavailableStaffHelp,
           ),
           if (widget.canManage) ...[
             const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: _isLoading ? null : _updateTrainingContent,
               icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Add lesson to My Library'),
+              label: Text(AppLocalizations.of(context).addLessonToMyLibrary),
             ),
           ],
         ],
@@ -341,22 +343,26 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
           children: [
             _TrainingPill(
               label:
-                  '${widget.assignment['durationMinutes'] ?? _sections.length} min',
+                  '${widget.assignment['durationMinutes'] ?? _sections.length} ${AppLocalizations.of(context).minUnit}',
             ),
             const SizedBox(width: 8),
-            _TrainingPill(label: '${_questions.length} question check'),
+            _TrainingPill(
+              label: AppLocalizations.of(
+                context,
+              ).questionCheck(_questions.length),
+            ),
           ],
         ),
         if (linkedTitle != null && linkedTitle.isNotEmpty) ...[
           const SizedBox(height: 18),
           _TrainingInfoBlock(
-            title: 'Assigned for follow-up',
+            title: AppLocalizations.of(context).assignedForFollowUp,
             body: linkedTitle,
           ),
         ],
         const SizedBox(height: 18),
         _TrainingInfoBlock(
-          title: 'You will cover',
+          title: AppLocalizations.of(context).youWillCover,
           body: _sections
               .map((section) => section['title'] as String? ?? '')
               .where((title) => title.isNotEmpty)
@@ -369,15 +375,17 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
             child: FilledButton.icon(
               onPressed: _sections.isEmpty ? null : _start,
               icon: const Icon(Icons.play_arrow),
-              label: const Text('Start training'),
+              label: Text(AppLocalizations.of(context).startTraining),
             ),
           )
         else
           _StatusMessage(
             icon: Icons.info_outline,
             color: _navy,
-            text:
-                'Assigned to ${widget.assignment['assignedToNameSnapshot'] ?? 'team member'}.',
+            text: AppLocalizations.of(context).assignedToName(
+              widget.assignment['assignedToNameSnapshot'] as String? ??
+                  AppLocalizations.of(context).teamMember,
+            ),
           ),
       ],
     );
@@ -426,16 +434,19 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
           ),
         const SizedBox(height: 24),
         if (pendingRequiredMedia.isNotEmpty) ...[
-          const _StatusMessage(
+          _StatusMessage(
             icon: Icons.play_circle_outline,
             color: _navy,
-            text: 'Watch the required video to continue.',
+            text: AppLocalizations.of(context).watchRequiredVideo,
           ),
           const SizedBox(height: 12),
         ],
         Row(
           children: [
-            TextButton(onPressed: _previousPage, child: const Text('Previous')),
+            TextButton(
+              onPressed: _previousPage,
+              child: Text(AppLocalizations.of(context).previous),
+            ),
             const Spacer(),
             FilledButton.icon(
               onPressed: _isSaving || pendingRequiredMedia.isNotEmpty
@@ -445,9 +456,9 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
               label: Text(
                 _page == _sections.length
                     ? _questions.isNotEmpty
-                          ? 'Quick check'
-                          : 'Complete'
-                    : 'Next',
+                          ? AppLocalizations.of(context).quickCheck
+                          : AppLocalizations.of(context).complete
+                    : AppLocalizations.of(context).next,
               ),
             ),
           ],
@@ -464,7 +475,9 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
       context,
       children: [
         Text(
-          'Quick check $questionNumber of ${_questions.length}',
+          AppLocalizations.of(
+            context,
+          ).quickCheckProgress(questionNumber, _questions.length),
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
             color: _muted,
             fontWeight: FontWeight.w700,
@@ -520,7 +533,10 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
         const SizedBox(height: 18),
         Row(
           children: [
-            TextButton(onPressed: _previousPage, child: const Text('Previous')),
+            TextButton(
+              onPressed: _previousPage,
+              child: Text(AppLocalizations.of(context).previous),
+            ),
             const Spacer(),
             FilledButton(
               onPressed: _isSaving || _selectedAnswer == null
@@ -528,10 +544,10 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
                   : () => _checkAnswer(question),
               child: Text(
                 !_answerChecked
-                    ? 'Check answer'
+                    ? AppLocalizations.of(context).checkAnswer
                     : questionNumber == _questions.length
-                    ? 'Finish'
-                    : 'Continue',
+                    ? AppLocalizations.of(context).finish
+                    : AppLocalizations.of(context).continueAction,
               ),
             ),
           ],
@@ -558,7 +574,7 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
         const Icon(Icons.check_circle_outline, color: _green, size: 34),
         const SizedBox(height: 12),
         Text(
-          'Training complete',
+          AppLocalizations.of(context).trainingComplete,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w800,
@@ -573,20 +589,20 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
         ),
         const SizedBox(height: 20),
         _TrainingInfoBlock(
-          title: 'Completed by',
+          title: AppLocalizations.of(context).completedBy,
           body:
-              '${widget.assignment['assignedToNameSnapshot'] ?? 'Team member'} | $completionDate',
+              '${widget.assignment['assignedToNameSnapshot'] ?? AppLocalizations.of(context).teamMember} | $completionDate',
         ),
         const SizedBox(height: 12),
         _TrainingInfoBlock(
-          title: 'Topics covered',
+          title: AppLocalizations.of(context).topicsCovered,
           body: topicNames.whereType<String>().join(' | '),
         ),
         const SizedBox(height: 12),
         _StatusMessage(
           icon: Icons.verified_outlined,
           color: _green,
-          text: 'Quick check completed. This completion is recorded.',
+          text: AppLocalizations.of(context).quickCheckRecorded,
         ),
         const SizedBox(height: 22),
         SizedBox(
@@ -594,7 +610,7 @@ class _TrainingPlayerViewState extends State<_TrainingPlayerView> {
           child: FilledButton(
             onPressed: widget.onBack,
             style: _greenFilledButtonStyle(),
-            child: const Text('Done'),
+            child: Text(AppLocalizations.of(context).done),
           ),
         ),
       ],

@@ -5,9 +5,54 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, authSnapshot) {
+        final user = authSnapshot.data;
+        if (user == null) {
+          return _FiScoreMaterialApp(locale: null);
+        }
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirestorePaths.user(user.uid).snapshots(),
+          builder: (context, profileSnapshot) {
+            return _FiScoreMaterialApp(
+              locale: _localeFromPreference(
+                profileSnapshot.data?.data()?['languagePreference'] as String?,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+Locale? _localeFromPreference(String? preference) {
+  return switch (preference) {
+    'en' => const Locale('en'),
+    'es' => const Locale('es'),
+    _ => null,
+  };
+}
+
+class _FiScoreMaterialApp extends StatelessWidget {
+  const _FiScoreMaterialApp({required this.locale});
+
+  final Locale? locale;
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       title: 'FiScore',
       debugShowCheckedModeBanner: false,
+      locale: locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: _navy,
@@ -40,8 +85,10 @@ class MyApp extends StatelessWidget {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
           alignLabelWithHint: true,
           labelStyle: const TextStyle(
             color: _muted,
@@ -73,4 +120,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

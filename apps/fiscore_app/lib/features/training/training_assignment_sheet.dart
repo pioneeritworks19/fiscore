@@ -69,12 +69,13 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
   }
 
   Future<void> _assign() async {
+    final strings = AppLocalizations.of(context);
     if (_training == null) {
-      setState(() => _error = 'Choose a training item to assign.');
+      setState(() => _error = strings.chooseTrainingItemToAssign);
       return;
     }
     if (_selectedAssignees.isEmpty) {
-      setState(() => _error = 'Choose at least one teammate to assign.');
+      setState(() => _error = strings.chooseAtLeastOneTeammateToAssign);
       return;
     }
     setState(() {
@@ -96,7 +97,7 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not assign training. Please try again.');
+        setState(() => _error = strings.couldNotAssignTraining);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -105,6 +106,7 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
@@ -118,7 +120,7 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Assign training',
+                strings.assignTraining,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: _ink,
                   fontWeight: FontWeight.w800,
@@ -127,7 +129,7 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
               if (widget.linkedViolationId != null) ...[
                 const SizedBox(height: 5),
                 Text(
-                  'For this violation',
+                  strings.forThisViolation,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: _muted,
                     fontWeight: FontWeight.w700,
@@ -154,7 +156,7 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
                   }
                   if (trainings.isEmpty) {
                     return Text(
-                      'No active training items are available.',
+                      strings.noActiveTrainingItems,
                       style: Theme.of(
                         context,
                       ).textTheme.bodyMedium?.copyWith(color: _muted),
@@ -162,7 +164,9 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
                   }
                   return DropdownButtonFormField<String>(
                     initialValue: _training?['_id'] as String?,
-                    decoration: const InputDecoration(labelText: 'Training'),
+                    decoration: InputDecoration(
+                      labelText: strings.trainingLabel,
+                    ),
                     items: [
                       for (final training in trainings)
                         DropdownMenuItem(
@@ -225,19 +229,21 @@ class _AssignTrainingSheetState extends State<_AssignTrainingSheet> {
                   'training-due-$_duePickerVersion-$_dueInDays-${_customDueDate?.millisecondsSinceEpoch}',
                 ),
                 initialValue: _dueInDays,
-                decoration: const InputDecoration(labelText: 'Due date'),
+                decoration: InputDecoration(labelText: strings.dueDate),
                 items: [
-                  const DropdownMenuItem(value: 1, child: Text('Tomorrow')),
-                  const DropdownMenuItem(value: 3, child: Text('In 3 days')),
-                  const DropdownMenuItem(value: 7, child: Text('In 1 week')),
-                  const DropdownMenuItem(value: 14, child: Text('In 2 weeks')),
-                  const DropdownMenuItem(value: 30, child: Text('In 1 month')),
+                  DropdownMenuItem(value: 1, child: Text(strings.tomorrow)),
+                  DropdownMenuItem(value: 3, child: Text(strings.inThreeDays)),
+                  DropdownMenuItem(value: 7, child: Text(strings.inOneWeek)),
+                  DropdownMenuItem(value: 14, child: Text(strings.inTwoWeeks)),
+                  DropdownMenuItem(value: 30, child: Text(strings.inOneMonth)),
                   DropdownMenuItem(
                     value: -1,
                     child: Text(
                       _customDueDate == null
-                          ? 'Choose date'
-                          : 'Choose date (${_customDueDate!.month}/${_customDueDate!.day})',
+                          ? strings.chooseDate
+                          : strings.chooseDateWithDate(
+                              '${_customDueDate!.month}/${_customDueDate!.day}',
+                            ),
                     ),
                   ),
                 ],
@@ -450,8 +456,11 @@ class _TrainingMemberPickerSheetState
                 onPressed: () => Navigator.of(context).pop(_selection),
                 child: Text(
                   _selection.isEmpty
-                      ? 'Done'
-                      : 'Select ${_selection.length} team member${_selection.length == 1 ? '' : 's'}',
+                      ? AppLocalizations.of(context).done
+                      : AppLocalizations.of(context).selectTeamMembers(
+                          _selection.length,
+                          _selection.length == 1 ? '' : 's',
+                        ),
                 ),
               ),
             ),
@@ -474,8 +483,8 @@ int _trainingSortValue(Map<String, dynamic> assignment) {
   return statusValue * 2000000000 + millis;
 }
 
-String _trainingDueLabel(Object? value) {
-  if (value is! Timestamp) return 'No due date';
+String _trainingDueLabel(Object? value, AppLocalizations strings) {
+  if (value is! Timestamp) return strings.noDueDate;
   final date = value.toDate();
   final now = DateTime.now();
   final difference = DateTime(
@@ -483,10 +492,10 @@ String _trainingDueLabel(Object? value) {
     date.month,
     date.day,
   ).difference(DateTime(now.year, now.month, now.day)).inDays;
-  if (difference < 0) return 'Overdue';
-  if (difference == 0) return 'Due today';
-  if (difference == 1) return 'Due tomorrow';
-  return 'Due ${date.month}/${date.day}';
+  if (difference < 0) return strings.overdue;
+  if (difference == 0) return strings.dueToday;
+  if (difference == 1) return strings.dueTomorrow;
+  return strings.dueShortDate('${date.month}/${date.day}');
 }
 
 String? _recommendedTrainingIdForViolation(Map<String, dynamic> violation) {

@@ -27,7 +27,7 @@ Future<String?> showAuditReassignmentSheet(
       tenantId: tenantId,
       siteId: siteId,
       currentAssigneeId: currentAssigneeId,
-      title: 'Reassign check',
+      title: AppLocalizations.of(context).reassignCheck,
     ),
   );
 }
@@ -61,12 +61,13 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
   }
 
   Future<void> _assign() async {
+    final strings = AppLocalizations.of(context);
     if (_templateId == null) {
-      setState(() => _error = 'Choose a checklist.');
+      setState(() => _error = strings.chooseChecklist);
       return;
     }
     if (_assigneeId == null) {
-      setState(() => _error = 'Choose a teammate.');
+      setState(() => _error = strings.chooseTeammate);
       return;
     }
     setState(() {
@@ -86,7 +87,7 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not assign this check. Try again.');
+        setState(() => _error = strings.couldNotAssignCheck);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -95,6 +96,7 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -109,7 +111,7 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Assign check',
+                strings.assignCheck,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: _ink,
                   fontWeight: FontWeight.w800,
@@ -117,7 +119,7 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
               ),
               const SizedBox(height: 5),
               Text(
-                'Choose a checklist and one teammate to complete it.',
+                strings.assignCheckHelp,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: _muted),
@@ -134,7 +136,7 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
                   }
                   return DropdownButtonFormField<String>(
                     initialValue: _templateId,
-                    decoration: const InputDecoration(labelText: 'Checklist'),
+                    decoration: InputDecoration(labelText: strings.checklist),
                     items: [
                       for (final template in templates)
                         DropdownMenuItem(
@@ -163,7 +165,7 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
                       tenantId: widget.tenantId,
                       siteId: widget.siteId,
                       currentAssigneeId: _assigneeId,
-                      title: 'Assign to',
+                      title: strings.assignTo,
                     ),
                   );
                   if (!mounted || userId == null) return;
@@ -178,16 +180,16 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
                     _assigneeName =
                         member['displayNameSnapshot'] as String? ??
                         member['emailSnapshot'] as String? ??
-                        'Team member';
+                        strings.teamMember;
                   });
                 },
                 child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Assign to',
-                    suffixIcon: Icon(Icons.chevron_right),
+                  decoration: InputDecoration(
+                    labelText: strings.assignTo,
+                    suffixIcon: const Icon(Icons.chevron_right),
                   ),
                   child: Text(
-                    _assigneeName ?? 'Choose teammate',
+                    _assigneeName ?? strings.chooseTeammate,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: _assigneeName == null ? _muted : _ink,
                     ),
@@ -200,19 +202,21 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
                   'audit-due-$_duePickerVersion-$_dueInDays-${_customDueDate?.millisecondsSinceEpoch}',
                 ),
                 initialValue: _dueInDays,
-                decoration: const InputDecoration(labelText: 'Due date'),
+                decoration: InputDecoration(labelText: strings.dueDate),
                 items: [
-                  const DropdownMenuItem(value: 1, child: Text('Tomorrow')),
-                  const DropdownMenuItem(value: 3, child: Text('In 3 days')),
-                  const DropdownMenuItem(value: 7, child: Text('In 1 week')),
-                  const DropdownMenuItem(value: 14, child: Text('In 2 weeks')),
-                  const DropdownMenuItem(value: 30, child: Text('In 1 month')),
+                  DropdownMenuItem(value: 1, child: Text(strings.tomorrow)),
+                  DropdownMenuItem(value: 3, child: Text(strings.inThreeDays)),
+                  DropdownMenuItem(value: 7, child: Text(strings.inOneWeek)),
+                  DropdownMenuItem(value: 14, child: Text(strings.inTwoWeeks)),
+                  DropdownMenuItem(value: 30, child: Text(strings.inOneMonth)),
                   DropdownMenuItem(
                     value: -1,
                     child: Text(
                       _customDueDate == null
-                          ? 'Choose date'
-                          : 'Choose date (${_customDueDate!.month}/${_customDueDate!.day})',
+                          ? strings.chooseDate
+                          : strings.chooseDateWithDate(
+                              '${_customDueDate!.month}/${_customDueDate!.day}',
+                            ),
                     ),
                   ),
                 ],
@@ -249,9 +253,9 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
               TextField(
                 controller: _noteController,
                 maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Optional note',
-                  hintText: 'Example: Complete before closing shift.',
+                decoration: InputDecoration(
+                  labelText: strings.optionalNote,
+                  hintText: strings.completeBeforeClosingShiftExample,
                 ),
               ),
               if (_error != null) ...[
@@ -268,7 +272,7 @@ class _AssignAuditSheetState extends State<_AssignAuditSheet> {
                 child: FilledButton.icon(
                   onPressed: _saving ? null : _assign,
                   icon: const Icon(Icons.send_outlined),
-                  label: const Text('Assign check'),
+                  label: Text(strings.assignCheck),
                 ),
               ),
             ],
@@ -343,9 +347,9 @@ class _AuditSingleMemberSheetState extends State<_AuditSingleMemberSheet> {
             TextField(
               controller: _searchController,
               onChanged: (value) => setState(() => _query = value.trim()),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Search team members',
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                hintText: AppLocalizations.of(context).searchTeamMembers,
               ),
             ),
             const SizedBox(height: 10),
@@ -377,7 +381,7 @@ class _AuditSingleMemberSheetState extends State<_AuditSingleMemberSheet> {
                           title: Text(
                             member.data()['displayNameSnapshot'] as String? ??
                                 member.data()['emailSnapshot'] as String? ??
-                                'Team member',
+                                AppLocalizations.of(context).teamMember,
                           ),
                           subtitle: Text(
                             member.data()['emailSnapshot'] as String? ?? '',
@@ -423,12 +427,15 @@ class _AssignedAuditRow extends StatelessWidget {
     final selfStarted = assignment['assignmentSource'] == 'self_started';
     final ownerLabel = selfStarted
         ? isAssignee
-              ? 'Started by you'
+              ? AppLocalizations.of(context).startedByYou
               : assignee.isNotEmpty
-              ? 'Started by $assignee'
-              : 'Self-started'
+              ? AppLocalizations.of(context).startedBy(assignee)
+              : AppLocalizations.of(context).selfStarted
         : assignee;
-    final due = _auditAssignmentDueLabel(assignment['dueDate']);
+    final due = _auditAssignmentDueLabel(
+      assignment['dueDate'],
+      AppLocalizations.of(context),
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Container(
@@ -448,7 +455,7 @@ class _AssignedAuditRow extends StatelessWidget {
                 children: [
                   Text(
                     assignment['templateNameSnapshot'] as String? ??
-                        'Internal check',
+                        AppLocalizations.of(context).sourceInternalCheck,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: _ink,
                       fontWeight: FontWeight.w700,
@@ -459,7 +466,8 @@ class _AssignedAuditRow extends StatelessWidget {
                     [
                       if (ownerLabel.isNotEmpty) ownerLabel,
                       ?due,
-                      if (status == 'in_progress') 'In progress',
+                      if (status == 'in_progress')
+                        AppLocalizations.of(context).inProgress,
                     ].join(' / '),
                     style: Theme.of(
                       context,
@@ -471,7 +479,11 @@ class _AssignedAuditRow extends StatelessWidget {
             if (isAssignee)
               TextButton(
                 onPressed: onStart,
-                child: Text(status == 'in_progress' ? 'Resume' : 'Start'),
+                child: Text(
+                  status == 'in_progress'
+                      ? AppLocalizations.of(context).resume
+                      : AppLocalizations.of(context).start,
+                ),
               ),
             if (canReassign || canCancel)
               PopupMenuButton<String>(
@@ -481,14 +493,14 @@ class _AssignedAuditRow extends StatelessWidget {
                 },
                 itemBuilder: (context) => [
                   if (canReassign)
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'reassign',
-                      child: Text('Reassign'),
+                      child: Text(AppLocalizations.of(context).reassign),
                     ),
                   if (canCancel)
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'cancel',
-                      child: Text('Cancel check'),
+                      child: Text(AppLocalizations.of(context).cancelCheck),
                     ),
                 ],
               ),
@@ -499,7 +511,7 @@ class _AssignedAuditRow extends StatelessWidget {
   }
 }
 
-String? _auditAssignmentDueLabel(Object? value) {
+String? _auditAssignmentDueLabel(Object? value, AppLocalizations strings) {
   if (value is! Timestamp) return null;
   final date = value.toDate();
   final today = DateTime.now();
@@ -508,8 +520,8 @@ String? _auditAssignmentDueLabel(Object? value) {
     date.month,
     date.day,
   ).difference(DateTime(today.year, today.month, today.day)).inDays;
-  if (difference < 0) return 'Overdue';
-  if (difference == 0) return 'Due today';
-  if (difference == 1) return 'Due tomorrow';
-  return 'Due ${date.month}/${date.day}';
+  if (difference < 0) return strings.overdue;
+  if (difference == 0) return strings.dueToday;
+  if (difference == 1) return strings.dueTomorrow;
+  return strings.dueShortDate('${date.month}/${date.day}');
 }

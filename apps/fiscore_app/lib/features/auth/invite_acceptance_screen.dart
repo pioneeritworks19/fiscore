@@ -79,6 +79,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
     if (_showCreateWorkspace) {
       return widget.onCreateWorkspace(context);
     }
@@ -112,7 +113,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
               ),
               const SizedBox(height: 10),
               Text(
-                'We could not load your pending team invites. Please try again.',
+                strings.couldNotLoadPendingInvites,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: _muted,
                   height: 1.45,
@@ -124,7 +125,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
                 color: const Color(0xFFB42318),
                 text: snapshot.error is AppException
                     ? (snapshot.error! as AppException).message
-                    : 'Invitation lookup failed.',
+                    : strings.invitationLookupFailed,
               ),
               const SizedBox(height: 18),
               OutlinedButton.icon(
@@ -134,7 +135,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
                   });
                 },
                 icon: const Icon(Icons.refresh),
-                label: const Text('Try again'),
+                label: Text(strings.tryAgain),
               ),
             ],
           );
@@ -145,7 +146,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Team access inactive',
+                  strings.teamAccessInactive,
                   style: theme.textTheme.headlineMedium?.copyWith(
                     color: _ink,
                     fontWeight: FontWeight.w800,
@@ -153,7 +154,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Your account is not active in this workspace. Ask your manager to send a new invitation if you need access again.',
+                  strings.inactiveAccessHelp,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: _muted,
                     height: 1.45,
@@ -166,7 +167,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Welcome, ${widget.displayName}',
+                strings.welcomeUser(widget.displayName),
                 style: theme.textTheme.headlineMedium?.copyWith(
                   color: _ink,
                   fontWeight: FontWeight.w800,
@@ -174,7 +175,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
               ),
               const SizedBox(height: 10),
               Text(
-                'No team invites were found for this email. Create a new FiScore workspace to get started.',
+                strings.noTeamInvitesCreateWorkspace,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: _muted,
                   height: 1.45,
@@ -188,7 +189,7 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
                   });
                 },
                 icon: const Icon(Icons.add_business_outlined),
-                label: const Text('Create workspace'),
+                label: Text(strings.createWorkspace),
               ),
             ],
           );
@@ -199,8 +200,8 @@ class _InviteAcceptanceContentState extends State<_InviteAcceptanceContent> {
           children: [
             Text(
               widget.reactivationTenantId == null
-                  ? 'Join your team'
-                  : 'Return to your team',
+                  ? strings.joinYourTeam
+                  : strings.returnToYourTeam,
               style: theme.textTheme.headlineMedium?.copyWith(
                 color: _ink,
                 fontWeight: FontWeight.w800,

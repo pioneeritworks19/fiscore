@@ -624,6 +624,8 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
               )
             : _MoreContent(
                 canAddSite: canAddSite,
+                onOpenProfile: () =>
+                    showProfilePreferencesSheet(context, user: widget.user),
                 isSyncingMasterData: _isSyncingMasterData,
                 message: _moreMessage,
                 error: _moreError,

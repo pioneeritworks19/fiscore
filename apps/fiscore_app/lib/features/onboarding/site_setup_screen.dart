@@ -52,12 +52,13 @@ class _SiteSetupContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final strings = AppLocalizations.of(context);
     final title = isEnteringManualSite
-        ? 'Add restaurant manually'
-        : 'Add restaurant';
+        ? strings.addRestaurantManually
+        : strings.addRestaurant;
     final subtitle = isEnteringManualSite
-        ? 'Enter the restaurant location to start running internal checks.'
-        : 'Find your restaurant to bring in public inspection history.';
+        ? strings.enterRestaurantToStartChecks
+        : strings.findRestaurantToImportHistory;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +76,7 @@ class _SiteSetupContent extends StatelessWidget {
               ),
             ),
             if (onCancel != null)
-              TextButton(onPressed: onCancel, child: const Text('Cancel')),
+              TextButton(onPressed: onCancel, child: Text(strings.cancel)),
           ],
         ),
         const SizedBox(height: 10),
@@ -94,9 +95,9 @@ class _SiteSetupContent extends StatelessWidget {
               final searchField = TextField(
                 controller: searchController,
                 textInputAction: TextInputAction.search,
-                decoration: const InputDecoration(
-                  labelText: 'Restaurant name, city, or ZIP',
-                  hintText: 'Search public restaurant records',
+                decoration: InputDecoration(
+                  labelText: strings.restaurantNameCityZip,
+                  hintText: strings.searchPublicRestaurantRecords,
                   border: OutlineInputBorder(),
                 ),
                 onSubmitted: (_) => onSearch(),
@@ -109,7 +110,7 @@ class _SiteSetupContent extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.search),
-                label: const Text('Search'),
+                label: Text(strings.search),
               );
 
               if (compact) {
@@ -155,7 +156,7 @@ class _SiteSetupContent extends StatelessWidget {
           if (results.isNotEmpty) ...[
             const SizedBox(height: 22),
             Text(
-              'Search results',
+              strings.searchResults,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -178,7 +179,7 @@ class _SiteSetupContent extends StatelessWidget {
           if (hasCompletedSearch && results.isEmpty) ...[
             const SizedBox(height: 18),
             Text(
-              'No matching restaurants found. Try another search or add this location manually.',
+              strings.noMatchingRestaurants,
               style: theme.textTheme.bodyMedium?.copyWith(color: _muted),
             ),
           ],
@@ -186,7 +187,7 @@ class _SiteSetupContent extends StatelessWidget {
           TextButton.icon(
             onPressed: isLinking || isSearching ? null : onShowManualEntry,
             icon: const Icon(Icons.add_business_outlined),
-            label: const Text('Add restaurant manually'),
+            label: Text(strings.addRestaurantManually),
           ),
         ] else ...[
           if (error != null) ...[
@@ -291,6 +292,7 @@ class _ManualSiteForm extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
     final stateCode = stateController.text.trim().toUpperCase();
     final selectedState = _usStateCodes.contains(stateCode) ? stateCode : null;
 
@@ -298,7 +300,7 @@ class _ManualSiteForm extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Public inspection history can be linked later.',
+          strings.publicInspectionHistoryCanBeLinkedLater,
           style: theme.textTheme.bodySmall?.copyWith(color: _muted),
         ),
         const SizedBox(height: 16),
@@ -306,7 +308,7 @@ class _ManualSiteForm extends StatelessWidget {
           controller: siteNameController,
           textCapitalization: TextCapitalization.words,
           textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(labelText: 'Restaurant name'),
+          decoration: InputDecoration(labelText: strings.restaurantName),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -314,7 +316,7 @@ class _ManualSiteForm extends StatelessWidget {
           textCapitalization: TextCapitalization.words,
           autofillHints: const [AutofillHints.streetAddressLine1],
           textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(labelText: 'Street address'),
+          decoration: InputDecoration(labelText: strings.streetAddress),
         ),
         const SizedBox(height: 12),
         Row(
@@ -326,7 +328,7 @@ class _ManualSiteForm extends StatelessWidget {
                 textCapitalization: TextCapitalization.words,
                 autofillHints: const [AutofillHints.addressCity],
                 textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'City'),
+                decoration: InputDecoration(labelText: strings.city),
               ),
             ),
             const SizedBox(width: 10),
@@ -335,7 +337,7 @@ class _ManualSiteForm extends StatelessWidget {
               child: DropdownButtonFormField<String>(
                 initialValue: selectedState,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'State'),
+                decoration: InputDecoration(labelText: strings.state),
                 items: _usStateCodes
                     .map(
                       (state) =>
@@ -359,8 +361,8 @@ class _ManualSiteForm extends StatelessWidget {
                 maxLength: 10,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => onCreate(),
-                decoration: const InputDecoration(
-                  labelText: 'ZIP',
+                decoration: InputDecoration(
+                  labelText: strings.zip,
                   counterText: '',
                 ),
               ),
@@ -376,12 +378,12 @@ class _ManualSiteForm extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.add_business_outlined),
-          label: const Text('Add restaurant'),
+          label: Text(strings.addRestaurant),
         ),
         const SizedBox(height: 6),
         TextButton(
           onPressed: isCreating ? null : onCancel,
-          child: const Text('Back to search'),
+          child: Text(strings.backToSearch),
         ),
       ],
     );

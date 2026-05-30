@@ -14,7 +14,8 @@ class _ActiveSiteHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final name = site['name'] as String? ?? 'Restaurant';
+    final strings = AppLocalizations.of(context);
+    final name = site['name'] as String? ?? strings.restaurant;
     final address = _formatSiteAddress(site);
     final isLinked =
         site['linkStatus'] == 'linked' ||
@@ -42,7 +43,7 @@ class _ActiveSiteHeader extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-              tooltip: 'Back to sites',
+              tooltip: strings.backToSites,
               onPressed: onShowSites,
               icon: const Icon(
                 Icons.arrow_back_ios_new,

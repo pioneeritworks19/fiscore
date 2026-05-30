@@ -29,6 +29,7 @@ class _ActionInboxContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     final repository = ActionItemRepository();
     final isTeamOverdue =
         (initialFilter == 'training_overdue' ||
@@ -42,23 +43,22 @@ class _ActionInboxContent extends StatelessWidget {
             siteId: siteId,
           );
     final title = switch (initialFilter) {
-      'review' => 'Fixes ready for review',
-      'assigned_fixes' => 'My assigned fixes',
-      'checks' => 'My checks',
-      'training' => 'My training',
-      'training_overdue' => 'Overdue training',
-      'audit_overdue' => 'Overdue checks',
-      _ => 'Action inbox',
+      'review' => strings.fixesReadyForReview,
+      'assigned_fixes' => strings.myAssignedFixes,
+      'checks' => strings.myChecks,
+      'training' => strings.myTraining,
+      'training_overdue' => strings.overdueTraining,
+      'audit_overdue' => strings.overdueChecks,
+      _ => strings.actionInbox,
     };
     final subtitle = switch (initialFilter) {
-      'review' => 'Review submitted fixes and close the work loop.',
-      'assigned_fixes' => 'Complete resolutions assigned to you.',
-      'checks' => 'Continue checks you started or were assigned.',
-      'training' => 'Complete the coaching assigned to you.',
-      'training_overdue' =>
-        'Follow up on training that has passed its due date.',
-      'audit_overdue' => 'Follow up on checks that have passed their due date.',
-      _ => 'Work that needs your attention.',
+      'review' => strings.reviewSubmittedFixesHelp,
+      'assigned_fixes' => strings.completeAssignedFixesHelp,
+      'checks' => strings.continueChecksHelp,
+      'training' => strings.completeAssignedCoachingHelp,
+      'training_overdue' => strings.followUpOverdueTrainingHelp,
+      'audit_overdue' => strings.followUpOverdueChecksHelp,
+      _ => strings.workNeedsAttentionHelp,
     };
 
     return Column(
@@ -67,7 +67,7 @@ class _ActionInboxContent extends StatelessWidget {
         TextButton.icon(
           onPressed: onBack,
           icon: const Icon(Icons.chevron_left),
-          label: const Text('Back to today'),
+          label: Text(strings.backToToday),
         ),
         const SizedBox(height: 4),
         Text(
@@ -146,6 +146,7 @@ class _ActionInboxContent extends StatelessWidget {
                       _ViolationListRow(
                         data: _ViolationRowData.fromAction(
                           actions[index].data(),
+                          buildContext: context,
                         ),
                         framed: false,
                         onOpen: () async {
@@ -271,10 +272,7 @@ class _ActionInboxRow extends StatelessWidget {
                   if (isAssignedCheck) ...[
                     const SizedBox(height: 6),
                     Text(
-                      [
-                        checkOwnershipLabel,
-                        ?dueText,
-                      ].join(' / '),
+                      [checkOwnershipLabel, ?dueText].join(' / '),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: isOverdue ? color : _muted,
                         fontWeight: FontWeight.w700,

@@ -27,12 +27,13 @@ class _AuditsContentState extends State<_AuditsContent> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!_inSubflow) ...[
           Text(
-            'Audits',
+            strings.audits,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: _ink,
               fontWeight: FontWeight.w800,
@@ -40,16 +41,16 @@ class _AuditsContentState extends State<_AuditsContent> {
           ),
           const SizedBox(height: 14),
           SegmentedButton<String>(
-            segments: const [
+            segments: [
               ButtonSegment(
                 value: 'internal',
-                icon: Icon(Icons.playlist_add_check_outlined),
-                label: Text('Internal'),
+                icon: const Icon(Icons.playlist_add_check_outlined),
+                label: Text(strings.internal),
               ),
               ButtonSegment(
                 value: 'public',
-                icon: Icon(Icons.fact_check_outlined),
-                label: Text('Public'),
+                icon: const Icon(Icons.fact_check_outlined),
+                label: Text(strings.public),
               ),
             ],
             selected: {_mode},
@@ -246,13 +247,14 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
         response: _currentViolationResponse(),
       );
       if (!mounted) return;
+      final strings = AppLocalizations.of(context);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Saved for later.')));
+        ..showSnackBar(SnackBar(content: Text(strings.savedForLater)));
     } catch (_) {
       if (mounted) {
         setState(() {
-          _violationError = 'Could not save the response. Please try again.';
+          _violationError = AppLocalizations.of(context).couldNotSaveResponse;
         });
       }
     } finally {
@@ -264,7 +266,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
     if (_correctiveController.text.trim().isEmpty) {
       setState(() {
         _violationMessage = null;
-        _violationError = 'Enter what was fixed before submitting for review.';
+        _violationError = AppLocalizations.of(context).enterFixBeforeSubmit;
       });
       return;
     }
@@ -288,16 +290,17 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
         reviewStatus: 'submitted',
       );
       if (!mounted) return;
+      final strings = AppLocalizations.of(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Submitted for review.')));
+      ).showSnackBar(SnackBar(content: Text(strings.submittedForReview)));
       setState(() {
-        _violationMessage = 'Submitted for review.';
+        _violationMessage = strings.submittedForReview;
       });
     } catch (_) {
       if (mounted) {
         setState(() {
-          _violationError = 'Could not submit the response. Please try again.';
+          _violationError = AppLocalizations.of(context).couldNotSubmitResponse;
         });
       }
     } finally {
@@ -445,7 +448,8 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => _error = 'Could not start the assigned check. Try again.',
+          () =>
+              _error = AppLocalizations.of(context).couldNotStartAssignedCheck,
         );
       }
     } finally {
@@ -460,9 +464,10 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
       siteId: widget.siteId,
     );
     if (!mounted || created != true) return;
+    final strings = AppLocalizations.of(context);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Check assigned.')));
+      ..showSnackBar(SnackBar(content: Text(strings.checkAssigned)));
   }
 
   Future<void> _reassignCheck(
@@ -484,12 +489,15 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
         assignedTo: assigneeId,
       );
       if (!mounted) return;
+      final strings = AppLocalizations.of(context);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Check reassigned.')));
+        ..showSnackBar(SnackBar(content: Text(strings.checkReassigned)));
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not reassign this check. Try again.');
+        setState(
+          () => _error = AppLocalizations.of(context).couldNotReassignCheck,
+        );
       }
     }
   }
@@ -498,25 +506,28 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
     String assignmentId, {
     bool selfStarted = false,
   }) async {
+    final strings = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          selfStarted ? 'Cancel this check?' : 'Cancel assigned check?',
+          selfStarted
+              ? strings.cancelThisCheckQuestion
+              : strings.cancelAssignedCheckQuestion,
         ),
         content: Text(
           selfStarted
-              ? 'This in-progress check will be cancelled and removed from your work list.'
-              : 'The teammate will no longer need to complete this check.',
+              ? strings.cancelSelfStartedCheckBody
+              : strings.cancelAssignedCheckBody,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep'),
+            child: Text(strings.keep),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Cancel check'),
+            child: Text(strings.cancelCheck),
           ),
         ],
       ),
@@ -531,12 +542,10 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Assigned check cancelled.')),
-        );
+        ..showSnackBar(SnackBar(content: Text(strings.assignedCheckCancelled)));
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not cancel this check. Try again.');
+        setState(() => _error = strings.couldNotCancelCheck);
       }
     }
   }
@@ -552,17 +561,18 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
         libraryItemId: libraryItemId,
       );
       if (!mounted) return;
+      final strings = AppLocalizations.of(context);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Checklist added to My Library.')),
+          SnackBar(content: Text(strings.checklistAddedToMyLibrary)),
         );
     } on AppException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
       if (mounted) {
         setState(
-          () => _error = 'Could not add this checklist. Please try again.',
+          () => _error = AppLocalizations.of(context).couldNotAddChecklist,
         );
       }
     } finally {
@@ -572,6 +582,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     if (_selectedViolationId != null) {
       return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: _violationRepository.streamViolation(
@@ -599,7 +610,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
             isSaving: _isSavingViolation,
             message: _violationMessage,
             error: _violationError,
-            backLabel: 'Back to completed check',
+            backLabel: strings.backToChecks,
             onBack: () {
               setState(() {
                 _selectedViolationId = null;
@@ -639,7 +650,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
         repository: _repository,
         exitLabel: _isAssignedCheckFlow && widget.assignedCheckBackLabel != null
             ? widget.assignedCheckBackLabel!
-            : 'Back to checks',
+            : strings.backToChecks,
         onBack: _exitAuditSession,
         onOpenViolation: (violationId) {
           setState(() {
@@ -741,7 +752,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                                   () => _selectingTemplate = true,
                                 ),
                                 icon: const Icon(Icons.add),
-                                label: const Text('Start check'),
+                                label: Text(strings.startCheck),
                               ),
                             ),
                           if (_canConduct && _canAssignChecks)
@@ -751,7 +762,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                               child: OutlinedButton.icon(
                                 onPressed: _assignCheck,
                                 icon: const Icon(Icons.person_add_alt_outlined),
-                                label: const Text('Assign check'),
+                                label: Text(strings.assignCheck),
                               ),
                             ),
                         ],
@@ -769,8 +780,8 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                         const SizedBox(height: 18),
                         Text(
                           _canAssignChecks
-                              ? 'Assigned checks'
-                              : 'Assigned to me',
+                              ? strings.assignedChecks
+                              : strings.assignedToMe,
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 color: _ink,
@@ -796,7 +807,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                           inProgress.isNotEmpty) ...[
                         const SizedBox(height: 18),
                         Text(
-                          'In progress',
+                          strings.inProgress,
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
                                 color: _ink,
@@ -844,12 +855,12 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                           child: TextButton(
                             onPressed: () =>
                                 setState(() => _assignmentLimit += 50),
-                            child: const Text('Load more active checks'),
+                            child: Text(strings.loadMoreActiveChecks),
                           ),
                         ),
                       const SizedBox(height: 18),
                       Text(
-                        'Completed checks',
+                        strings.completedChecks,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: _ink,
@@ -858,11 +869,10 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                       ),
                       const SizedBox(height: 10),
                       if (completed.isEmpty)
-                        const _EmptyStateCard(
+                        _EmptyStateCard(
                           icon: Icons.playlist_add_check_circle_outlined,
-                          title: 'No completed checks yet',
-                          body:
-                              'Run an internal check to identify issues before an inspection.',
+                          title: strings.noCompletedChecksYet,
+                          body: strings.runInternalCheckHelp,
                         )
                       else
                         ...completed
@@ -870,7 +880,7 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                             .map(
                               (doc) => _InternalAuditRow(
                                 audit: doc.data(),
-                                actionLabel: 'View',
+                                actionLabel: strings.view,
                                 onOpen: () =>
                                     _openSubflow(() => _activeAuditId = doc.id),
                               ),
@@ -879,13 +889,13 @@ class _InternalAuditsContentState extends State<_InternalAuditsContent> {
                         TextButton(
                           onPressed: () =>
                               setState(() => _showCompletedHistory = true),
-                          child: const Text('View more completed checks'),
+                          child: Text(strings.viewMoreCompletedChecks),
                         ),
                       if (_showCompletedHistory &&
                           completed.length == _auditLimit)
                         TextButton(
                           onPressed: () => setState(() => _auditLimit += 20),
-                          child: const Text('Load more completed checks'),
+                          child: Text(strings.loadMoreCompletedChecks),
                         ),
                     ],
                   ],

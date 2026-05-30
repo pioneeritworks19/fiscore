@@ -6,14 +6,17 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import 'firebase_options.dart';
+import 'l10n/generated/app_localizations.dart';
 
 part 'app/fiscore_app.dart';
+part 'l10n/app_localizations_helpers.dart';
 part 'features/auth/auth_gate.dart';
 part 'core/widgets/fiscore_logo.dart';
 part 'features/auth/welcome_screen.dart';
@@ -21,6 +24,7 @@ part 'features/auth/email_link_completion_screen.dart';
 part 'features/home/signed_in_home_screen.dart';
 part 'features/shell/setup_scaffold.dart';
 part 'features/shell/app_scaffold.dart';
+part 'features/shell/profile_preferences_sheet.dart';
 part 'features/shell/bottom_nav.dart';
 part 'features/shell/active_site_header.dart';
 part 'features/onboarding/workspace_setup_screen.dart';

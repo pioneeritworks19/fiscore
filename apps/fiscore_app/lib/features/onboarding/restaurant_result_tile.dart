@@ -16,7 +16,9 @@ class _RestaurantResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayName = restaurant['displayName'] as String? ?? 'Restaurant';
+    final strings = AppLocalizations.of(context);
+    final displayName =
+        restaurant['displayName'] as String? ?? strings.restaurant;
     final addressLine1 = restaurant['addressLine1'] as String? ?? '';
     final city = restaurant['city'] as String? ?? '';
     final stateCode = restaurant['stateCode'] as String? ?? '';
@@ -51,22 +53,23 @@ class _RestaurantResultTile extends StatelessWidget {
                 Text(
                   [
                     addressLine1,
-                    [city, stateCode, zipCode]
-                        .where((part) => part.trim().isNotEmpty)
-                        .join(' '),
+                    [
+                      city,
+                      stateCode,
+                      zipCode,
+                    ].where((part) => part.trim().isNotEmpty).join(' '),
                   ].where((part) => part.trim().isNotEmpty).join(', '),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: _muted,
-                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: _muted),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   latestInspectionDate == null
-                      ? '$inspectionCount inspections'
-                      : '$inspectionCount inspections - Latest $latestInspectionDate',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: _muted,
-                  ),
+                      ? strings.inspectionCount(inspectionCount)
+                      : strings.inspectionCountLatest(
+                          inspectionCount,
+                          latestInspectionDate,
+                        ),
+                  style: theme.textTheme.bodySmall?.copyWith(color: _muted),
                 ),
               ],
             ),
@@ -79,11 +82,10 @@ class _RestaurantResultTile extends StatelessWidget {
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Link'),
+                : Text(strings.link),
           ),
         ],
       ),
     );
   }
 }
-

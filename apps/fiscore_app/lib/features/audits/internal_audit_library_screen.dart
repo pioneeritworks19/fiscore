@@ -46,16 +46,17 @@ class _AuditTemplatePickerState extends State<_AuditTemplatePicker> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextButton.icon(
           onPressed: widget.isWorking ? null : widget.onBack,
           icon: const Icon(Icons.chevron_left),
-          label: const Text('Back'),
+          label: Text(strings.back),
         ),
         Text(
-          'Start a check',
+          strings.startACheck,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w800,
@@ -64,8 +65,8 @@ class _AuditTemplatePickerState extends State<_AuditTemplatePicker> {
         const SizedBox(height: 4),
         Text(
           _libraryView == 'my'
-              ? 'Choose a checklist your team uses at this site.'
-              : 'Add curated FiScore checklists to your team library.',
+              ? strings.chooseChecklistForSite
+              : strings.addCuratedChecklistsHelp,
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: _muted),
@@ -84,17 +85,20 @@ class _AuditTemplatePickerState extends State<_AuditTemplatePicker> {
           enabled: !widget.isWorking,
           onChanged: (value) =>
               setState(() => _query = value.trim().toLowerCase()),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search),
-            hintText: 'Search checklists',
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            hintText: strings.searchChecklists,
           ),
         ),
         const SizedBox(height: 14),
         SegmentedButton<String>(
           expandedInsets: EdgeInsets.zero,
-          segments: const [
-            ButtonSegment(value: 'my', label: Text('My Library')),
-            ButtonSegment(value: 'explore', label: Text('Explore FiScore')),
+          segments: [
+            ButtonSegment(value: 'my', label: Text(strings.myLibrary)),
+            ButtonSegment(
+              value: 'explore',
+              label: Text(strings.exploreFiScore),
+            ),
           ],
           selected: {_libraryView},
           onSelectionChanged: widget.isWorking
@@ -137,7 +141,7 @@ class _AuditTemplatePickerState extends State<_AuditTemplatePicker> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'No checklists in My Library',
+                        strings.noChecklistsInMyLibrary,
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: _ink,
@@ -147,8 +151,8 @@ class _AuditTemplatePickerState extends State<_AuditTemplatePicker> {
                       const SizedBox(height: 6),
                       Text(
                         widget.canManageLibrary
-                            ? 'Explore FiScore Library to add a checklist your team can use.'
-                            : 'Ask a manager to add an internal checklist for this site.',
+                            ? strings.exploreChecklistLibraryHelp
+                            : strings.askManagerToAddChecklist,
                         style: Theme.of(
                           context,
                         ).textTheme.bodyMedium?.copyWith(color: _muted),
@@ -160,17 +164,17 @@ class _AuditTemplatePickerState extends State<_AuditTemplatePicker> {
                               ? null
                               : () => setState(() => _libraryView = 'explore'),
                           icon: const Icon(Icons.explore_outlined),
-                          label: const Text('Explore FiScore Library'),
+                          label: Text(strings.exploreFiScoreLibrary),
                         ),
                     ],
                   ),
                 );
               }
               if (templates.isEmpty) {
-                return const _EmptyStateCard(
+                return _EmptyStateCard(
                   icon: Icons.search_off_outlined,
-                  title: 'No matching checklists',
-                  body: 'Try another search term.',
+                  title: strings.noMatchingChecklists,
+                  body: strings.tryDifferentSearchTerm,
                 );
               }
               return Column(

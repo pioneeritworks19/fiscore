@@ -26,7 +26,8 @@ class _FiScoreAppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayName = user.displayName ?? 'FiScore user';
+    final strings = AppLocalizations.of(context);
+    final displayName = user.displayName ?? strings.fiScoreUser;
     final email = user.email ?? '';
     final photoUrl = user.photoURL?.trim();
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
@@ -51,18 +52,14 @@ class _FiScoreAppScaffold extends StatelessWidget {
                   const FiScoreHeaderBrand(),
                   const Spacer(),
                   PopupMenuButton<String>(
-                    tooltip: 'Account',
+                    tooltip: strings.account,
                     position: PopupMenuPosition.under,
                     offset: const Offset(0, 8),
                     onSelected: (value) {
                       if (value == 'sign_out') {
                         onSignOut();
                       } else if (value == 'profile') {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Profile settings are coming soon.'),
-                          ),
-                        );
+                        showProfilePreferencesSheet(context, user: user);
                       }
                     },
                     itemBuilder: (context) => [
@@ -91,21 +88,21 @@ class _FiScoreAppScaffold extends StatelessWidget {
                         ),
                       ),
                       const PopupMenuDivider(),
-                      const PopupMenuItem<String>(
+                      PopupMenuItem<String>(
                         value: 'profile',
                         child: ListTile(
                           dense: true,
-                          leading: Icon(Icons.person_outline),
-                          title: Text('Profile'),
+                          leading: const Icon(Icons.person_outline),
+                          title: Text(strings.profile),
                           contentPadding: EdgeInsets.zero,
                         ),
                       ),
-                      const PopupMenuItem<String>(
+                      PopupMenuItem<String>(
                         value: 'sign_out',
                         child: ListTile(
                           dense: true,
-                          leading: Icon(Icons.logout),
-                          title: Text('Sign out'),
+                          leading: const Icon(Icons.logout),
+                          title: Text(strings.signOut),
                           contentPadding: EdgeInsets.zero,
                         ),
                       ),

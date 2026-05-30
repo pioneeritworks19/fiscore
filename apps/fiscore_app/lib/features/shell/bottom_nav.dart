@@ -13,35 +13,36 @@ class _FiScoreBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
     final appIndexes = [1, 2, 3, 4, 5];
     final navIndex = appIndexes.contains(selectedIndex)
         ? appIndexes.indexOf(selectedIndex)
         : appIndexes.indexOf(1);
     final destinations = <NavigationDestination>[
-      const NavigationDestination(
-        icon: Icon(Icons.home_outlined),
-        selectedIcon: Icon(Icons.home),
-        label: 'Home',
+      NavigationDestination(
+        icon: const Icon(Icons.home_outlined),
+        selectedIcon: const Icon(Icons.home),
+        label: strings.home,
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.report_problem_outlined),
-        selectedIcon: Icon(Icons.report_problem),
-        label: 'Violations',
+      NavigationDestination(
+        icon: const Icon(Icons.report_problem_outlined),
+        selectedIcon: const Icon(Icons.report_problem),
+        label: strings.violations,
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.playlist_add_check_circle_outlined),
-        selectedIcon: Icon(Icons.playlist_add_check_circle),
-        label: 'Audits',
+      NavigationDestination(
+        icon: const Icon(Icons.playlist_add_check_circle_outlined),
+        selectedIcon: const Icon(Icons.playlist_add_check_circle),
+        label: strings.audits,
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.school_outlined),
-        selectedIcon: Icon(Icons.school),
-        label: 'Training',
+      NavigationDestination(
+        icon: const Icon(Icons.school_outlined),
+        selectedIcon: const Icon(Icons.school),
+        label: strings.training,
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.more_horiz),
-        selectedIcon: Icon(Icons.more),
-        label: 'More',
+      NavigationDestination(
+        icon: const Icon(Icons.more_horiz),
+        selectedIcon: const Icon(Icons.more),
+        label: strings.more,
       ),
     ];
 

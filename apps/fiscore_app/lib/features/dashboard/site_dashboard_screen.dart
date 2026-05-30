@@ -41,6 +41,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
     final site = widget.site;
     final latestInspectionDate =
         site['latestInspectionDateSnapshot'] as String?;
@@ -57,7 +58,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
         Row(
           children: [
             Text(
-              'Today',
+              strings.today,
               style: theme.textTheme.headlineSmall?.copyWith(
                 color: _ink,
                 fontWeight: FontWeight.w800,
@@ -65,7 +66,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
             ),
             const Spacer(),
             Text(
-              'Daily work',
+              strings.dailyWork,
               style: theme.textTheme.bodySmall?.copyWith(color: _muted),
             ),
           ],
@@ -136,10 +137,10 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
                   overdueCheckCount: overdueChecks,
                   overdueTrainingCount: overdueTraining,
                   emptyMessage: isLinkedToMaster
-                      ? 'Nothing needs attention right now.'
+                      ? strings.noActionNeeded
                       : widget.canStartAudit
                       ? 'No items need attention yet. Start an internal check to build this site\'s safety record.'
-                      : 'Nothing needs attention right now.',
+                      : strings.noActionNeeded,
                   isLoading:
                       myActionSnapshot.connectionState ==
                           ConnectionState.waiting ||
@@ -164,7 +165,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
         ),
         const SizedBox(height: 18),
         Text(
-          'Recent activity',
+          strings.recentActivity,
           style: theme.textTheme.titleMedium?.copyWith(
             color: _ink,
             fontWeight: FontWeight.w800,
@@ -247,7 +248,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
             child: FilledButton.icon(
               onPressed: widget.onStartAudit,
               icon: const Icon(Icons.playlist_add_check_outlined),
-              label: const Text('Start internal check'),
+              label: Text(strings.startInternalCheck),
             ),
           ),
         const SizedBox(height: 10),
@@ -257,7 +258,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
               child: TextButton.icon(
                 onPressed: widget.onOpenAudits,
                 icon: const Icon(Icons.fact_check_outlined, size: 19),
-                label: const Text('View audits'),
+                label: Text(strings.viewAudits),
               ),
             ),
             if (widget.canAddSite) ...[
@@ -266,7 +267,7 @@ class _SiteDashboardContentState extends State<_SiteDashboardContent> {
                 child: TextButton.icon(
                   onPressed: widget.onAddSite,
                   icon: const Icon(Icons.add_business_outlined, size: 19),
-                  label: const Text('Add site'),
+                  label: Text(strings.addSite),
                 ),
               ),
             ],
@@ -319,6 +320,7 @@ class _NeedsActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
@@ -333,7 +335,7 @@ class _NeedsActionCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Needs action',
+                  strings.needsAction,
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: _ink,
                     fontWeight: FontWeight.w800,
@@ -365,7 +367,7 @@ class _NeedsActionCard extends StatelessWidget {
             )
           else ...[
             if (assignedFixCount > 0 || myCheckCount > 0 || myTrainingCount > 0)
-              const _DashboardActionGroupLabel(label: 'My work'),
+              _DashboardActionGroupLabel(label: strings.myWork),
             if (assignedFixCount > 0)
               _DashboardActionRow(
                 icon: Icons.assignment_ind_outlined,
@@ -398,7 +400,7 @@ class _NeedsActionCard extends StatelessWidget {
                     unassignedViolationCount > 0 ||
                     overdueCheckCount > 0 ||
                     overdueTrainingCount > 0))
-              const _DashboardActionGroupLabel(label: 'Team follow-up'),
+              _DashboardActionGroupLabel(label: strings.teamFollowUp),
             if (showManagerActions && reviewCount > 0)
               _DashboardActionRow(
                 icon: Icons.verified_outlined,

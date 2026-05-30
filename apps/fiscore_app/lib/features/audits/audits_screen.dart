@@ -85,12 +85,13 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
       if (!mounted) {
         return;
       }
+      final strings = AppLocalizations.of(context);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Saved for later.')));
+        ..showSnackBar(SnackBar(content: Text(strings.savedForLater)));
     } catch (_) {
       setState(() {
-        _violationError = 'Could not save the response. Please try again.';
+        _violationError = AppLocalizations.of(context).couldNotSaveResponse;
       });
     } finally {
       if (mounted) {
@@ -105,7 +106,7 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
     if (_correctiveController.text.trim().isEmpty) {
       setState(() {
         _violationMessage = null;
-        _violationError = 'Enter what was fixed before submitting for review.';
+        _violationError = AppLocalizations.of(context).enterFixBeforeSubmit;
       });
       return;
     }
@@ -133,15 +134,16 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
       if (!mounted) {
         return;
       }
+      final strings = AppLocalizations.of(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Submitted for review.')));
+      ).showSnackBar(SnackBar(content: Text(strings.submittedForReview)));
       setState(() {
-        _violationMessage = 'Submitted for review.';
+        _violationMessage = strings.submittedForReview;
       });
     } catch (_) {
       setState(() {
-        _violationError = 'Could not submit the response. Please try again.';
+        _violationError = AppLocalizations.of(context).couldNotSubmitResponse;
       });
     } finally {
       if (mounted) {
@@ -443,7 +445,7 @@ class _PublicInspectionsContentState extends State<_PublicInspectionsContent> {
               Center(
                 child: TextButton(
                   onPressed: () => setState(() => _inspectionLimit += 20),
-                  child: const Text('Load more inspections'),
+                  child: Text(AppLocalizations.of(context).loadMoreInspections),
                 ),
               ),
           ],
@@ -462,6 +464,7 @@ class _InspectionListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
     final grade = _inspectionGradeText(inspection);
     final score = _inspectionScoreText(inspection);
     final findingCount = (inspection['findingCount'] as num?)?.toInt() ?? 0;
@@ -536,16 +539,20 @@ class _InspectionListCard extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        if (grade.isNotEmpty) _AuditPill(label: 'Grade $grade'),
+                        if (grade.isNotEmpty)
+                          _AuditPill(label: strings.gradeValue(grade)),
                         if (score.isNotEmpty)
-                          _AuditPill(label: 'Score $score', color: _green),
+                          _AuditPill(
+                            label: strings.scoreValue(score),
+                            color: _green,
+                          ),
                         _AuditPill(
-                          label: '$findingCount findings',
+                          label: strings.findingCount(findingCount),
                           color: findingCount == 0 ? _green : _navy,
                         ),
                         if (reportReady)
-                          const _AuditPill(
-                            label: 'Report stored',
+                          _AuditPill(
+                            label: strings.reportStored,
                             color: Color(0xFF1D4ED8),
                           ),
                       ],
@@ -596,7 +603,7 @@ class _InspectionDetailView extends StatelessWidget {
         TextButton.icon(
           onPressed: onBack,
           icon: const Icon(Icons.arrow_back_ios_new, size: 16),
-          label: const Text('Back to public inspections'),
+          label: Text(AppLocalizations.of(context).backToPublicInspections),
         ),
         const SizedBox(height: 8),
         _InspectionHeroCard(inspection: inspection),
@@ -916,9 +923,10 @@ class _InspectionReportActionState extends State<_InspectionReportAction> {
         inspectionId: widget.inspectionId,
       );
       if (mounted) {
+        final strings = AppLocalizations.of(context);
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Report uploaded.')));
+          ..showSnackBar(SnackBar(content: Text(strings.reportUploaded)));
       }
     } on AppException catch (error) {
       if (mounted) {
@@ -1059,7 +1067,11 @@ class _InspectionFindingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _ViolationListRow(
-      data: _ViolationRowData.fromViolation(violation, context: rowContext),
+      data: _ViolationRowData.fromViolation(
+        violation,
+        context: rowContext,
+        buildContext: context,
+      ),
       onOpen: onOpen,
     );
   }

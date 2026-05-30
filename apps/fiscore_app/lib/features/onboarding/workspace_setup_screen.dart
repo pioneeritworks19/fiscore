@@ -21,12 +21,13 @@ class _WorkspaceSetupContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final strings = AppLocalizations.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Set up your FiScore workspace',
+          strings.setUpWorkspace,
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: _ink,
@@ -34,7 +35,7 @@ class _WorkspaceSetupContent extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'Signed in as $displayName. Create one workspace for the business or restaurant group that owns the locations you will manage.',
+          strings.signedInWorkspaceHelp(displayName),
           style: theme.textTheme.bodyLarge?.copyWith(
             color: _muted,
             height: 1.45,
@@ -43,17 +44,16 @@ class _WorkspaceSetupContent extends StatelessWidget {
         const SizedBox(height: 24),
         _GuidancePanel(
           icon: Icons.info_outline,
-          text:
-              'Only an owner or administrator should create a workspace. Restaurant staff should join later through an invitation from the workspace owner.',
+          text: strings.workspaceOwnerGuidance,
         ),
         const SizedBox(height: 24),
         TextField(
           controller: tenantNameController,
           textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(
-            labelText: 'Workspace name',
-            helperText: 'Use the business, franchise, or restaurant group name.',
-            hintText: 'Example: Kannappan Hospitality',
+          decoration: InputDecoration(
+            labelText: strings.workspaceName,
+            helperText: strings.workspaceNameHelp,
+            hintText: strings.workspaceNameHint,
             border: OutlineInputBorder(),
           ),
           onSubmitted: (_) => onCreateTenant(),
@@ -67,7 +67,7 @@ class _WorkspaceSetupContent extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.add_business_outlined),
-          label: const Text('Create workspace'),
+          label: Text(strings.createWorkspace),
         ),
         if (tenantMessage != null) ...[
           const SizedBox(height: 18),
@@ -89,4 +89,3 @@ class _WorkspaceSetupContent extends StatelessWidget {
     );
   }
 }
-

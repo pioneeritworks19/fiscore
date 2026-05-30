@@ -59,6 +59,8 @@ Specialized reference doc:
   [DEVICE_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\DEVICE_STRATEGY.md)
 - mobile platform support:
   [MOBILE_PLATFORM_SUPPORT.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\MOBILE_PLATFORM_SUPPORT.md)
+- multilingual app strategy:
+  [MULTILINGUAL_APP_STRATEGY.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\MULTILINGUAL_APP_STRATEGY.md)
 - content management model:
   [CONTENT_MANAGEMENT_MODEL.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\CONTENT_MANAGEMENT_MODEL.md)
 - library content sync flow:

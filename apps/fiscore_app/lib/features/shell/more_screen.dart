@@ -4,6 +4,7 @@ class _MoreContent extends StatelessWidget {
   const _MoreContent({
     required this.onAddSite,
     required this.canAddSite,
+    required this.onOpenProfile,
     required this.onManageTeam,
     required this.isSyncingMasterData,
     required this.message,
@@ -13,6 +14,7 @@ class _MoreContent extends StatelessWidget {
 
   final VoidCallback onAddSite;
   final bool canAddSite;
+  final VoidCallback onOpenProfile;
   final VoidCallback? onManageTeam;
   final bool isSyncingMasterData;
   final String? message;
@@ -20,21 +22,20 @@ class _MoreContent extends StatelessWidget {
   final VoidCallback? onRefreshMasterData;
 
   Future<void> _confirmRefreshPublicData(BuildContext context) async {
+    final strings = AppLocalizations.of(context);
     final shouldRefresh = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Refresh public inspection data?'),
-        content: const Text(
-          'FiScore will check for the latest public inspections and findings for this restaurant.',
-        ),
+        title: Text(strings.refreshPublicInspectionQuestion),
+        content: Text(strings.refreshPublicInspectionBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(strings.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Refresh'),
+            child: Text(strings.refresh),
           ),
         ],
       ),
@@ -47,12 +48,13 @@ class _MoreContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = AppLocalizations.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'More',
+          strings.more,
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: _ink,
@@ -88,7 +90,7 @@ class _MoreContent extends StatelessWidget {
             icon: Icons.sync_outlined,
             title: isSyncingMasterData
                 ? 'Refreshing public inspection data...'
-                : 'Refresh public inspection data',
+                : strings.refreshPublicInspectionData,
             body:
                 'Pull the latest available public inspection history and findings into this location.',
             enabled: !isSyncingMasterData,
@@ -106,6 +108,13 @@ class _MoreContent extends StatelessWidget {
             enabled: true,
             onTap: onAddSite,
           ),
+        _ActionRow(
+          icon: Icons.person_outline,
+          title: 'Profile & preferences',
+          body: 'Choose your language and review account details.',
+          enabled: true,
+          onTap: onOpenProfile,
+        ),
         _ActionRow(
           icon: Icons.groups_outlined,
           title: 'Team management',
