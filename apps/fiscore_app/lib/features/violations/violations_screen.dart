@@ -841,6 +841,12 @@ class _ViolationDetailView extends StatelessWidget {
         violation['title'] as String? ??
         violation['summaryText'] as String? ??
         'Violation finding';
+    final canClose = const [
+          'tenant_owner',
+          'admin',
+          'manager',
+        ].contains(currentRole) &&
+        status != 'closed';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -855,6 +861,9 @@ class _ViolationDetailView extends StatelessWidget {
           title: title,
           status: status,
           severity: violation['severity'] as String?,
+          onCloseViolation: canClose
+              ? () => _showCloseViolationSheet(context)
+              : null,
         ),
         if (status == 'pending_review') ...[
           const SizedBox(height: 14),
@@ -894,6 +903,7 @@ class _ViolationDetailView extends StatelessWidget {
         const SizedBox(height: 14),
         _ViolationActions(
           status: status,
+          currentRole: currentRole,
           isSaving: isSaving,
           onSendBack:
               onSendBack ??
@@ -903,6 +913,21 @@ class _ViolationDetailView extends StatelessWidget {
       ],
     );
   }
+
+  Future<void> _showCloseViolationSheet(BuildContext context) async {
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => const _CloseViolationSheet(),
+    );
+    if (reason == null || reason.trim().isEmpty) return;
+    onUpdateStatus(
+      'closed',
+      reviewStatus: 'closed',
+      closureReason: reason.trim(),
+    );
+  }
 }
 
 class _ViolationDetailHero extends StatelessWidget {
@@ -910,11 +935,13 @@ class _ViolationDetailHero extends StatelessWidget {
     required this.title,
     required this.status,
     required this.severity,
+    this.onCloseViolation,
   });
 
   final String title;
   final String status;
   final String? severity;
+  final VoidCallback? onCloseViolation;
 
   @override
   Widget build(BuildContext context) {
@@ -942,14 +969,33 @@ class _ViolationDetailHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              _SmallStatusBadge(status: status),
-              if (showSeverity) ...[
-                const SizedBox(width: 8),
-                _DetailChip(
-                  label: severityText,
-                  color: _severityColor(severityText),
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _SmallStatusBadge(status: status),
+                    if (showSeverity)
+                      _DetailChip(
+                        label: severityText,
+                        color: _severityColor(severityText),
+                      ),
+                  ],
                 ),
-              ],
+              ),
+              if (onCloseViolation != null)
+                PopupMenuButton<String>(
+                  tooltip: 'Violation actions',
+                  onSelected: (value) {
+                    if (value == 'close') onCloseViolation!();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'close',
+                      child: Text(AppLocalizations.of(context).closeViolation),
+                    ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -3421,12 +3467,14 @@ class _DetailChip extends StatelessWidget {
 class _ViolationActions extends StatelessWidget {
   const _ViolationActions({
     required this.status,
+    required this.currentRole,
     required this.isSaving,
     required this.onSendBack,
     required this.onUpdateStatus,
   });
 
   final String status;
+  final String currentRole;
   final bool isSaving;
   final VoidCallback onSendBack;
   final void Function(
@@ -3440,28 +3488,21 @@ class _ViolationActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
     final actions = <Widget>[];
+    final canClose = const [
+      'tenant_owner',
+      'admin',
+      'manager',
+    ].contains(currentRole);
 
-    if (status == 'pending_review') {
-      actions.addAll([
+    if (status == 'pending_review' && canClose) {
+      actions.add(
         OutlinedButton.icon(
           onPressed: isSaving ? null : onSendBack,
           icon: const Icon(Icons.undo),
           label: Text(strings.sendBack),
         ),
-        FilledButton.icon(
-          onPressed: isSaving
-              ? null
-              : () => onUpdateStatus(
-                  'closed',
-                  reviewStatus: 'closed',
-                  closureReason: strings.closedAfterManagerReview,
-                ),
-          style: _greenFilledButtonStyle(),
-          icon: const Icon(Icons.check_circle_outline),
-          label: Text(strings.closeViolation),
-        ),
-      ]);
-    } else if (status == 'closed') {
+      );
+    } else if (status == 'closed' && canClose) {
       actions.add(
         FilledButton.icon(
           onPressed: isSaving
@@ -3487,6 +3528,89 @@ class _ViolationActions extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(child: actions.last),
       ],
+    );
+  }
+
+}
+
+class _CloseViolationSheet extends StatefulWidget {
+  const _CloseViolationSheet();
+
+  @override
+  State<_CloseViolationSheet> createState() => _CloseViolationSheetState();
+}
+
+class _CloseViolationSheetState extends State<_CloseViolationSheet> {
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reason = _reasonController.text.trim();
+    final strings = AppLocalizations.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              strings.closeViolation,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Add a short reason. This will be saved in the violation notes.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: _muted),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _reasonController,
+              minLines: 3,
+              maxLines: 5,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(hintText: 'Reason for closing'),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(strings.cancel),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: reason.isEmpty
+                        ? null
+                        : () => Navigator.of(context).pop(reason),
+                    style: _greenFilledButtonStyle(),
+                    child: Text(strings.closeViolation),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

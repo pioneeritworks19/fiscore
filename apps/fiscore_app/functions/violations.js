@@ -152,18 +152,15 @@ const closeViolation = onCall({ region }, async (request) => {
   const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
   const siteId = cleanString(request.data?.siteId, "Site ID", 160);
   const violationId = cleanString(request.data?.violationId, "Violation ID", 180);
-  const closureReason = safeText(
-    request.data?.closureReason,
-    "Closed after manager review.",
-  );
+  const closureReason = cleanString(request.data?.closureReason, "Closure reason", 1000);
   await requireSiteRole(tenantId, siteId, auth.uid, siteActionRoles);
   const { ref, data: violation } = await violationForAction(
     tenantId,
     siteId,
     violationId,
   );
-  if (violation.status !== "pending_review") {
-    throw new HttpsError("failed-precondition", "Only submitted work can be closed.");
+  if (violation.status === "closed") {
+    throw new HttpsError("failed-precondition", "This violation is already closed.");
   }
   const now = admin.firestore.FieldValue.serverTimestamp();
   const batch = db.batch();
@@ -177,12 +174,33 @@ const closeViolation = onCall({ region }, async (request) => {
     closureReason,
     updatedAt: now,
   }, { merge: true });
-  batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), {
-    openViolationCountSnapshot: admin.firestore.FieldValue.increment(-1),
-    pendingReviewCountSnapshot: admin.firestore.FieldValue.increment(-1),
+  batch.set(ref.collection("threads").doc(), {
+    entryType: "comment",
+    body: `Closed: ${closureReason}`,
+    mentionedUserIds: [],
+    attachmentIds: [],
+    statusSnapshot: "closed",
+    assignmentSnapshot: safeText(violation.assignedTo) || null,
+    createdAt: now,
+    createdBy: auth.uid,
+    createdByDisplayNameSnapshot: request.auth.token.name || "FiScore reviewer",
+    updatedAt: now,
+  });
+  const siteUpdate = {
     closedViolationCountSnapshot: admin.firestore.FieldValue.increment(1),
     updatedAt: now,
-  }, { merge: true });
+  };
+  if (violation.status === "pending_review") {
+    siteUpdate.pendingReviewCountSnapshot = admin.firestore.FieldValue.increment(-1);
+    siteUpdate.openViolationCountSnapshot = admin.firestore.FieldValue.increment(-1);
+  } else {
+    siteUpdate.openViolationCountSnapshot = admin.firestore.FieldValue.increment(-1);
+    if (!safeText(violation.assignedTo)) {
+      siteUpdate.unassignedActiveViolationCountSnapshot =
+        admin.firestore.FieldValue.increment(-1);
+    }
+  }
+  batch.set(db.doc(`tenants/${tenantId}/sites/${siteId}`), siteUpdate, { merge: true });
   await completeActionsForTarget(batch, tenantId, "violation", violationId, "closed");
   await batch.commit();
   return { status: "closed" };
