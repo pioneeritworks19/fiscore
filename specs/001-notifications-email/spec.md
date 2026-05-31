@@ -8,6 +8,13 @@
 
 **Input**: User description: "Create a clear notification strategy and technology strategy for how FiScore sends emails, including first sign-on, registration, tenant workspace creation, sign-in links, team invites, resend invites, deactivation, and other important events."
 
+## Clarifications
+
+### Session 2026-05-31
+
+- Q: Should all notifications be emails? -> A: No; account access, onboarding, and future billing use email, while operational work uses action items first and push later.
+- Q: Should incomplete first-time workspace setup be included? -> A: Yes; use sparse onboarding lifecycle nudges that do not create operational action items.
+
 ## Affected Areas
 
 - FiScore App: notification surfaces, action inbox entry points, user preferences, and email-link sign-in states.
