@@ -1,4 +1,4 @@
-package com.pioneeritworks.fiscore.dev
+package com.pioneeritworks.fiscore
 
 import io.flutter.embedding.android.FlutterActivity
 
