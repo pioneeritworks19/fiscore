@@ -22,6 +22,8 @@ Use these documents as canonical unless a later doc explicitly replaces them:
 
 - Product scope and feature intent:
   [product/FEATURES.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\FEATURES.md)
+- SpecKit project context:
+  [product/SPECKIT_PROJECT_CONTEXT.md](C:\Users\mkann\Documents\kannappan\fiscore\docs\product\SPECKIT_PROJECT_CONTEXT.md)
 - Day-to-day user behavior:
   [product/WORKFLOWS.md](C:\Users\Kannappan\Documents\Projects\FiScore\docs\product\WORKFLOWS.md)
 - Roles and permissions:
@@ -107,6 +109,8 @@ If you are coding in a specific area, start here:
 
 - Building tenant app screens:
   `product/FEATURES.md`, `product/WORKFLOWS.md`, `app/APP_NAVIGATION.md`
+- Writing SpecKit specs:
+  `product/SPECKIT_PROJECT_CONTEXT.md`, then the canonical docs for the affected area
 - Designing tenant data or Firestore rules:
   `product/DATA_MODEL.md`, `app/FIRESTORE_SCHEMA.md`, `product/USER_ROLES.md`
 - Working on offline behavior:
