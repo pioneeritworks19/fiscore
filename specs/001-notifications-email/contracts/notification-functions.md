@@ -20,16 +20,19 @@ Input:
 - `recipientUserId`
 - `recipientEmail`
 - `recipientRoleSnapshot`
+- `tenantNameSnapshot`
 - `channel`
 - `dedupeKey`
 - `templateId`
 - `templateData`
+- `locale`
 - `reason`
 
 Behavior:
 
 - validates required event/channel/recipient fields
 - checks dedupe/suppression rules
+- resolves/falls back locale when caller does not provide one
 - writes a notification event
 - returns `{eventId, status, suppressed}`
 
@@ -46,7 +49,7 @@ Internal helper called after a notification decision is recorded.
 Behavior:
 
 - loads template
-- renders subject/body from safe variables
+- renders localized subject/body from safe variables
 - calls provider adapter
 - records delivery attempt
 - updates notification event status
@@ -66,7 +69,7 @@ Notification behavior:
 
 - after tenant/member/user creation succeeds, record/send `workspace_created`
 - recipient is the creator/tenant owner
-- email includes workspace name, next step to add/link restaurant, app link, website/help link, and admin console mention when available
+- email identifies FiScore as sender, includes workspace name, next step to add/link restaurant, app link, website/help link, and admin console mention when available
 
 ### `createTenantInvite`
 
@@ -76,7 +79,7 @@ Notification behavior:
 
 - after invite creation succeeds, record/send `team_invite_created`
 - recipient is invited email
-- email includes workspace name, role/site context, and sign-in/join CTA
+- email identifies FiScore as sender, includes workspace name, role/site context, and sign-in/join CTA
 
 ### `resendTenantInvite`
 
@@ -135,3 +138,14 @@ The following remain action-item-first in V1:
 - audit/check overdue
 
 Future push can consume the same event/action data.
+
+## Template Rendering Requirements
+
+V1 email templates are code-owned inside the notification module.
+
+- render subject, text body, and HTML body from the same safe template data
+- support English and Spanish FiScore-controlled copy
+- choose locale from recipient preference, then future tenant default, then English fallback
+- preserve tenant names, site names, user names, comments, and authored content exactly as entered
+- include FiScore product identity and tenant/workspace context when available
+- do not require tenant-managed logos, colors, sender domains, or custom branding in V1

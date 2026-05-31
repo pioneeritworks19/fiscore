@@ -14,7 +14,7 @@
 
 - [ ] T001 Create `apps/fiscore_app/functions/notifications.js` with exported notification decision, dedupe, and email adapter helpers.
 - [ ] T002 Export the notification helpers from `apps/fiscore_app/functions/index.js` only if callable or scheduled functions are added.
-- [ ] T003 [P] Add notification template constants for account access and onboarding emails in `apps/fiscore_app/functions/notifications.js`.
+- [ ] T003 [P] Add code-owned `en`/`es` notification template constants for account access and onboarding emails in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T004 [P] Document required provider environment variables in `apps/fiscore_app/functions/README.md` or `docs/product/NOTIFICATION_FLOW.md`.
 
 ---
@@ -25,7 +25,7 @@
 
 - [ ] T005 Define notification event and delivery attempt write helpers in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T006 Add dedupe key generation and suppression checks in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T007 Add provider adapter interface with `noop`/sandbox behavior in `apps/fiscore_app/functions/notifications.js`.
+- [ ] T007 Add provider adapter interface, locale fallback helper, and `noop`/sandbox behavior in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T008 Add Firestore rules for tenant notification event read access in `apps/fiscore_app/firestore.rules`.
 - [ ] T009 Add required Firestore composite indexes for notification event query shapes in `apps/fiscore_app/firestore.indexes.json`.
 - [ ] T010 [P] Add syntax validation notes for `node --check index.js` and `node --check notifications.js` to `specs/001-notifications-email/quickstart.md` if commands change.
@@ -42,7 +42,7 @@
 
 - [ ] T011 [US1] Wire `createTenantInvite` in `apps/fiscore_app/functions/team.js` to record/send `team_invite_created`.
 - [ ] T012 [US1] Wire `resendTenantInvite` in `apps/fiscore_app/functions/team.js` to record/send `team_invite_resent`.
-- [ ] T013 [US1] Ensure invite email template includes workspace name, inviter/context when available, role/site context, and join CTA in `apps/fiscore_app/functions/notifications.js`.
+- [ ] T013 [US1] Ensure invite email template identifies FiScore, includes workspace name, tenant context, inviter/context when available, role/site context, and join CTA in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T014 [US1] Ensure rapid resend attempts use dedupe/suppression behavior in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T015 [US1] Validate invite/resend flow against `specs/001-notifications-email/quickstart.md`.
 
@@ -57,7 +57,7 @@
 **Independent Test**: Create a new workspace from a fresh owner account; verify notification event, delivery attempt, and first-owner orientation copy.
 
 - [ ] T016 [US2] Wire `createTenantAndOwner` in `apps/fiscore_app/functions/tenants.js` to record/send `workspace_created`.
-- [ ] T017 [US2] Add workspace-created template copy in `apps/fiscore_app/functions/notifications.js`.
+- [ ] T017 [US2] Add localized workspace-created template copy with FiScore sender identity and tenant context in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T018 [US2] Include app return path, add/link restaurant next step, website/help mention, and admin console mention in template data in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T019 [US2] Add dedupe protection for retried workspace creation in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T020 [US2] Validate workspace-created flow against `specs/001-notifications-email/quickstart.md`.
@@ -89,7 +89,7 @@
 
 - [ ] T025 [US4] Add scheduled or callable-testable helper for signed-in users with no workspace in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T026 [US4] Add scheduled or callable-testable helper for workspaces with no sites in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T027 [US4] Add templates for `signed_in_no_workspace` and `workspace_has_no_site` in `apps/fiscore_app/functions/notifications.js`.
+- [ ] T027 [US4] Add localized templates for `signed_in_no_workspace` and `workspace_has_no_site` in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T028 [US4] Ensure reminder helpers re-check eligibility immediately before delivery in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T029 [US4] Export scheduled reminder functions from `apps/fiscore_app/functions/index.js`.
 - [ ] T030 [US4] Validate reminder scenarios against `specs/001-notifications-email/quickstart.md`.

@@ -14,7 +14,7 @@ The first implementation slice should build the shared notification record/templ
 
 **Language/Version**: Node.js 22 for Firebase Cloud Functions; Dart/Flutter for mobile app UI; React/Vite for Admin Console follow-up.
 
-**Primary Dependencies**: `firebase-functions`, `firebase-admin`, existing callable/scheduled Cloud Functions, Firestore, Firebase Auth email-link flow. Transactional email provider to be introduced behind a small adapter; provider choice remains implementation-time but must support template variables, delivery response IDs, and sandbox/test mode.
+**Primary Dependencies**: `firebase-functions`, `firebase-admin`, existing callable/scheduled Cloud Functions, Firestore, Firebase Auth email-link flow. Transactional email provider to be introduced behind a small adapter; provider choice remains implementation-time but must support template variables, delivery response IDs, and sandbox/test mode. V1 email templates are code-owned renderer functions with English and Spanish system copy, rather than provider-managed or Firestore-managed customer-editable templates.
 
 **Storage**: Firestore tenant-scoped notification records, delivery attempts, action items, invites, members, sites, and users. Existing Storage paths are not affected.
 
@@ -26,7 +26,7 @@ The first implementation slice should build the shared notification record/templ
 
 **Performance Goals**: Common dashboard/action reads remain bounded and query-specific. Notification writes must be part of existing business transitions where practical and must not add unbounded collection scans to user-facing operations.
 
-**Constraints**: App must not send email directly. Operational email noise must be avoided. Notification decisions must be role-aware, tenant/site-scoped, deduped, and inspectable. Auth sign-in emails remain compatible with Firebase Auth.
+**Constraints**: App must not send email directly. Operational email noise must be avoided. Notification decisions must be role-aware, tenant/site-scoped, deduped, and inspectable. Auth sign-in emails remain compatible with Firebase Auth. V1 uses lightweight tenant context in copy, not tenant-managed branding, logos, colors, sender domains, or editable templates.
 
 **Scale/Scope**: Designed for many tenants with low per-tenant operational volume but long-lived history. Notification logs should be queryable by tenant, recipient, event type, status, and target without reading all history.
 
@@ -69,7 +69,7 @@ apps/fiscore_app/
 |   |-- tenants.js
 |   |-- team.js
 |   |-- actions.js
-|   |-- notifications.js          # new shared notification/email boundary
+|   |-- notifications.js          # new shared notification/email boundary, localized templates, provider adapter
 |   `-- shared/runtime.js
 |-- lib/
 |   |-- data/repositories/
@@ -88,7 +88,7 @@ docs/product/
 `-- NOTIFICATION_FLOW.md
 ```
 
-**Structure Decision**: Use the existing Firebase Functions module structure. Add a notification module and keep provider-specific code behind an adapter so team, tenant, violation, audit, and training functions call a consistent business notification API. App/Admin changes should read notification/action data rather than duplicate business rules.
+**Structure Decision**: Use the existing Firebase Functions module structure. Add a notification module and keep provider-specific code behind an adapter so team, tenant, violation, audit, and training functions call a consistent business notification API. App/Admin changes should read notification/action data rather than duplicate business rules. Keep account/onboarding email templates in code for V1 so copy, localization, and tenant-context behavior are reviewed with the same PRs as the business workflow.
 
 ## Phase 0: Research Decisions
 

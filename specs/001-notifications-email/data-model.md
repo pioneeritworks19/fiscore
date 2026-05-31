@@ -21,12 +21,13 @@ Fields:
 - `recipientUserId`: string or null
 - `recipientEmail`: string or null
 - `recipientRoleSnapshot`: string or null
+- `tenantNameSnapshot`: string or null, used for recipient context and support review
 - `channel`: `email`, `in_app`, `push`, `skip`
 - `status`: `pending`, `sent`, `failed`, `skipped`, `suppressed`
 - `dedupeKey`: string
 - `reason`: short system-readable reason for sent/skipped/suppressed
 - `templateId`: string or null
-- `locale`: string, default `en`
+- `locale`: string, selected from recipient user preference, then future tenant default, then `en`
 - `createdAt`: timestamp
 - `updatedAt`: timestamp
 - `sentAt`: timestamp or null
@@ -90,6 +91,9 @@ Fields:
 V1 recommendation:
 
 - Keep templates in code/config first for version control.
+- Store localized FiScore-controlled subject/body variants for at least `en` and `es`.
+- Interpolate tenant, site, invite, role, and user values without translating or rewriting those values.
+- Use lightweight tenant context such as "FiScore on behalf of {tenantName}" when a tenant/workspace name is available.
 - Move to Firestore only when non-developer template management is needed.
 
 ## Notification Preference

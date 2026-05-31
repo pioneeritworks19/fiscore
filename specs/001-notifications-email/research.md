@@ -44,3 +44,30 @@
 
 - Create action items for setup reminders: rejected because users without a site/workspace may not have meaningful action inbox context yet.
 - Repeat daily setup reminders: rejected for V1 to avoid spam.
+
+## Decision: Use code-owned localized templates for V1 emails
+
+**Rationale**: FiScore is still converging on its self-service onboarding and access flows. Code-owned templates keep subject/body copy, variables, localization, and provider behavior version-controlled and testable with the Cloud Functions changes. This also avoids making the first email provider the source of truth for product copy.
+
+**Alternatives considered**:
+
+- Provider-managed templates: deferred because it couples product copy to a provider console and makes code review harder.
+- Firestore-managed tenant-editable templates: rejected for V1 because customer-editable email copy adds moderation, preview, permissions, and support complexity before pilot.
+
+## Decision: Use tenant context, not tenant branding, in V1
+
+**Rationale**: Users should know why they received the message and which workspace it belongs to, but V1 does not need customer logos, colors, sender domains, or branding controls. Copy such as "FiScore on behalf of Kannappan Hospitality" gives enough context while preserving product trust and implementation simplicity.
+
+**Alternatives considered**:
+
+- Full tenant branding: deferred until FiScore has a clear paid plan need and support process for branded email assets.
+- FiScore-only emails with no tenant context: rejected because invited staff may not recognize why they are receiving an invite or setup message.
+
+## Decision: Localize FiScore-controlled copy, not customer-entered values
+
+**Rationale**: The app already has English/Spanish localization direction. Emails should use the same recipient-language-first behavior for system copy, while tenant names, user names, comments, site names, and authored content remain exactly as entered.
+
+**Alternatives considered**:
+
+- English-only emails: acceptable for a prototype but not aligned with mobile-first staff usage.
+- Live translation of tenant/user-entered content: rejected because it is not a V1 business need and can distort compliance-relevant wording.
