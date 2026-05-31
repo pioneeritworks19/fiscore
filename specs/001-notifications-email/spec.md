@@ -8,6 +8,13 @@
 
 **Input**: User description: "Create a clear notification strategy and technology strategy for how FiScore sends emails, including first sign-on, registration, tenant workspace creation, sign-in links, team invites, resend invites, deactivation, and other important events."
 
+## Clarifications
+
+### Session 2026-05-31
+
+- Q: Should all notifications be emails? -> A: No; account access, onboarding, and future billing use email, while operational work uses action items first and push later.
+- Q: Should incomplete first-time workspace setup be included? -> A: Yes; use sparse onboarding lifecycle nudges that do not create operational action items.
+
 ## Affected Areas
 
 - FiScore App: notification surfaces, action inbox entry points, user preferences, and email-link sign-in states.
@@ -132,6 +139,8 @@ Users can rely on sensible defaults now, while FiScore keeps a clean path for fu
 - **FR-002**: System MUST send or queue account-access emails for team invitation, invite resend, passwordless sign-in link, workspace creation confirmation, and important access changes.
 - **FR-002A**: Workspace creation confirmation MUST orient the first tenant owner to the FiScore app for daily work, the FiScore website for product/help resources, and the FiScore admin console for owner/admin management when available.
 - **FR-002B**: System MUST support sparse onboarding lifecycle reminders for users who sign in but do not create a workspace and owners who create a workspace but do not add or link a restaurant.
+- **FR-002C**: FiScore-controlled emails MUST identify FiScore as the product sender and include tenant/workspace context when available using "FiScore on behalf of {tenantName}" style wording; V1 MUST NOT require tenant-managed logos, colors, sender domains, or custom branding.
+- **FR-002D**: FiScore-controlled email copy MUST support localization using recipient language preference when known, a future tenant default when available, and English fallback; tenant names, user names, site names, comments, and other user-entered values MUST remain as entered.
 - **FR-003**: System MUST avoid email by default for low-value collaboration events such as note creation, draft save, photo upload, routine list refresh, and ordinary read activity.
 - **FR-004**: System MUST keep action items as the primary in-app needs-action model for violations, assigned checks, assigned training, review requests, sent-back fixes, due work, and overdue work.
 - **FR-005**: System MUST define notification recipients from tenant role, site access, assignment, and workflow ownership rules.
@@ -152,7 +161,7 @@ Users can rely on sensible defaults now, while FiScore keeps a clean path for fu
 - **Notification Event**: A business event that may create an in-app action item, email delivery, push delivery, or an intentional skip record.
 - **Action Item**: A read-optimized operational work item assigned to a user or role for dashboard and inbox use.
 - **Delivery Attempt**: A record of one channel attempt for a notification event, including status, provider response summary, and timestamps.
-- **Notification Template**: A product-managed message definition for a category, locale, channel, and event type.
+- **Notification Template**: A product-managed message definition for a category, locale, channel, and event type; V1 templates are code-owned and localized for FiScore-controlled copy.
 - **Recipient**: A user, invited email, role group, or site-scoped actor selected by business rules.
 - **Notification Preference**: A future user-level or tenant-level setting that can adjust optional categories while preserving required account/security messages.
 
