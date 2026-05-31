@@ -33,6 +33,39 @@ class SiteRepository {
     return siteId is String ? siteId : null;
   }
 
+  Future<void> updateManualSite({
+    required String tenantId,
+    required String siteId,
+    required String siteName,
+    required String addressLine1,
+    required String city,
+    required String state,
+    required String postalCode,
+  }) async {
+    await _functions.call('updateManualSite', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'siteName': siteName,
+      'addressLine1': addressLine1,
+      'city': city,
+      'state': state,
+      'postalCode': postalCode,
+      'siteType': 'restaurant',
+    });
+  }
+
+  Future<void> deleteSite({
+    required String tenantId,
+    required String siteId,
+    required String confirmation,
+  }) async {
+    await _functions.call('deleteSite', {
+      'tenantId': tenantId,
+      'siteId': siteId,
+      'confirmation': confirmation,
+    });
+  }
+
   Stream<QuerySnapshot<Map<String, dynamic>>> activeSitesStream(
     String tenantId, {
     Map<String, dynamic>? member,

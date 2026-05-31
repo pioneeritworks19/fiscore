@@ -293,6 +293,88 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
     }
   }
 
+  Future<void> _editManualSite(
+    String tenantId,
+    QueryDocumentSnapshot<Map<String, dynamic>> siteDoc,
+  ) async {
+    final updated = await showModalBottomSheet<_ManualSiteDraft>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _EditManualSiteSheet(site: siteDoc.data()),
+    );
+    if (updated == null) return;
+
+    try {
+      await _siteRepository.updateManualSite(
+        tenantId: tenantId,
+        siteId: siteDoc.id,
+        siteName: updated.siteName,
+        addressLine1: updated.addressLine1,
+        city: updated.city,
+        state: updated.state,
+        postalCode: updated.postalCode,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Restaurant updated.')));
+    } on AppException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update this restaurant.')),
+      );
+    }
+  }
+
+  Future<void> _deleteSite(
+    String tenantId,
+    QueryDocumentSnapshot<Map<String, dynamic>> siteDoc,
+  ) async {
+    final site = siteDoc.data();
+    final siteName = site['name'] as String? ?? 'this restaurant';
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _DeleteSiteSheet(siteName: siteName),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await _siteRepository.deleteSite(
+        tenantId: tenantId,
+        siteId: siteDoc.id,
+        confirmation: 'DELETE',
+      );
+      if (!mounted) return;
+      setState(() {
+        if (_activeSiteId == siteDoc.id) {
+          _activeSiteId = null;
+          _selectedTabIndex = 0;
+        }
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$siteName deleted.')));
+    } on AppException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete this restaurant.')),
+      );
+    }
+  }
+
   Future<void> _refreshMasterData(String tenantId, String siteId) async {
     setState(() {
       _isSyncingMasterData = true;
@@ -328,7 +410,10 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
     Map<String, dynamic> currentMember,
   ) {
     final currentRole = currentMember['role'] as String? ?? 'staff';
-    final canAddSite = const ['tenant_owner', 'admin'].contains(currentRole);
+    final canManageSites = const [
+      'tenant_owner',
+      'admin',
+    ].contains(currentRole);
     if (sites.length == 1 && _selectedTabIndex == 0) {
       _selectedTabIndex = 1;
     }
@@ -358,7 +443,8 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
       case 0:
         content = _SitesOverviewContent(
           sites: sites,
-          canAddSite: canAddSite,
+          canAddSite: canManageSites,
+          canManageSites: canManageSites,
           onOpenSite: (siteId) {
             setState(() {
               _activeSiteId = siteId;
@@ -376,6 +462,8 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
               _hasCompletedRestaurantSearch = false;
             });
           },
+          onEditManualSite: (site) => _editManualSite(tenantId, site),
+          onDeleteSite: (site) => _deleteSite(tenantId, site),
         );
         break;
       case 1:
@@ -531,7 +619,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                       _hasCompletedRestaurantSearch = false;
                     });
                   },
-                  canAddSite: canAddSite,
+                  canAddSite: canManageSites,
                 );
         }
         break;
@@ -623,7 +711,7 @@ class _SignedInHomeScreenState extends State<SignedInHomeScreen> {
                 },
               )
             : _MoreContent(
-                canAddSite: canAddSite,
+                canAddSite: canManageSites,
                 onOpenProfile: () =>
                     showProfilePreferencesSheet(context, user: widget.user),
                 isSyncingMasterData: _isSyncingMasterData,
