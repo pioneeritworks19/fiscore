@@ -2,7 +2,9 @@
 
 ## Purpose
 
-This document defines the notification model for FiScore version 1.
+This document defines the notification model for FiScore version 1. The
+canonical SpecKit feature specification for the next notification/email work is
+`specs/001-notifications-email/spec.md`.
 
 It focuses on operational notifications that help users take action without creating noise.
 
@@ -23,13 +25,17 @@ FiScore notifications should not behave like a social chat stream.
 Version 1 should prioritize:
 
 - in-app notifications
-- mobile push notifications for important action items
-- email only where it clearly fits, such as invitations and possibly future digest use cases
+- action items as the scalable needs-action read model
+- email where it clearly fits account access, invitations, sign-in links, and
+  later billing or digest use cases
+- mobile push notifications later for important action items
 
 Recommended default:
 
 - invites by email
-- operational work notifications by in-app plus push
+- passwordless sign-in links by email
+- operational work notifications by in-app action items first
+- push later for urgent assigned work, review requests, and overdue work
 
 ## Core Notification Channels
 
@@ -50,17 +56,25 @@ Use for:
 - due soon or overdue work
 - review requests that need attention
 
-Push should be selective in version 1.
+Push should be selective and can be layered on after the action item model is
+stable.
 
 ### 3. Email
 
 Use for:
 
 - tenant invitations
+- passwordless sign-in links
+- workspace creation confirmation
+- important account-access changes
 - optional later digest summaries
 - optional later administrative summaries
 
 Version 1 should avoid heavy operational email noise.
+
+Email should not be sent directly by the app. Email decisions should be made by
+trusted backend workflows that can validate role/site access, dedupe repeated
+events, record delivery state, and keep action items consistent.
 
 ## Notification Priority Model
 
@@ -352,6 +366,48 @@ Recommended capabilities:
 - show site context
 - show timestamp
 - group by actionable recency where useful
+
+### Account And Access Email Events
+
+Version 1 account/access email events:
+
+- passwordless sign-in link requested
+- team invitation created
+- team invitation resent
+- workspace created
+- important access change or deactivation, if product copy requires direct user
+  notice
+
+These emails must preserve tenant/workspace context, explain why the recipient
+received the email, and provide one clear next step.
+
+The workspace-created email is the first-owner orientation moment. It should
+confirm the workspace, guide the owner back to the FiScore app to add or link a
+restaurant, and lightly reference the FiScore website for product/help resources
+and the FiScore admin console for owner/admin management.
+
+FiScore should also support sparse onboarding lifecycle nudges:
+
+- signed in but no workspace after the configured waiting period
+- workspace created but no restaurant/site after the configured waiting period
+
+These reminders should be sent only when the setup condition is still true at
+delivery time. They should not create operational action items or repeated
+daily reminders in V1.
+
+### Operational Email Boundary
+
+Operational work should stay low-noise. Do not send email by default for:
+
+- notes
+- draft saves
+- photo or video uploads
+- ordinary status refreshes
+- routine list/dashboard activity
+
+Potential future operational emails should be limited to digest or escalation
+patterns such as unresolved overdue training, overdue assigned checks, or
+manager summaries.
 
 ### Action Item Implementation Boundary
 
