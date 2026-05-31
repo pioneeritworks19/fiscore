@@ -76,6 +76,23 @@ Email should not be sent directly by the app. Email decisions should be made by
 trusted backend workflows that can validate role/site access, dedupe repeated
 events, record delivery state, and keep action items consistent.
 
+V1 email templates are owned in Cloud Functions code and start with English and
+Spanish FiScore-controlled copy. The template renderer should choose the
+recipient language preference when known, fall back to a future tenant default
+when available, and then use English. Tenant names, site names, user names,
+comments, and authored content are inserted exactly as entered.
+
+V1 emails use FiScore product identity plus lightweight tenant context, such as
+`FiScore on behalf of {tenantName}`. Tenant-managed logos, colors, sender
+domains, and editable templates are intentionally out of scope until a later
+branding or enterprise plan requires them.
+
+The first backend implementation uses a `noop` email adapter. It records
+notification events and delivery attempts as if a provider accepted the message,
+but it does not send a real email. When a provider is selected, add the provider
+API key and sender configuration as Firebase Functions secrets or environment
+configuration and keep the rest of the notification contract unchanged.
+
 ## Notification Priority Model
 
 Recommended priority levels:
