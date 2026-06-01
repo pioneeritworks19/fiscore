@@ -7,6 +7,22 @@ const {
   normalizedEmail,
   cleanString,
 } = require("./shared/runtime");
+const {
+  recordNotificationDecision,
+  sendEmailForNotification,
+} = require("./notifications");
+
+function appUrl() {
+  return process.env.FISCORE_APP_URL || "https://fiscore-dev.web.app";
+}
+
+function websiteUrl() {
+  return process.env.FISCORE_WEBSITE_URL || "https://fiscore.app";
+}
+
+function adminUrl() {
+  return process.env.FISCORE_ADMIN_URL || appUrl();
+}
 
 const createTenantAndOwner = onCall({ region }, async (request) => {
   const auth = requireAuth(request);
@@ -75,7 +91,32 @@ const createTenantAndOwner = onCall({ region }, async (request) => {
     });
   });
 
-  return { tenantId: tenantRef.id };
+  const decision = await recordNotificationDecision({
+    eventType: "workspace_created",
+    category: "onboarding",
+    tenantId: tenantRef.id,
+    targetType: "tenant",
+    targetId: tenantRef.id,
+    targetPath: `tenants/${tenantRef.id}`,
+    recipientUserId: uid,
+    recipientEmail: email,
+    recipientRoleSnapshot: "tenant_owner",
+    tenantNameSnapshot: tenantName,
+    channel: "email",
+    templateId: "workspace_created",
+    templateData: {
+      tenantName,
+      appUrl: appUrl(),
+      websiteUrl: websiteUrl(),
+      adminUrl: adminUrl(),
+    },
+    reason: "workspace_created_orientation",
+  });
+  if (!decision.suppressed) {
+    await sendEmailForNotification(decision.ref);
+  }
+
+  return { tenantId: tenantRef.id, notificationStatus: decision.status };
 });
 
 module.exports = { createTenantAndOwner };
