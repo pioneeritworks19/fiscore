@@ -19,7 +19,6 @@ class _TeamManagementContent extends StatefulWidget {
 
 class _TeamManagementContentState extends State<_TeamManagementContent> {
   final TeamRepository _teamRepository = TeamRepository();
-  final AuthService _authService = AuthService();
   final TextEditingController _emailController = TextEditingController();
   String _selectedRole = 'staff';
   String _siteAccessMode = 'all';
@@ -81,7 +80,6 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
         siteAccessMode: _siteAccessMode,
         siteIds: siteIds,
       );
-      await _authService.sendEmailSignInLink(email);
       if (!mounted) return;
       setState(() {
         _message = strings.inviteSentTo(email);
@@ -94,15 +92,6 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
       if (!mounted) return;
       setState(() {
         _error = error.message;
-      });
-    } on FirebaseAuthException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        final detail = error.message ?? '';
-        _error = [
-          strings.inviteSavedEmailFailed,
-          detail,
-        ].where((part) => part.trim().isNotEmpty).join(' ');
       });
     } catch (_) {
       if (!mounted) return;
@@ -118,22 +107,20 @@ class _TeamManagementContentState extends State<_TeamManagementContent> {
     }
   }
 
-  Future<void> _resendInviteLink(String email) async {
+  Future<void> _resendInviteLink(String inviteId, String email) async {
     final strings = AppLocalizations.of(context);
     setState(() {
       _message = null;
       _error = null;
     });
     try {
-      await _authService.sendEmailSignInLink(email);
+      await _teamRepository.resendInvite(
+        tenantId: widget.tenantId,
+        inviteId: inviteId,
+      );
       if (!mounted) return;
       setState(() {
         _message = strings.signInLinkResentTo(email);
-      });
-    } on FirebaseAuthException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = error.message ?? strings.couldNotResendSignInLink;
       });
     } catch (_) {
       if (!mounted) return;
@@ -563,7 +550,7 @@ class _TeamListCard extends StatelessWidget {
   final String? currentUserId;
   final String currentRole;
   final bool canManage;
-  final ValueChanged<String>? onResendInvite;
+  final void Function(String inviteId, String email)? onResendInvite;
   final void Function(String inviteId, String email)? onCancelInvite;
   final void Function(String inviteId, Map<String, dynamic> invite)?
   onEditInvite;
@@ -700,7 +687,11 @@ class _TeamListCard extends StatelessWidget {
                                     ? () => onEditInvite!(doc.id, invite)
                                     : null,
                                 onResendInvite: canManageInvite
-                                    ? onResendInvite
+                                    ? () => onResendInvite?.call(
+                                        doc.id,
+                                        invite['email'] as String? ??
+                                            'this teammate',
+                                      )
                                     : null,
                                 onCancelInvite:
                                     !canManageInvite || onCancelInvite == null
@@ -911,7 +902,7 @@ class _TeamPersonRow extends StatelessWidget {
   final bool invited;
   final bool reInvited;
   final VoidCallback? onEdit;
-  final ValueChanged<String>? onResendInvite;
+  final VoidCallback? onResendInvite;
   final VoidCallback? onCancelInvite;
   final VoidCallback? onDeactivate;
 
@@ -993,7 +984,7 @@ class _TeamPersonRow extends StatelessWidget {
                     onEdit?.call();
                     break;
                   case 'resend':
-                    if (email != null) onResendInvite?.call(email);
+                    onResendInvite?.call();
                     break;
                   case 'cancel':
                     onCancelInvite?.call();

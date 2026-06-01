@@ -14,6 +14,77 @@ const {
   teamAccessSnapshot,
   teamActivityData,
 } = require("./shared/runtime");
+const {
+  recordNotificationDecision,
+  sendEmailForNotification,
+} = require("./notifications");
+
+function appUrl() {
+  return process.env.FISCORE_APP_URL || "https://fiscore-dev.web.app";
+}
+
+function roleLabel(role) {
+  return {
+    tenant_owner: "Tenant owner",
+    admin: "Admin",
+    manager: "Manager",
+    auditor: "Auditor",
+    staff: "Staff",
+  }[role] || "Team member";
+}
+
+function siteContext(siteAccessMode, siteIds) {
+  if (siteAccessMode !== "selected") {
+    return "Access: all restaurant sites.";
+  }
+  const count = Array.isArray(siteIds) ? siteIds.length : 0;
+  if (count === 1) {
+    return "Access: 1 selected restaurant site.";
+  }
+  return `Access: ${count} selected restaurant sites.`;
+}
+
+async function tenantName(tenantId) {
+  const tenantSnap = await db.doc(`tenants/${tenantId}`).get();
+  return tenantSnap.data()?.name || "FiScore workspace";
+}
+
+async function recordAndSendInviteEmail({
+  eventType,
+  tenantId,
+  inviteId,
+  email,
+  role,
+  siteAccessMode,
+  siteIds,
+  actor,
+}) {
+  const currentTenantName = await tenantName(tenantId);
+  const decision = await recordNotificationDecision({
+    eventType,
+    category: "account_access",
+    tenantId,
+    targetType: "invite",
+    targetId: inviteId,
+    targetPath: `tenants/${tenantId}/invites/${inviteId}`,
+    recipientEmail: email,
+    channel: "email",
+    tenantNameSnapshot: currentTenantName,
+    templateId: eventType,
+    templateData: {
+      tenantName: currentTenantName,
+      inviterName: actor?.displayNameSnapshot || actor?.emailSnapshot || "A FiScore admin",
+      roleLabel: roleLabel(role),
+      siteContext: siteContext(siteAccessMode, siteIds),
+      actionUrl: appUrl(),
+    },
+    reason: "team_invite_email",
+  });
+  if (!decision.suppressed) {
+    await sendEmailForNotification(decision.ref);
+  }
+  return decision;
+}
 
 const createTenantInvite = onCall({ region }, async (request) => {
   const auth = requireAuth(request);
@@ -53,6 +124,17 @@ const createTenantInvite = onCall({ region }, async (request) => {
     after: { role, siteAccessMode, siteIds },
   }));
   await batch.commit();
+
+  await recordAndSendInviteEmail({
+    eventType: "team_invite_created",
+    tenantId,
+    inviteId: inviteRef.id,
+    email,
+    role,
+    siteAccessMode,
+    siteIds,
+    actor,
+  });
 
   return { inviteId: inviteRef.id };
 });
@@ -223,6 +305,50 @@ const cancelTenantInvite = onCall({ region }, async (request) => {
   });
 
   return { tenantId, inviteId };
+});
+
+const resendTenantInvite = onCall({ region }, async (request) => {
+  const auth = requireAuth(request);
+  const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
+  const inviteId = cleanString(request.data?.inviteId, "Invite ID", 160);
+  const inviteRef = db.doc(`tenants/${tenantId}/invites/${inviteId}`);
+  const actor = await requireTenantRole(tenantId, auth.uid, tenantAdminRoles);
+  const inviteSnap = await inviteRef.get();
+  if (!inviteSnap.exists) {
+    throw new HttpsError("not-found", "Invite not found.");
+  }
+  const invite = inviteSnap.data();
+  if (invite.status !== "pending") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Only pending invitations can be resent.",
+    );
+  }
+  if (invite.role === "admin" && actor.role !== "tenant_owner") {
+    throw new HttpsError(
+      "permission-denied",
+      "Only the tenant owner can resend an admin invitation.",
+    );
+  }
+
+  const decision = await recordAndSendInviteEmail({
+    eventType: "team_invite_resent",
+    tenantId,
+    inviteId,
+    email: invite.email,
+    role: invite.role,
+    siteAccessMode: invite.siteAccessMode,
+    siteIds: invite.siteIds,
+    actor,
+  });
+
+  await inviteRef.set({
+    lastResentBy: auth.uid,
+    lastResentAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  return { inviteId, notificationStatus: decision.status };
 });
 
 const updateTenantInviteAccess = onCall({ region }, async (request) => {
@@ -407,6 +533,7 @@ module.exports = {
   listMyPendingInvites,
   acceptTenantInvite,
   cancelTenantInvite,
+  resendTenantInvite,
   updateTenantInviteAccess,
   updateTenantMemberAccess,
   deactivateTenantMember,
