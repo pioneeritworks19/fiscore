@@ -56,10 +56,10 @@
 
 **Independent Test**: Create a new workspace from a fresh owner account; verify notification event, delivery attempt, and first-owner orientation copy.
 
-- [ ] T016 [US2] Wire `createTenantAndOwner` in `apps/fiscore_app/functions/tenants.js` to record/send `workspace_created`.
-- [ ] T017 [US2] Add localized workspace-created template copy with FiScore sender identity and tenant context in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T018 [US2] Include app return path, add/link restaurant next step, website/help mention, and admin console mention in template data in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T019 [US2] Add dedupe protection for retried workspace creation in `apps/fiscore_app/functions/notifications.js`.
+- [x] T016 [US2] Wire `createTenantAndOwner` in `apps/fiscore_app/functions/tenants.js` to record/send `workspace_created`.
+- [x] T017 [US2] Add localized workspace-created template copy with FiScore sender identity and tenant context in `apps/fiscore_app/functions/notifications.js`.
+- [x] T018 [US2] Include app return path, add/link restaurant next step, website/help mention, and admin console mention in template data in `apps/fiscore_app/functions/notifications.js`.
+- [x] T019 [US2] Add dedupe protection for retried workspace creation in `apps/fiscore_app/functions/notifications.js`.
 - [ ] T020 [US2] Validate workspace-created flow against `specs/001-notifications-email/quickstart.md`.
 
 **Checkpoint**: First owner receives one clear orientation email.
