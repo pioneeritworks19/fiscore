@@ -1,8 +1,10 @@
 const crypto = require("crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const {
   admin,
   db,
+  region,
   safeText,
 } = require("./shared/runtime");
 
@@ -155,6 +157,32 @@ const templates = {
     },
   },
 };
+
+function appUrl() {
+  return process.env.FISCORE_APP_URL || "https://fiscore-dev.web.app";
+}
+
+function reminderDelayDays() {
+  const parsed = Number.parseInt(
+    process.env.FISCORE_ONBOARDING_REMINDER_DAYS || "3",
+    10,
+  );
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
+}
+
+function reminderCutoffDate() {
+  return new Date(Date.now() - reminderDelayDays() * 24 * 60 * 60 * 1000);
+}
+
+function isBeforeCutoff(timestampOrDate, cutoffDate) {
+  if (!timestampOrDate) {
+    return false;
+  }
+  const date = typeof timestampOrDate.toDate === "function"
+    ? timestampOrDate.toDate()
+    : new Date(timestampOrDate);
+  return !Number.isNaN(date.getTime()) && date <= cutoffDate;
+}
 
 function normalizeLocale(locale) {
   const normalized = safeText(locale, "en").toLowerCase().split("-")[0];
@@ -316,6 +344,151 @@ async function recordNotificationDecision(input) {
   return { eventId: eventRef.id, ref: eventRef, status, suppressed: !!existing };
 }
 
+async function recordAndSendSetupReminder(input) {
+  const decision = await recordNotificationDecision({
+    category: "onboarding",
+    channel: "email",
+    ...input,
+  });
+  if (!decision.suppressed) {
+    await sendEmailForNotification(decision.ref);
+  }
+  return decision;
+}
+
+async function scanNoWorkspaceUsers({ cutoffDate = reminderCutoffDate() } = {}) {
+  let pageToken;
+  let scanned = 0;
+  let queued = 0;
+  let skipped = 0;
+
+  do {
+    const result = await admin.auth().listUsers(1000, pageToken);
+    pageToken = result.pageToken;
+    for (const user of result.users) {
+      scanned += 1;
+      const email = safeText(user.email);
+      if (
+        !email ||
+        user.disabled ||
+        !isBeforeCutoff(user.metadata?.lastSignInTime, cutoffDate)
+      ) {
+        skipped += 1;
+        continue;
+      }
+
+      const userRef = db.doc(`users/${user.uid}`);
+      const userSnap = await userRef.get();
+      const userData = userSnap.data() || {};
+      if (safeText(userData.activeTenantId)) {
+        skipped += 1;
+        continue;
+      }
+
+      await recordAndSendSetupReminder({
+        eventType: "signed_in_no_workspace",
+        targetType: "user",
+        targetId: user.uid,
+        targetPath: `users/${user.uid}`,
+        recipientUserId: user.uid,
+        recipientEmail: email.toLowerCase(),
+        templateId: "signed_in_no_workspace",
+        templateData: {
+          appUrl: appUrl(),
+        },
+        locale: userData.languagePreference,
+        reason: "signed_in_no_workspace_reminder",
+      });
+      queued += 1;
+    }
+  } while (pageToken);
+
+  return { scanned, queued, skipped };
+}
+
+async function scanNoSiteWorkspaces({ cutoffDate = reminderCutoffDate() } = {}) {
+  const cutoffTimestamp = admin.firestore.Timestamp.fromDate(cutoffDate);
+  const tenants = await db.collection("tenants")
+    .where("status", "==", "active")
+    .where("activeSiteCount", "==", 0)
+    .where("createdAt", "<=", cutoffTimestamp)
+    .limit(500)
+    .get();
+  let scanned = 0;
+  let queued = 0;
+  let skipped = 0;
+
+  for (const tenantDoc of tenants.docs) {
+    scanned += 1;
+    const tenant = tenantDoc.data();
+    if (!isBeforeCutoff(tenant.createdAt, cutoffDate)) {
+      skipped += 1;
+      continue;
+    }
+
+    const freshTenantSnap = await tenantDoc.ref.get();
+    const freshTenant = freshTenantSnap.data() || {};
+    if (
+      freshTenant.status !== "active" ||
+      Number(freshTenant.activeSiteCount || 0) > 0
+    ) {
+      skipped += 1;
+      continue;
+    }
+
+    const ownerId = safeText(freshTenant.primaryOwnerUserId);
+    if (!ownerId) {
+      skipped += 1;
+      continue;
+    }
+    const ownerSnap = await db.doc(`users/${ownerId}`).get();
+    const owner = ownerSnap.data() || {};
+    const email = safeText(owner.email);
+    if (!email) {
+      skipped += 1;
+      continue;
+    }
+
+    await recordAndSendSetupReminder({
+      eventType: "workspace_has_no_site",
+      tenantId: tenantDoc.id,
+      targetType: "tenant",
+      targetId: tenantDoc.id,
+      targetPath: `tenants/${tenantDoc.id}`,
+      recipientUserId: ownerId,
+      recipientEmail: email.toLowerCase(),
+      recipientRoleSnapshot: "tenant_owner",
+      tenantNameSnapshot: safeText(freshTenant.name, "FiScore workspace"),
+      templateId: "workspace_has_no_site",
+      templateData: {
+        tenantName: safeText(freshTenant.name, "FiScore workspace"),
+        appUrl: appUrl(),
+      },
+      locale: owner.languagePreference,
+      reason: "workspace_has_no_site_reminder",
+    });
+    queued += 1;
+  }
+
+  return { scanned, queued, skipped };
+}
+
+const sendNoWorkspaceSetupReminders = onSchedule(
+  { region, schedule: "every day 07:10", timeZone: "America/New_York" },
+  async () => {
+    const result = await scanNoWorkspaceUsers();
+    console.log("No-workspace setup reminders", result);
+  },
+);
+
+const sendNoSiteSetupReminders = onSchedule(
+  { region, schedule: "every day 07:20", timeZone: "America/New_York" },
+  async () => {
+    const result = await scanNoSiteWorkspaces();
+    console.log("No-site setup reminders", result);
+  },
+);
+
 async function deliverNoopEmail(eventRef, rendered) {
   return {
     provider: "noop",
@@ -402,4 +575,8 @@ module.exports = {
   assertEmailEventIsEnabled,
   recordNotificationDecision,
   sendEmailForNotification,
+  scanNoWorkspaceUsers,
+  scanNoSiteWorkspaces,
+  sendNoWorkspaceSetupReminders,
+  sendNoSiteSetupReminders,
 };

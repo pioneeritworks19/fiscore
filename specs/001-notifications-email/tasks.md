@@ -87,11 +87,11 @@
 
 **Independent Test**: Simulate no-workspace and no-site states; verify reminders send only while conditions remain true.
 
-- [ ] T025 [US4] Add scheduled or callable-testable helper for signed-in users with no workspace in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T026 [US4] Add scheduled or callable-testable helper for workspaces with no sites in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T027 [US4] Add localized templates for `signed_in_no_workspace` and `workspace_has_no_site` in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T028 [US4] Ensure reminder helpers re-check eligibility immediately before delivery in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T029 [US4] Export scheduled reminder functions from `apps/fiscore_app/functions/index.js`.
+- [x] T025 [US4] Add scheduled or callable-testable helper for signed-in users with no workspace in `apps/fiscore_app/functions/notifications.js`.
+- [x] T026 [US4] Add scheduled or callable-testable helper for workspaces with no sites in `apps/fiscore_app/functions/notifications.js`.
+- [x] T027 [US4] Add localized templates for `signed_in_no_workspace` and `workspace_has_no_site` in `apps/fiscore_app/functions/notifications.js`.
+- [x] T028 [US4] Ensure reminder helpers re-check eligibility immediately before delivery in `apps/fiscore_app/functions/notifications.js`.
+- [x] T029 [US4] Export scheduled reminder functions from `apps/fiscore_app/functions/index.js`.
 - [ ] T030 [US4] Validate reminder scenarios against `specs/001-notifications-email/quickstart.md`.
 
 **Checkpoint**: Setup reminders recover abandoned setup without daily spam.
