@@ -74,6 +74,16 @@ service cloud.firestore {
       allow create: if isSelf(userId);
       allow read, update: if isSelf(userId);
       allow delete: if false;
+
+      match /notificationEvents/{eventId} {
+        allow read: if isSelf(userId);
+        allow create, update, delete: if false;
+
+        match /deliveryAttempts/{attemptId} {
+          allow read: if isSelf(userId);
+          allow create, update, delete: if false;
+        }
+      }
     }
 
     match /tenants/{tenantId} {
@@ -96,6 +106,16 @@ service cloud.firestore {
       match /teamActivity/{activityId} {
         allow read: if isTenantAdmin(tenantId);
         allow create, update, delete: if false;
+      }
+
+      match /notificationEvents/{eventId} {
+        allow read: if isTenantAdmin(tenantId);
+        allow create, update, delete: if false;
+
+        match /deliveryAttempts/{attemptId} {
+          allow read: if isTenantAdmin(tenantId);
+          allow create, update, delete: if false;
+        }
       }
 
       match /actionItems/{actionItemId} {
