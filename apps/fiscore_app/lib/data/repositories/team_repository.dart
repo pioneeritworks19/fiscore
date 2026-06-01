@@ -78,6 +78,16 @@ class TeamRepository {
     });
   }
 
+  Future<void> resendInvite({
+    required String tenantId,
+    required String inviteId,
+  }) async {
+    await _functions.call('resendTenantInvite', {
+      'tenantId': tenantId,
+      'inviteId': inviteId,
+    });
+  }
+
   Future<void> updateInviteAccess({
     required String tenantId,
     required String inviteId,
