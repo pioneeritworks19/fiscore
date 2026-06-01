@@ -72,9 +72,9 @@
 
 **Independent Test**: Exercise existing operational transitions and verify action items change while outbound email attempts are not created for notes, draft saves, photos, or routine status changes.
 
-- [ ] T021 [US3] Review `apps/fiscore_app/functions/actions.js` and document which action item types are non-email by default.
-- [ ] T022 [US3] Add guard or helper naming in `apps/fiscore_app/functions/notifications.js` that makes operational email opt-in rather than default.
-- [ ] T023 [US3] Verify `submitViolationForReview`, `sendViolationBack`, training assignment, and check assignment still create action items in `apps/fiscore_app/functions/violations.js`, `apps/fiscore_app/functions/training.js`, and `apps/fiscore_app/functions/audits.js`.
+- [x] T021 [US3] Review `apps/fiscore_app/functions/actions.js` and document which action item types are non-email by default.
+- [x] T022 [US3] Add guard or helper naming in `apps/fiscore_app/functions/notifications.js` that makes operational email opt-in rather than default.
+- [x] T023 [US3] Verify `submitViolationForReview`, `sendViolationBack`, training assignment, and check assignment still create action items in `apps/fiscore_app/functions/violations.js`, `apps/fiscore_app/functions/training.js`, and `apps/fiscore_app/functions/audits.js`.
 - [ ] T024 [US3] Validate no email delivery attempts are created for notes, draft saves, attachment uploads, and normal operational action item creation using `specs/001-notifications-email/quickstart.md`.
 
 **Checkpoint**: Operational workflows remain low-noise.

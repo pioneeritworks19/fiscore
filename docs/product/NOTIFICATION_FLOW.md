@@ -426,6 +426,29 @@ Potential future operational emails should be limited to digest or escalation
 patterns such as unresolved overdue training, overdue assigned checks, or
 manager summaries.
 
+The backend notification helper treats email as opt-in per event type. V1
+email-enabled events are limited to account access and onboarding lifecycle
+events:
+
+- `passwordless_sign_in_link`
+- `team_invite_created`
+- `team_invite_resent`
+- `workspace_created`
+- `signed_in_no_workspace`
+- `workspace_has_no_site`
+
+Operational action item types are intentionally in-app only by default:
+
+- `violation_resolution`
+- `violation_review`
+- `violation_sent_back`
+- `training_completion`
+- `audit_completion`
+
+These action items power the dashboard and action inbox without creating email
+delivery attempts. If FiScore later adds operational email, it should add a new
+explicitly named email event rather than reusing ordinary action-item writes.
+
 ### Action Item Implementation Boundary
 
 Operational inbox rows should be stored as action items at:

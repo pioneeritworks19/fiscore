@@ -15,6 +15,7 @@ const requiredEmailEvents = new Set([
   "signed_in_no_workspace",
   "workspace_has_no_site",
 ]);
+const emailEnabledEvents = new Set(requiredEmailEvents);
 
 const templates = {
   team_invite_created: {
@@ -200,6 +201,16 @@ function statusForChannel(channel) {
   return channel === "skip" ? "skipped" : "pending";
 }
 
+function assertEmailEventIsEnabled(eventType, channel) {
+  if (channel !== "email" || emailEnabledEvents.has(eventType)) {
+    return;
+  }
+  throw new HttpsError(
+    "failed-precondition",
+    `Email is not enabled for notification event ${eventType}.`,
+  );
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -261,6 +272,7 @@ async function recordNotificationDecision(input) {
       "Email notifications require a recipient.",
     );
   }
+  assertEmailEventIsEnabled(eventType, channel);
 
   const collectionRef = notificationCollection({
     tenantId: safeText(input?.tenantId),
@@ -387,6 +399,7 @@ module.exports = {
   normalizeLocale,
   generateDedupeKey,
   renderEmailTemplate,
+  assertEmailEventIsEnabled,
   recordNotificationDecision,
   sendEmailForNotification,
 };
