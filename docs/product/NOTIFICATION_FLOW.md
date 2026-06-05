@@ -93,6 +93,40 @@ but it does not send a real email. When a provider is selected, add the provider
 API key and sender configuration as Firebase Functions secrets or environment
 configuration and keep the rest of the notification contract unchanged.
 
+## Delivery Status Definitions
+
+Tenant admins and support can inspect notification records without reading raw
+Cloud Functions logs. V1 status meanings are:
+
+- `pending`: FiScore recorded the business notification decision, but delivery
+  has not completed yet.
+- `sent`: the configured provider accepted the message. With the current `noop`
+  adapter, this means FiScore recorded a successful simulated provider attempt;
+  it does not mean a real email reached an inbox.
+- `failed`: FiScore attempted delivery and the provider adapter returned an
+  error. The delivery attempt should include a concise error code or message.
+- `skipped`: FiScore intentionally did not attempt delivery because the event
+  was not email-worthy or did not meet the required delivery conditions.
+- `suppressed`: FiScore intentionally did not attempt delivery because a
+  duplicate or suppression rule applied, such as a rapid resend inside the
+  dedupe window.
+
+The tenant Admin Console notification history is read-only in V1. It is for
+understanding invite, workspace, and onboarding email decisions; it is not a
+second sender, retry tool, or operational action inbox.
+
+## V1 Preference Defaults
+
+V1 does not store editable notification preference records. Required account,
+access, workspace setup, and onboarding lifecycle emails are evaluated by
+backend business rules and bypass optional preference suppression. Operational
+work remains action-item-first and does not create email delivery attempts by
+default.
+
+Future preference records can add optional categories, digest behavior, and push
+settings without changing the existing notification event or delivery attempt
+history.
+
 ## Notification Priority Model
 
 Recommended priority levels:
