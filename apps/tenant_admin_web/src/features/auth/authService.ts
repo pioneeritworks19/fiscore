@@ -8,7 +8,7 @@ import {
   signOut,
   type User,
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth } from '../../shared/firebase/firebase';
 
 const emailStorageKey = 'fiscore_admin_email_for_sign_in';
 
