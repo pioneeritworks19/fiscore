@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -19,6 +20,8 @@ import type {
   AuditResponse,
   Invite,
   Member,
+  NotificationDeliveryAttempt,
+  NotificationEvent,
   PublicInspection,
   RestaurantSearchResult,
   Site,
@@ -117,6 +120,48 @@ export function subscribeActivity(
   return onSnapshot(
     query(collection(db, 'tenants', tenantId, 'teamActivity'), orderBy('createdAt', 'desc')),
     (snapshot) => next(snapshot.docs.slice(0, 20).map((docSnap) => documentTo<Activity>(docSnap))),
+    (err) => error(err.message),
+  );
+}
+
+export function subscribeNotificationEvents(
+  tenantId: string,
+  statusFilter: string,
+  next: (events: NotificationEvent[]) => void,
+  error: (message: string) => void,
+) {
+  const baseCollection = collection(db, 'tenants', tenantId, 'notificationEvents');
+  const eventQuery =
+    statusFilter === 'all'
+      ? query(baseCollection, orderBy('createdAt', 'desc'), limit(100))
+      : query(
+          baseCollection,
+          where('status', '==', statusFilter),
+          orderBy('createdAt', 'desc'),
+          limit(100),
+        );
+
+  return onSnapshot(
+    eventQuery,
+    (snapshot) => next(snapshot.docs.map((docSnap) => documentTo<NotificationEvent>(docSnap))),
+    (err) => error(err.message),
+  );
+}
+
+export function subscribeNotificationDeliveryAttempts(
+  tenantId: string,
+  eventId: string,
+  next: (attempts: NotificationDeliveryAttempt[]) => void,
+  error: (message: string) => void,
+) {
+  return onSnapshot(
+    query(
+      collection(db, 'tenants', tenantId, 'notificationEvents', eventId, 'deliveryAttempts'),
+      orderBy('createdAt', 'desc'),
+      limit(20),
+    ),
+    (snapshot) =>
+      next(snapshot.docs.map((docSnap) => documentTo<NotificationDeliveryAttempt>(docSnap))),
     (err) => error(err.message),
   );
 }

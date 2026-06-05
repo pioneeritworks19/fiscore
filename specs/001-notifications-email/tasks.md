@@ -107,8 +107,8 @@
 **Independent Test**: Trigger each V1 notification category and inspect stored notification event/delivery records.
 
 - [x] T031 [US5] Add query indexes for tenant notification events by status, event type, recipient, and target in `apps/fiscore_app/firestore.indexes.json`.
-- [ ] T032 [US5] Add a read-only repository or admin-console data access plan for notification events in `apps/tenant_admin_web/src` when admin UI is implemented.
-- [ ] T033 [US5] Add support-facing status definitions to `docs/product/NOTIFICATION_FLOW.md`.
+- [x] T032 [US5] Add a read-only repository or admin-console data access plan for notification events in `apps/tenant_admin_web/src` when admin UI is implemented.
+- [x] T033 [US5] Add support-facing status definitions to `docs/product/NOTIFICATION_FLOW.md`.
 - [ ] T034 [US5] Validate support/debug inspection using Firestore records created by prior stories and document gaps in `specs/001-notifications-email/quickstart.md`.
 
 **Checkpoint**: Delivery behavior can be understood without raw function logs.
@@ -121,9 +121,9 @@
 
 **Independent Test**: New users receive required access emails without configuring preferences; optional categories can be modeled later without changing event records.
 
-- [ ] T035 [US6] Document V1 default preferences in `docs/product/NOTIFICATION_FLOW.md`.
+- [x] T035 [US6] Document V1 default preferences in `docs/product/NOTIFICATION_FLOW.md`.
 - [ ] T036 [US6] Add placeholder preference entity notes to `docs/app/FIRESTORE_SCHEMA.md` only if implementation stores preference data.
-- [ ] T037 [US6] Ensure required account/security emails bypass optional preference suppression in `apps/fiscore_app/functions/notifications.js`.
+- [x] T037 [US6] Ensure required account/security emails bypass optional preference suppression in `apps/fiscore_app/functions/notifications.js`.
 
 **Checkpoint**: Preference design is future-ready but not overbuilt.
 

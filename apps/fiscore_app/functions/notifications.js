@@ -306,11 +306,19 @@ async function recordNotificationDecision(input) {
     tenantId: safeText(input?.tenantId),
     recipientUserId,
   });
+  const locale = normalizeLocale(input?.locale);
+  const templateId = safeText(input?.templateId, eventType);
+  const renderedEmail = channel === "email" && templates[templateId]
+    ? renderEmailTemplate(
+      templateId,
+      locale,
+      input?.templateData || {},
+    )
+    : null;
   const dedupeKey = safeText(input?.dedupeKey) || generateDedupeKey(input);
   const existing = await findExistingDedupe(collectionRef, dedupeKey);
   const now = admin.firestore.FieldValue.serverTimestamp();
   const eventRef = collectionRef.doc();
-  const locale = normalizeLocale(input?.locale);
   const status = existing ? "suppressed" : statusForChannel(channel);
   const eventData = {
     eventType,
@@ -329,9 +337,12 @@ async function recordNotificationDecision(input) {
     dedupeKey,
     dedupeHash: hashText(dedupeKey),
     reason: safeText(input?.reason, existing ? "dedupe_suppressed" : "queued"),
-    templateId: safeText(input?.templateId, eventType),
+    templateId,
     templateData: input?.templateData || {},
     locale,
+    renderedSubject: renderedEmail?.subject || "",
+    renderedText: renderedEmail?.text || "",
+    renderedHtml: renderedEmail?.html || "",
     required: requiredEmailEvents.has(eventType),
     suppressedByEventId: existing?.id || null,
     createdAt: now,
@@ -539,10 +550,18 @@ async function sendEmailForNotification(eventRefOrPath) {
       provider: result.provider,
       providerMessageId: result.providerMessageId,
       status: result.status,
+      renderedSubject: rendered.subject,
+      renderedText: rendered.text,
+      renderedHtml: rendered.html,
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
     await eventRef.set({
       status: "sent",
+      provider: result.provider,
+      providerMessageId: result.providerMessageId,
+      renderedSubject: rendered.subject,
+      renderedText: rendered.text,
+      renderedHtml: rendered.html,
       sentAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
