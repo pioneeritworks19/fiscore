@@ -43,7 +43,7 @@ import {
   signInWithGoogle,
   signOutUser,
   subscribeAuth,
-} from './auth';
+} from '../features/auth/authService';
 import {
   cancelTenantInvite,
   createSite,
@@ -76,7 +76,7 @@ import {
   updateLanguagePreference,
   updateManualSite,
   updateTenantMemberAccess,
-} from './data';
+} from '../data';
 import type {
   Activity as ActivityItem,
   Audit,
@@ -95,9 +95,9 @@ import type {
   Violation,
   ViolationAttachment,
   ViolationThreadEntry,
-} from './types';
-import i18n from './i18n';
-import { friendlyError, type FriendlyError } from './errors';
+} from '../types';
+import i18n from '../shared/i18n/i18n';
+import { friendlyError, type FriendlyError } from '../shared/utils/errors';
 
 const tenantAdminRoles = ['tenant_owner', 'admin'];
 const roles: Role[] = ['admin', 'manager', 'auditor', 'staff'];

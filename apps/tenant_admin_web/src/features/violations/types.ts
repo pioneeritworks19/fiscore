@@ -1,0 +1,73 @@
+import type { Timestamp } from 'firebase/firestore';
+
+export type Violation = {
+  id: string;
+  siteId?: string;
+  siteName?: string;
+  title?: string;
+  summaryText?: string;
+  description?: string;
+  displayText?: string;
+  officialText?: string;
+  officialCode?: string;
+  officialClauseReference?: string;
+  clauseReference?: string;
+  sectionLabel?: string;
+  normalizedCategory?: string;
+  severity?: string;
+  status?: string;
+  lifecycleStage?: string;
+  reviewStatus?: string;
+  sourceType?: string;
+  sourceTitleSnapshot?: string;
+  sourceReferenceId?: string;
+  masterInspectionId?: string;
+  inspectionDate?: string;
+  inspectionType?: string;
+  inspectionScore?: number | string | null;
+  inspectionGrade?: string | null;
+  officialStatus?: string | null;
+  auditorComments?: string;
+  creatorComments?: string;
+  comments?: string;
+  questionLabel?: string;
+  responseLabel?: string;
+  correctedDuringInspection?: boolean | null;
+  isRepeatViolation?: boolean | null;
+  assignmentStatus?: string;
+  assignedTo?: string | null;
+  assignedToNameSnapshot?: string | null;
+  responseGeneral?: string;
+  responseContainment?: string;
+  responseRootCause?: string;
+  responseCorrectiveAction?: string;
+  responsePreventiveAction?: string;
+  latestThreadEntrySummary?: string;
+  updatedAt?: Timestamp;
+  submittedForReviewAt?: Timestamp;
+  closedAt?: Timestamp;
+};
+
+export type ViolationAttachment = {
+  id: string;
+  displayName?: string;
+  type?: string;
+  attachmentType?: string;
+  linkedContext?: string;
+  status?: string;
+  storagePath?: string;
+  compressedPath?: string;
+  thumbnailPath?: string;
+  originalPath?: string;
+  downloadUrl?: string;
+  createdAt?: Timestamp;
+};
+
+export type ViolationThreadEntry = {
+  id: string;
+  body?: string;
+  createdBy?: string;
+  createdByDisplayNameSnapshot?: string;
+  attachmentIds?: string[];
+  createdAt?: Timestamp;
+};

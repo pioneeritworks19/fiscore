@@ -1,0 +1,45 @@
+import type { Timestamp } from 'firebase/firestore';
+
+export type NotificationEvent = {
+  id: string;
+  eventType?: string;
+  channel?: string;
+  status?: string;
+  reason?: string;
+  recipientEmail?: string;
+  recipientUserId?: string;
+  targetType?: string;
+  targetId?: string;
+  templateId?: string;
+  locale?: string;
+  provider?: string;
+  providerMessageId?: string;
+  dedupeHash?: string;
+  renderedSubject?: string;
+  renderedText?: string;
+  renderedHtml?: string;
+  createdAt?: Timestamp;
+  queuedAt?: Timestamp;
+  sentAt?: Timestamp;
+  skippedAt?: Timestamp;
+  suppressedAt?: Timestamp;
+  failedAt?: Timestamp;
+};
+
+export type NotificationDeliveryAttempt = {
+  id: string;
+  channel?: string;
+  provider?: string;
+  status?: string;
+  providerMessageId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  renderedSubject?: string;
+  renderedText?: string;
+  renderedHtml?: string;
+  createdAt?: Timestamp;
+  attemptedAt?: Timestamp;
+  completedAt?: Timestamp;
+  sentAt?: Timestamp;
+  failedAt?: Timestamp;
+};
