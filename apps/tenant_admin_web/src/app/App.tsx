@@ -20,8 +20,6 @@ import {
   LogOut,
   Mail,
   Menu,
-  MessageSquare,
-  PlayCircle,
   PlusCircle,
   Settings,
   ShieldCheck,
@@ -46,7 +44,6 @@ import {
   subscribeMembers,
   subscribeSites,
   subscribeTenant,
-  subscribeTrainingAssignments,
   subscribeUserProfile,
   updateLanguagePreference,
 } from '../data';
@@ -56,20 +53,15 @@ import type {
   Member,
   Site,
   Tenant,
-  TrainingAssignment,
   UserProfile,
-  Violation,
 } from '../types';
 import { NotificationHistoryPage } from '../features/notifications/NotificationHistoryPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
-import {
-  ViolationDetailPage,
-  ViolationListRow,
-  ViolationsPage,
-} from '../features/violations/ViolationsPage';
+import { ViolationsPage } from '../features/violations/ViolationsPage';
 import { AddSiteScreen, SiteRow, SitesPage } from '../features/sites/SitesPage';
 import { TeamPage } from '../features/team/TeamPage';
 import { AuditsPage, PublicInspectionsPage } from '../features/audits/AuditsPage';
+import { TrainingPage } from '../features/training/TrainingPage';
 import i18n from '../shared/i18n/i18n';
 
 const tenantAdminRoles = ['tenant_owner', 'admin'];
@@ -721,273 +713,6 @@ function initialsFor(value: string) {
     .split(/[.\s_-]+/)
     .filter(Boolean);
   return (parts[0]?.[0] || 'F').toUpperCase() + (parts[1]?.[0] || '').toUpperCase();
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const { t } = useTranslation();
-  return <span className={`status-badge ${status}`}>{t(status)}</span>;
-}
-
-function violationTitle(violation: Violation) {
-  return firstText(violation.title, violation.summaryText, 'Violation finding');
-}
-
-function firstText(...values: unknown[]) {
-  return values.map(displayText).find((value) => value.length > 0) || '';
-}
-
-function displayText(value: unknown) {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number') return String(value);
-  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    return dateText(value);
-  }
-  return String(value);
-}
-
-function dateText(value: unknown) {
-  const date =
-    typeof value === 'string'
-      ? new Date(value)
-      : value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function'
-        ? value.toDate()
-        : null;
-  if (!date || Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function dateTimeText(value: unknown) {
-  const date =
-    typeof value === 'string'
-      ? new Date(value)
-      : value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function'
-        ? value.toDate()
-        : null;
-  if (!date || Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
-function humanizeToken(value: string) {
-  return value
-    .replaceAll('_', ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function isActiveTraining(assignment: TrainingAssignment) {
-  return !['completed', 'cancelled'].includes(assignment.status || 'assigned');
-}
-
-function isTrainingOverdue(assignment: TrainingAssignment) {
-  if (!isActiveTraining(assignment)) return false;
-  const value = assignment.dueDate || assignment.dueAt;
-  const date =
-    typeof value === 'string'
-      ? new Date(value)
-      : value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function'
-        ? value.toDate()
-        : null;
-  if (!date || Number.isNaN(date.getTime())) return false;
-  const today = new Date();
-  const dueDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-  return dueDay < todayDay;
-}
-
-function sourceLabel(sourceType?: string) {
-  if (sourceType === 'internal_audit') return 'Internal check';
-  if (sourceType === 'public_inspection_finding') return 'Public inspection';
-  return sourceType ? sourceType.replaceAll('_', ' ') : '';
-}
-
-function severityLabel(severity?: string) {
-  if (!severity) return '';
-  return severity.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function severityTone(severity: string) {
-  const normalized = severity.toLowerCase();
-  if (normalized.includes('critical') || normalized.includes('high')) return 'high';
-  if (normalized.includes('medium') || normalized.includes('normal')) return 'medium';
-  return 'low';
-}
-
-function DetailFactCard({
-  title,
-  icon,
-  facts,
-  emptyText,
-}: {
-  title: string;
-  icon: ReactNode;
-  facts: Array<[string, unknown]>;
-  emptyText: string;
-}) {
-  const visibleFacts = facts
-    .map(([label, value]) => [label, displayText(value)] as [string, string])
-    .filter(([, value]) => value.length > 0);
-  return (
-    <section className="detail-card">
-      <div className="detail-card-title">
-        <span>{icon}</span>
-        <h3>{title}</h3>
-      </div>
-      {visibleFacts.length === 0 ? (
-        <p className="muted">{emptyText}</p>
-      ) : (
-        <div className="fact-list">
-          {visibleFacts.map(([label, value]) => (
-            <div key={label} className="fact-row">
-              <span>{label}</span>
-              <strong>{value}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function TrainingPage({ tenantId, sites }: { tenantId: string; sites: Site[] }) {
-  const { t } = useTranslation();
-  const [assignments, setAssignments] = useState<TrainingAssignment[]>([]);
-  const [statusFilter, setStatusFilter] = useState('active');
-  const [siteFilter, setSiteFilter] = useState('all');
-  const [queryText, setQueryText] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    return subscribeTrainingAssignments(tenantId, sites, setAssignments, setError);
-  }, [tenantId, sites]);
-
-  const activeCount = assignments.filter(isActiveTraining).length;
-  const overdueCount = assignments.filter(isTrainingOverdue).length;
-  const completedCount = assignments.filter((assignment) => assignment.status === 'completed').length;
-
-  const visibleAssignments = assignments.filter((assignment) => {
-    const matchesSite = siteFilter === 'all' || assignment.siteId === siteFilter;
-    const status = assignment.status || 'assigned';
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && isActiveTraining(assignment)) ||
-      (statusFilter === 'overdue' && isTrainingOverdue(assignment)) ||
-      status === statusFilter;
-    const blob = [
-      assignment.trainingTitleSnapshot,
-      assignment.trainingDescriptionSnapshot,
-      assignment.assignedToNameSnapshot,
-      assignment.assignedToEmailSnapshot,
-      assignment.siteName,
-      assignment.linkedViolationTitleSnapshot,
-      status,
-    ].join(' ').toLowerCase();
-    return matchesSite && matchesStatus && (!queryText.trim() || blob.includes(queryText.trim().toLowerCase()));
-  });
-
-  return (
-    <div className="page-stack compact-list-page">
-      <section className="summary-strip" aria-label={t('trainingCommandCenter')}>
-        <div>
-          <GraduationCap size={17} />
-          <strong>{activeCount}</strong>
-          <span>{t('activeTraining')}</span>
-        </div>
-        <div className={overdueCount ? 'warning' : 'good'}>
-          <AlertTriangle size={17} />
-          <strong>{overdueCount}</strong>
-          <span>{t('overdueTraining')}</span>
-        </div>
-        <div className="good">
-          <CheckCircle2 size={17} />
-          <strong>{completedCount}</strong>
-          <span>{t('completedTraining')}</span>
-        </div>
-      </section>
-      <section className="panel inspections-list-panel">
-        <div className="list-panel-heading">
-          <div>
-            <p className="eyebrow">{t('trainingCommandCenter')}</p>
-            <h2>{t('trainingHeadline')}</h2>
-            <p>{t('trainingIntro')}</p>
-          </div>
-        </div>
-        <div className="violations-toolbar compact-toolbar">
-          <div className="filter-chips" role="group" aria-label={t('trainingFilters')}>
-            {['active', 'overdue', 'completed', 'all'].map((filter) => (
-              <button
-                key={filter}
-                className={statusFilter === filter ? 'filter-chip active' : 'filter-chip'}
-                onClick={() => setStatusFilter(filter)}
-              >
-                {t(filter)}
-              </button>
-            ))}
-          </div>
-          <div className="violations-controls">
-            <label className="field compact-field">
-              <span>{t('site')}</span>
-              <select value={siteFilter} onChange={(event) => setSiteFilter(event.target.value)}>
-                <option value="all">{t('allSites')}</option>
-                {sites.map((site) => (
-                  <option key={site.id} value={site.id}>{site.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="field compact-field">
-              <span>{t('search')}</span>
-              <input value={queryText} onChange={(event) => setQueryText(event.target.value)} placeholder={t('searchTrainingAssignments')} />
-            </label>
-          </div>
-        </div>
-        {error && <div className="status error">{error}</div>}
-        <div className="violation-list">
-          {visibleAssignments.map((assignment) => (
-            <TrainingListRow key={assignment.id} assignment={assignment} />
-          ))}
-          {visibleAssignments.length === 0 && (
-            <EmptyState icon={<GraduationCap size={22} />} title={t('emptyTrainingAssignmentsTitle')} body={t('emptyTrainingAssignmentsBody')} />
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function TrainingListRow({ assignment }: { assignment: TrainingAssignment }) {
-  const { t } = useTranslation();
-  const dueDate = assignment.dueDate || assignment.dueAt;
-  const overdue = isTrainingOverdue(assignment);
-  const status = overdue ? 'overdue' : assignment.status || 'assigned';
-  const progress = typeof assignment.progressPercent === 'number' ? `${assignment.progressPercent}%` : '';
-
-  return (
-    <article className="violation-row training-row">
-      <span className={`severity-rail ${overdue ? 'medium' : assignment.status === 'completed' ? 'low' : ''}`} />
-      <div className="violation-row-main">
-        <div className="violation-row-title">
-          <strong>{assignment.trainingTitleSnapshot || t('training')}</strong>
-          <StatusBadge status={status} />
-        </div>
-        <p>
-          {assignment.siteName || t('site')}
-          {assignment.assignedToNameSnapshot ? ` - ${assignment.assignedToNameSnapshot}` : ''}
-        </p>
-        <div className="row-badges">
-          {dueDate && <span>{t('due')}: {dateText(dueDate)}</span>}
-          {progress && <span>{t('progress')}: {progress}</span>}
-          {assignment.linkedViolationTitleSnapshot && <span>{assignment.linkedViolationTitleSnapshot}</span>}
-          {assignment.completedAt && <span>{t('completed')}: {dateText(assignment.completedAt)}</span>}
-        </div>
-      </div>
-    </article>
-  );
 }
 
 function Placeholder({ title, body }: { title: string; body: string }) {
