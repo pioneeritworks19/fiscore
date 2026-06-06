@@ -97,10 +97,21 @@ Email provider configuration:
 
 - `FISCORE_EMAIL_PROVIDER=noop` keeps simulated delivery and is the default.
 - `FISCORE_EMAIL_PROVIDER=resend` sends through Resend.
-- `RESEND_API_KEY` is required when the provider is `resend`.
+- `RESEND_API_KEY` is required when the provider is `resend` and is stored as a
+  Firebase Secret Manager secret, not in a committed `.env` file.
 - `FISCORE_EMAIL_FROM` controls the sender identity, for example
   `FiScore <notifications@fiscore.app>`.
 - `FISCORE_EMAIL_REPLY_TO` is optional.
+
+For Firebase dev setup:
+
+```powershell
+firebase functions:secrets:set RESEND_API_KEY --project fiscore-dev
+```
+
+Non-secret settings can remain environment configuration for the target project,
+for example `FISCORE_EMAIL_PROVIDER`, `FISCORE_EMAIL_FROM`, and
+`FISCORE_EMAIL_REPLY_TO`.
 
 Notification records store the rendered subject, text body, and HTML body before
 the provider request is made. This means the Admin Console can show what FiScore

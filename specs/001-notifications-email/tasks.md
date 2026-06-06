@@ -10,7 +10,7 @@
 
 **Reconciliation note (2026-06-04)**: Checklist status reflects code merged through PR #25 and Firebase Functions/Firestore deployment to `fiscore-dev`. Manual validation, provider selection, and admin-console notification history remain open.
 
-**Provider note (2026-06-06)**: Resend is the selected V1 transactional email provider, behind the existing notification adapter. `noop` remains the default until `FISCORE_EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and sender environment configuration are set for the target Firebase project.
+**Provider note (2026-06-06)**: Resend is the selected V1 transactional email provider, behind the existing notification adapter. `noop` remains the default until `FISCORE_EMAIL_PROVIDER=resend`, the `RESEND_API_KEY` Firebase Secret Manager secret, and sender environment configuration are set for the target Firebase project.
 
 ## Phase 1: Setup (Shared Infrastructure)
 

@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const {
   admin,
@@ -7,6 +8,9 @@ const {
   region,
   safeText,
 } = require("./shared/runtime");
+
+const resendApiKey = defineSecret("RESEND_API_KEY");
+const emailSecrets = [resendApiKey];
 
 const supportedLocales = new Set(["en", "es"]);
 const requiredEmailEvents = new Set([
@@ -500,7 +504,12 @@ async function scanNoSiteWorkspaces({ cutoffDate = reminderCutoffDate() } = {}) 
 }
 
 const sendNoWorkspaceSetupReminders = onSchedule(
-  { region, schedule: "every day 07:10", timeZone: "America/New_York" },
+  {
+    region,
+    schedule: "every day 07:10",
+    timeZone: "America/New_York",
+    secrets: emailSecrets,
+  },
   async () => {
     const result = await scanNoWorkspaceUsers();
     console.log("No-workspace setup reminders", result);
@@ -508,7 +517,12 @@ const sendNoWorkspaceSetupReminders = onSchedule(
 );
 
 const sendNoSiteSetupReminders = onSchedule(
-  { region, schedule: "every day 07:20", timeZone: "America/New_York" },
+  {
+    region,
+    schedule: "every day 07:20",
+    timeZone: "America/New_York",
+    secrets: emailSecrets,
+  },
   async () => {
     const result = await scanNoSiteWorkspaces();
     console.log("No-site setup reminders", result);
@@ -525,7 +539,7 @@ async function deliverNoopEmail(eventRef, rendered) {
 }
 
 async function deliverResendEmail(event, rendered) {
-  const apiKey = safeText(process.env.RESEND_API_KEY);
+  const apiKey = safeText(resendApiKey.value());
   if (!apiKey) {
     throw new HttpsError(
       "failed-precondition",
@@ -691,6 +705,7 @@ async function sendEmailForNotification(eventRefOrPath) {
 }
 
 module.exports = {
+  emailSecrets,
   templates,
   normalizeLocale,
   generateDedupeKey,
