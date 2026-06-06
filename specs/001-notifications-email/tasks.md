@@ -10,6 +10,8 @@
 
 **Reconciliation note (2026-06-04)**: Checklist status reflects code merged through PR #25 and Firebase Functions/Firestore deployment to `fiscore-dev`. Manual validation, provider selection, and admin-console notification history remain open.
 
+**Provider note (2026-06-06)**: Resend is the selected V1 transactional email provider, behind the existing notification adapter. `noop` remains the default until `FISCORE_EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and sender environment configuration are set for the target Firebase project.
+
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: Prepare the notification/email backend boundary.
@@ -135,7 +137,7 @@
 - [x] T039 [P] Run `node --check notifications.js` from `apps/fiscore_app/functions`.
 - [ ] T040 [P] Run `flutter analyze` from `apps/fiscore_app` only if Flutter files are touched.
 - [x] T041 Deploy updated Firebase Functions and Firestore rules/indexes from `apps/fiscore_app` to `fiscore-dev`.
-- [ ] T042 Update implementation notes in `docs/product/NOTIFICATION_FLOW.md` after the first provider is selected.
+- [x] T042 Update implementation notes in `docs/product/NOTIFICATION_FLOW.md` after the first provider is selected.
 
 ---
 

@@ -87,11 +87,24 @@ V1 emails use FiScore product identity plus lightweight tenant context, such as
 domains, and editable templates are intentionally out of scope until a later
 branding or enterprise plan requires them.
 
-The first backend implementation uses a `noop` email adapter. It records
+The first backend implementation used a `noop` email adapter. It records
 notification events and delivery attempts as if a provider accepted the message,
-but it does not send a real email. When a provider is selected, add the provider
-API key and sender configuration as Firebase Functions secrets or environment
-configuration and keep the rest of the notification contract unchanged.
+but it does not send a real email. The V1 transactional provider is Resend,
+configured behind the same adapter so FiScore can keep using `noop` in local/dev
+environments and switch delivery on through environment configuration.
+
+Email provider configuration:
+
+- `FISCORE_EMAIL_PROVIDER=noop` keeps simulated delivery and is the default.
+- `FISCORE_EMAIL_PROVIDER=resend` sends through Resend.
+- `RESEND_API_KEY` is required when the provider is `resend`.
+- `FISCORE_EMAIL_FROM` controls the sender identity, for example
+  `FiScore <notifications@fiscore.app>`.
+- `FISCORE_EMAIL_REPLY_TO` is optional.
+
+Notification records store the rendered subject, text body, and HTML body before
+the provider request is made. This means the Admin Console can show what FiScore
+attempted to send even when a provider call fails.
 
 ## Delivery Status Definitions
 

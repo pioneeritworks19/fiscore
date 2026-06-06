@@ -162,6 +162,21 @@ function appUrl() {
   return process.env.FISCORE_APP_URL || "https://fiscore-dev.web.app";
 }
 
+function emailProvider() {
+  return safeText(process.env.FISCORE_EMAIL_PROVIDER, "noop").toLowerCase();
+}
+
+function emailFrom() {
+  return safeText(
+    process.env.FISCORE_EMAIL_FROM,
+    "FiScore <notifications@fiscore.app>",
+  );
+}
+
+function emailReplyTo() {
+  return safeText(process.env.FISCORE_EMAIL_REPLY_TO);
+}
+
 function reminderDelayDays() {
   const parsed = Number.parseInt(
     process.env.FISCORE_ONBOARDING_REMINDER_DAYS || "3",
@@ -509,6 +524,87 @@ async function deliverNoopEmail(eventRef, rendered) {
   };
 }
 
+async function deliverResendEmail(event, rendered) {
+  const apiKey = safeText(process.env.RESEND_API_KEY);
+  if (!apiKey) {
+    throw new HttpsError(
+      "failed-precondition",
+      "RESEND_API_KEY is required when FISCORE_EMAIL_PROVIDER=resend.",
+    );
+  }
+  if (typeof fetch !== "function") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Node fetch is required for Resend email delivery.",
+    );
+  }
+  const recipientEmail = safeText(event.recipientEmail);
+  if (!recipientEmail) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Notification email delivery requires recipientEmail.",
+    );
+  }
+
+  const payload = {
+    from: emailFrom(),
+    to: [recipientEmail],
+    subject: rendered.subject,
+    text: rendered.text,
+    html: rendered.html,
+  };
+  const replyTo = emailReplyTo();
+  if (replyTo) {
+    payload.reply_to = replyTo;
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const text = await response.text();
+  let body = {};
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch (_error) {
+      body = { raw: text };
+    }
+  }
+
+  if (!response.ok) {
+    const message = safeText(
+      body.message || body.error || body.raw,
+      `Resend email delivery failed with HTTP ${response.status}.`,
+    );
+    throw new HttpsError("internal", message);
+  }
+
+  return {
+    provider: "resend",
+    providerMessageId: safeText(body.id),
+    status: "accepted",
+  };
+}
+
+async function deliverEmail(eventRef, event, rendered) {
+  const provider = emailProvider();
+  if (provider === "noop") {
+    return deliverNoopEmail(eventRef, rendered);
+  }
+  if (provider === "resend") {
+    return deliverResendEmail(event, rendered);
+  }
+  throw new HttpsError(
+    "failed-precondition",
+    `Unsupported email provider ${provider}.`,
+  );
+}
+
 async function sendEmailForNotification(eventRefOrPath) {
   const eventRef = typeof eventRefOrPath === "string"
     ? db.doc(eventRefOrPath)
@@ -525,14 +621,30 @@ async function sendEmailForNotification(eventRefOrPath) {
     return { status: "suppressed", reason: "dedupe_suppressed" };
   }
 
+  const rendered = renderEmailTemplate(
+    event.templateId || event.eventType,
+    event.locale,
+    event.templateData || {},
+  );
+  await eventRef.set({
+    renderedSubject: rendered.subject,
+    renderedText: rendered.text,
+    renderedHtml: rendered.html,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  const provider = emailProvider();
   const attemptRef = eventRef.collection("deliveryAttempts").doc();
   const startedAt = admin.firestore.FieldValue.serverTimestamp();
   await attemptRef.set({
     channel: "email",
-    provider: "noop",
+    provider,
     providerMessageId: null,
     status: "pending",
     recipientEmail: event.recipientEmail || null,
+    renderedSubject: rendered.subject,
+    renderedText: rendered.text,
+    renderedHtml: rendered.html,
     attemptedAt: startedAt,
     completedAt: null,
     errorCode: null,
@@ -540,19 +652,11 @@ async function sendEmailForNotification(eventRefOrPath) {
   });
 
   try {
-    const rendered = renderEmailTemplate(
-      event.templateId || event.eventType,
-      event.locale,
-      event.templateData || {},
-    );
-    const result = await deliverNoopEmail(eventRef, rendered);
+    const result = await deliverEmail(eventRef, event, rendered);
     await attemptRef.set({
       provider: result.provider,
       providerMessageId: result.providerMessageId,
       status: result.status,
-      renderedSubject: rendered.subject,
-      renderedText: rendered.text,
-      renderedHtml: rendered.html,
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
     await eventRef.set({
