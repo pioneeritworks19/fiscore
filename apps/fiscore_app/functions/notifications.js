@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { HttpsError } = require("firebase-functions/v2/https");
+const { HttpsError, onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const {
@@ -10,7 +10,9 @@ const {
 } = require("./shared/runtime");
 
 const resendApiKey = defineSecret("RESEND_API_KEY");
+const resendWebhookSecret = defineSecret("RESEND_WEBHOOK_SECRET");
 const emailSecrets = [resendApiKey];
+const resendWebhookSecrets = [resendWebhookSecret];
 
 const supportedLocales = new Set(["en", "es"]);
 const requiredEmailEvents = new Set([
@@ -160,6 +162,38 @@ const templates = {
       html: "<p><strong>FiScore</strong> en nombre de <strong>{{tenantName}}</strong></p><p>Agrega o vincula tu primer restaurante para que tu espacio empiece a mostrar trabajo util.</p><p><a href=\"{{appUrl}}\">Agregar restaurante</a></p>",
     },
   },
+  passwordless_sign_in_link: {
+    en: {
+      subject: "Your FiScore sign-in link",
+      text: [
+        "Use this secure link to sign in to FiScore:",
+        "",
+        "{{actionUrl}}",
+        "",
+        "If you did not request this link, you can ignore this email.",
+      ].join("\n"),
+      html: [
+        "<p>Use this secure link to sign in to FiScore:</p>",
+        "<p><a href=\"{{actionUrl}}\">Sign in to FiScore</a></p>",
+        "<p>If you did not request this link, you can ignore this email.</p>",
+      ].join(""),
+    },
+    es: {
+      subject: "Tu enlace de acceso a FiScore",
+      text: [
+        "Usa este enlace seguro para acceder a FiScore:",
+        "",
+        "{{actionUrl}}",
+        "",
+        "Si no solicitaste este enlace, puedes ignorar este email.",
+      ].join("\n"),
+      html: [
+        "<p>Usa este enlace seguro para acceder a FiScore:</p>",
+        "<p><a href=\"{{actionUrl}}\">Acceder a FiScore</a></p>",
+        "<p>Si no solicitaste este enlace, puedes ignorar este email.</p>",
+      ].join(""),
+    },
+  },
 };
 
 function appUrl() {
@@ -179,6 +213,11 @@ function emailFrom() {
 
 function emailReplyTo() {
   return safeText(process.env.FISCORE_EMAIL_REPLY_TO);
+}
+
+function headerValue(headers, name) {
+  const value = headers[name] || headers[name.toLowerCase()];
+  return Array.isArray(value) ? value[0] : safeText(value);
 }
 
 function reminderDelayDays() {
@@ -215,14 +254,53 @@ function notificationCollection({ tenantId, recipientUserId }) {
   if (safeText(recipientUserId)) {
     return db.collection(`users/${recipientUserId}/notificationEvents`);
   }
-  throw new HttpsError(
-    "invalid-argument",
-    "Tenant ID or recipient user ID is required.",
-  );
+  return db.collection("notificationEvents");
 }
 
 function hashText(value) {
   return crypto.createHash("sha1").update(value).digest("hex");
+}
+
+function verifySvixWebhook(rawBody, headers, secret) {
+  const webhookId = headerValue(headers, "svix-id");
+  const timestamp = headerValue(headers, "svix-timestamp");
+  const signature = headerValue(headers, "svix-signature");
+  if (!webhookId || !timestamp || !signature) {
+    throw new Error("Missing webhook signature headers.");
+  }
+  const timestampSeconds = Number.parseInt(timestamp, 10);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (
+    !Number.isFinite(timestampSeconds) ||
+    Math.abs(nowSeconds - timestampSeconds) > 5 * 60
+  ) {
+    throw new Error("Webhook timestamp is outside the allowed window.");
+  }
+
+  const secretValue = secret.startsWith("whsec_") ? secret.slice(6) : secret;
+  const secretBytes = Buffer.from(secretValue, "base64");
+  const signedPayload = `${webhookId}.${timestamp}.${rawBody}`;
+  const expected = crypto
+    .createHmac("sha256", secretBytes)
+    .update(signedPayload)
+    .digest("base64");
+  const expectedBytes = Buffer.from(expected);
+  const suppliedSignatures = signature
+    .split(" ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.split(","))
+    .filter(([version, value]) => version === "v1" && value)
+    .map(([, value]) => Buffer.from(value));
+
+  const matched = suppliedSignatures.some((candidate) =>
+    candidate.length === expectedBytes.length &&
+    crypto.timingSafeEqual(candidate, expectedBytes),
+  );
+  if (!matched) {
+    throw new Error("Webhook signature verification failed.");
+  }
+  return webhookId;
 }
 
 function generateDedupeKey({
@@ -704,8 +782,196 @@ async function sendEmailForNotification(eventRefOrPath) {
   }
 }
 
+function providerDeliveryStatusForResend(eventType) {
+  switch (eventType) {
+    case "email.sent":
+      return "sent";
+    case "email.delivered":
+      return "delivered";
+    case "email.delivery_delayed":
+      return "delayed";
+    case "email.bounced":
+      return "bounced";
+    case "email.complained":
+      return "complained";
+    case "email.failed":
+      return "failed";
+    case "email.suppressed":
+      return "suppressed";
+    case "email.opened":
+      return "opened";
+    case "email.clicked":
+      return "clicked";
+    default:
+      return "received";
+  }
+}
+
+function eventStatusForProviderDelivery(providerDeliveryStatus, currentStatus) {
+  switch (providerDeliveryStatus) {
+    case "bounced":
+    case "complained":
+    case "failed":
+    case "suppressed":
+      return "failed";
+    default:
+      return currentStatus || "sent";
+  }
+}
+
+async function updateNotificationFromResendWebhook({
+  webhookId,
+  eventType,
+  providerDeliveryStatus,
+  payload,
+}) {
+  const emailId = safeText(payload?.data?.email_id || payload?.data?.id);
+  const providerEventAt = safeText(payload?.created_at || payload?.data?.created_at);
+  if (!emailId) {
+    return { matched: 0, reason: "missing_email_id" };
+  }
+
+  const attempts = await db.collectionGroup("deliveryAttempts")
+    .where("providerMessageId", "==", emailId)
+    .limit(10)
+    .get();
+  if (attempts.empty) {
+    return { matched: 0, reason: "no_matching_delivery_attempt" };
+  }
+
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const parsedEventAt = providerEventAt ? new Date(providerEventAt) : null;
+  const eventAtValue = parsedEventAt && !Number.isNaN(parsedEventAt.getTime())
+    ? admin.firestore.Timestamp.fromDate(parsedEventAt)
+    : now;
+  let matched = 0;
+  const batch = db.batch();
+  for (const attemptDoc of attempts.docs) {
+    const attempt = attemptDoc.data() || {};
+    if (safeText(attempt.provider) !== "resend") {
+      continue;
+    }
+    matched += 1;
+    const notificationRef = attemptDoc.ref.parent.parent;
+    const attemptUpdate = {
+      providerDeliveryStatus,
+      providerEventType: eventType,
+      providerEventAt: eventAtValue,
+      lastProviderEventAt: now,
+      lastWebhookEventId: webhookId,
+      webhookPayload: {
+        type: eventType,
+        createdAt: safeText(payload?.created_at),
+        emailId,
+        to: payload?.data?.to || [],
+        from: safeText(payload?.data?.from),
+        subject: safeText(payload?.data?.subject),
+      },
+      updatedAt: now,
+    };
+    batch.set(attemptDoc.ref, attemptUpdate, { merge: true });
+    if (notificationRef) {
+      const notificationSnap = await notificationRef.get();
+      const notification = notificationSnap.data() || {};
+      batch.set(notificationRef, {
+        status: eventStatusForProviderDelivery(
+          providerDeliveryStatus,
+          notification.status,
+        ),
+        providerDeliveryStatus,
+        providerEventType: eventType,
+        providerEventAt: eventAtValue,
+        lastProviderEventAt: now,
+        lastWebhookEventId: webhookId,
+        updatedAt: now,
+      }, { merge: true });
+    }
+  }
+  if (matched === 0) {
+    return { matched: 0, reason: "no_resend_delivery_attempt" };
+  }
+  await batch.commit();
+  return { matched, reason: "updated" };
+}
+
+const receiveResendWebhook = onRequest(
+  {
+    region,
+    secrets: resendWebhookSecrets,
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    const secret = safeText(resendWebhookSecret.value());
+    if (!secret) {
+      res.status(503).send("Webhook secret is not configured");
+      return;
+    }
+
+    const rawBody = Buffer.isBuffer(req.rawBody)
+      ? req.rawBody.toString("utf8")
+      : JSON.stringify(req.body || {});
+    let webhookId;
+    try {
+      webhookId = verifySvixWebhook(rawBody, req.headers, secret);
+    } catch (error) {
+      console.warn("Rejected Resend webhook", {
+        error: safeText(error.message),
+      });
+      res.status(401).send("Invalid signature");
+      return;
+    }
+
+    const webhookEventRef = db.collection("providerWebhookEvents").doc(webhookId);
+    const existing = await webhookEventRef.get();
+    if (existing.exists) {
+      res.status(200).json({ ok: true, duplicate: true });
+      return;
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch (_error) {
+      res.status(400).send("Invalid JSON");
+      return;
+    }
+
+    const eventType = safeText(payload?.type);
+    const providerDeliveryStatus = providerDeliveryStatusForResend(eventType);
+    const updateResult = await updateNotificationFromResendWebhook({
+      webhookId,
+      eventType,
+      providerDeliveryStatus,
+      payload,
+    });
+    await webhookEventRef.create({
+      provider: "resend",
+      eventType,
+      providerDeliveryStatus,
+      providerMessageId: safeText(payload?.data?.email_id || payload?.data?.id),
+      matchedNotificationCount: updateResult.matched,
+      matchReason: updateResult.reason,
+      payloadSummary: {
+        createdAt: safeText(payload?.created_at),
+        emailId: safeText(payload?.data?.email_id || payload?.data?.id),
+        from: safeText(payload?.data?.from),
+        to: payload?.data?.to || [],
+        subject: safeText(payload?.data?.subject),
+      },
+      receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    res.status(200).json({ ok: true, ...updateResult });
+  },
+);
+
 module.exports = {
   emailSecrets,
+  resendWebhookSecrets,
   templates,
   normalizeLocale,
   generateDedupeKey,
@@ -717,4 +983,5 @@ module.exports = {
   scanNoSiteWorkspaces,
   sendNoWorkspaceSetupReminders,
   sendNoSiteSetupReminders,
+  receiveResendWebhook,
 };

@@ -117,6 +117,7 @@ export function NotificationHistoryPage({ tenantId }: { tenantId: string }) {
                 <div className="row-badges">
                   <span>{dateTimeText(event.createdAt)}</span>
                   {event.channel && <span>{event.channel}</span>}
+                  {event.providerDeliveryStatus && <span>{humanizeToken(event.providerDeliveryStatus)}</span>}
                   {event.targetType && <span>{humanizeToken(event.targetType)}</span>}
                 </div>
               </div>
@@ -186,6 +187,9 @@ function NotificationDetailPage({
               [t('sent'), dateTimeText(event.sentAt)],
               [t('provider'), event.provider],
               [t('providerMessageId'), event.providerMessageId],
+              ['Provider delivery', event.providerDeliveryStatus && humanizeToken(event.providerDeliveryStatus)],
+              ['Provider event', event.providerEventType],
+              ['Provider updated', dateTimeText(event.lastProviderEventAt)],
               [t('dedupeHash'), event.dedupeHash],
             ]}
           />
@@ -207,6 +211,7 @@ function NotificationDetailPage({
                     <div className="row-badges">
                       {attempt.provider && <span>{attempt.provider}</span>}
                       {attempt.channel && <span>{attempt.channel}</span>}
+                      {attempt.providerDeliveryStatus && <span>{humanizeToken(attempt.providerDeliveryStatus)}</span>}
                       {attempt.providerMessageId && <span>{attempt.providerMessageId}</span>}
                     </div>
                     {(attempt.errorCode || attempt.errorMessage) && (

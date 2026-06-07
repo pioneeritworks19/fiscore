@@ -4,6 +4,11 @@ class AuthService {
   static const String _hostedEmailLinkUrl =
       'https://fiscore-dev.firebaseapp.com';
 
+  AuthService({CloudFunctionsService? functions})
+    : _functions = functions ?? CloudFunctionsService();
+
+  final CloudFunctionsService _functions;
+
   Stream<User?> authStateChanges() {
     return FirebaseAuth.instance.authStateChanges();
   }
@@ -20,16 +25,10 @@ class AuthService {
     final continueUrl = kIsWeb
         ? '${Uri.base.scheme}://${Uri.base.authority}'
         : _hostedEmailLinkUrl;
-    await FirebaseAuth.instance.sendSignInLinkToEmail(
-      email: email.trim().toLowerCase(),
-      actionCodeSettings: ActionCodeSettings(
-        url: continueUrl,
-        handleCodeInApp: true,
-        androidPackageName: 'com.pioneeritworks.fiscore.dev',
-        androidInstallApp: true,
-        iOSBundleId: 'com.pioneeritworks.fiscore.dev',
-      ),
-    );
+    await _functions.call('sendPasswordlessSignInLink', {
+      'email': email.trim().toLowerCase(),
+      'continueUrl': continueUrl,
+    });
   }
 
   Future<void> completeEmailSignIn({

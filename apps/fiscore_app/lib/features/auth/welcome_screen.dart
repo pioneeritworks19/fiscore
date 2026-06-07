@@ -80,6 +80,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       setState(() {
         _errorMessage = error.message ?? error.code;
       });
+    } on AppException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.message;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() {

@@ -1,3 +1,4 @@
+const auth = require("./auth");
 const tenants = require("./tenants");
 const team = require("./team");
 const sites = require("./sites");
@@ -10,6 +11,7 @@ const violations = require("./violations");
 const training = require("./training");
 
 module.exports = {
+  ...auth,
   ...tenants,
   ...team,
   ...sites,
@@ -20,6 +22,7 @@ module.exports = {
   markOverdueAuditActions: actions.markOverdueAuditActions,
   sendNoWorkspaceSetupReminders: notifications.sendNoWorkspaceSetupReminders,
   sendNoSiteSetupReminders: notifications.sendNoSiteSetupReminders,
+  receiveResendWebhook: notifications.receiveResendWebhook,
   ...violations,
   ...training,
 };

@@ -14,6 +14,9 @@ export type NotificationEvent = {
   locale?: string;
   provider?: string;
   providerMessageId?: string;
+  providerDeliveryStatus?: string;
+  providerEventType?: string;
+  lastProviderEventAt?: Timestamp;
   dedupeHash?: string;
   renderedSubject?: string;
   renderedText?: string;
@@ -32,6 +35,9 @@ export type NotificationDeliveryAttempt = {
   provider?: string;
   status?: string;
   providerMessageId?: string;
+  providerDeliveryStatus?: string;
+  providerEventType?: string;
+  lastProviderEventAt?: Timestamp;
   errorCode?: string;
   errorMessage?: string;
   renderedSubject?: string;
