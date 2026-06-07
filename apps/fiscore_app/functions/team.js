@@ -15,6 +15,7 @@ const {
   teamActivityData,
 } = require("./shared/runtime");
 const {
+  emailSecrets,
   recordNotificationDecision,
   sendEmailForNotification,
 } = require("./notifications");
@@ -86,7 +87,9 @@ async function recordAndSendInviteEmail({
   return decision;
 }
 
-const createTenantInvite = onCall({ region }, async (request) => {
+const createTenantInvite = onCall(
+  { region, secrets: emailSecrets },
+  async (request) => {
   const auth = requireAuth(request);
   const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
   const email = cleanString(request.data?.email, "Email", 254).toLowerCase();
@@ -137,7 +140,8 @@ const createTenantInvite = onCall({ region }, async (request) => {
   });
 
   return { inviteId: inviteRef.id };
-});
+  },
+);
 
 const listMyPendingInvites = onCall({ region }, async (request) => {
   const auth = requireAuth(request);
@@ -307,7 +311,9 @@ const cancelTenantInvite = onCall({ region }, async (request) => {
   return { tenantId, inviteId };
 });
 
-const resendTenantInvite = onCall({ region }, async (request) => {
+const resendTenantInvite = onCall(
+  { region, secrets: emailSecrets },
+  async (request) => {
   const auth = requireAuth(request);
   const tenantId = cleanString(request.data?.tenantId, "Tenant ID", 160);
   const inviteId = cleanString(request.data?.inviteId, "Invite ID", 160);
@@ -349,7 +355,8 @@ const resendTenantInvite = onCall({ region }, async (request) => {
   }, { merge: true });
 
   return { inviteId, notificationStatus: decision.status };
-});
+  },
+);
 
 const updateTenantInviteAccess = onCall({ region }, async (request) => {
   const auth = requireAuth(request);

@@ -36,7 +36,7 @@ export function subscribeNotificationDeliveryAttempts(
   return onSnapshot(
     query(
       collection(db, 'tenants', tenantId, 'notificationEvents', eventId, 'deliveryAttempts'),
-      orderBy('createdAt', 'desc'),
+      orderBy('attemptedAt', 'desc'),
       limit(20),
     ),
     (snapshot) =>

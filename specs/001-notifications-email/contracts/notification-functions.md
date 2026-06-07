@@ -59,7 +59,43 @@ Errors:
 - provider failures are recorded as failed delivery attempts
 - caller receives failure only when the surrounding business action must fail
 
+## `receiveResendWebhook`
+
+HTTP function in `apps/fiscore_app/functions/notifications.js`.
+
+Behavior:
+
+- accepts Resend/Svix signed webhook POST requests
+- verifies `svix-id`, `svix-timestamp`, and `svix-signature` using the
+  `RESEND_WEBHOOK_SECRET` Firebase secret
+- records a top-level provider webhook event by `svix-id` for idempotency
+- maps Resend email events into `providerDeliveryStatus`
+- updates the matching notification event and delivery attempt by Resend
+  provider message id
+- preserves FiScore notification `status` as the business send state while
+  storing provider mailbox status separately
+
+Errors:
+
+- `401` for missing or invalid webhook signature
+- `405` for unsupported methods
+- unmatched Resend message ids are recorded as webhook events with no matching
+  notification instead of failing the webhook
+
 ## Existing Callable Integration Points
+
+### `sendPasswordlessSignInLink`
+
+Callable in `apps/fiscore_app/functions/auth.js`.
+
+Notification behavior:
+
+- generates the Firebase Auth email sign-in link on the backend
+- records/sends `passwordless_sign_in_link` through the notification adapter
+- uses Resend when `FISCORE_EMAIL_PROVIDER=resend`
+- tenant-scopes the notification when the email matches a pending invite or
+  active member, otherwise writes a global pre-tenant notification event
+- does not dedupe repeated requests so users can request a fresh sign-in link
 
 ### `createTenantAndOwner`
 

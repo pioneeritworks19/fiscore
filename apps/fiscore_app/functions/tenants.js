@@ -8,6 +8,7 @@ const {
   cleanString,
 } = require("./shared/runtime");
 const {
+  emailSecrets,
   recordNotificationDecision,
   sendEmailForNotification,
 } = require("./notifications");
@@ -24,7 +25,9 @@ function adminUrl() {
   return process.env.FISCORE_ADMIN_URL || appUrl();
 }
 
-const createTenantAndOwner = onCall({ region }, async (request) => {
+const createTenantAndOwner = onCall(
+  { region, secrets: emailSecrets },
+  async (request) => {
   const auth = requireAuth(request);
   const uid = auth.uid;
   const email = normalizedEmail(auth);
@@ -117,6 +120,7 @@ const createTenantAndOwner = onCall({ region }, async (request) => {
   }
 
   return { tenantId: tenantRef.id, notificationStatus: decision.status };
-});
+  },
+);
 
 module.exports = { createTenantAndOwner };
