@@ -12,6 +12,8 @@
 
 **Provider note (2026-06-06)**: Resend is the selected V1 transactional email provider, behind the existing notification adapter. `noop` remains the default until `FISCORE_EMAIL_PROVIDER=resend`, the `RESEND_API_KEY` Firebase Secret Manager secret, and sender environment configuration are set for the target Firebase project.
 
+**Provider delivery note (2026-06-07)**: Resend delivery webhooks are wired through `receiveResendWebhook`, with `RESEND_WEBHOOK_SECRET` in Firebase Secret Manager and a `deliveryAttempts.providerMessageId` collection-group index. Admin Console notification history shows rendered email content, delivery attempts, and provider delivery metadata after webhook replay/success.
+
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: Prepare the notification/email backend boundary.
@@ -48,7 +50,7 @@
 - [x] T012 [US1] Wire `resendTenantInvite` in `apps/fiscore_app/functions/team.js` to record/send `team_invite_resent`.
 - [x] T013 [US1] Ensure invite email template identifies FiScore, includes workspace name, tenant context, inviter/context when available, role/site context, and join CTA in `apps/fiscore_app/functions/notifications.js`.
 - [x] T014 [US1] Ensure rapid resend attempts use dedupe/suppression behavior in `apps/fiscore_app/functions/notifications.js`.
-- [ ] T015 [US1] Validate invite/resend flow against `specs/001-notifications-email/quickstart.md`.
+- [x] T015 [US1] Validate invite/resend flow against `specs/001-notifications-email/quickstart.md`.
 
 **Checkpoint**: Invite and resend emails are usable without changing operational action items.
 
@@ -111,7 +113,7 @@
 - [x] T031 [US5] Add query indexes for tenant notification events by status, event type, recipient, and target in `apps/fiscore_app/firestore.indexes.json`.
 - [x] T032 [US5] Add a read-only repository or admin-console data access plan for notification events in `apps/tenant_admin_web/src` when admin UI is implemented.
 - [x] T033 [US5] Add support-facing status definitions to `docs/product/NOTIFICATION_FLOW.md`.
-- [ ] T034 [US5] Validate support/debug inspection using Firestore records created by prior stories and document gaps in `specs/001-notifications-email/quickstart.md`.
+- [x] T034 [US5] Validate support/debug inspection using Firestore records created by prior stories and document gaps in `specs/001-notifications-email/quickstart.md`.
 
 **Checkpoint**: Delivery behavior can be understood without raw function logs.
 
