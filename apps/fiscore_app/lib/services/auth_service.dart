@@ -5,9 +5,11 @@ class AuthService {
       'https://fiscore-dev.firebaseapp.com';
 
   AuthService({CloudFunctionsService? functions})
-    : _functions = functions ?? CloudFunctionsService();
+    : _providedFunctions = functions;
 
-  final CloudFunctionsService _functions;
+  final CloudFunctionsService? _providedFunctions;
+  late final CloudFunctionsService _functions =
+      _providedFunctions ?? CloudFunctionsService();
 
   Stream<User?> authStateChanges() {
     return FirebaseAuth.instance.authStateChanges();
