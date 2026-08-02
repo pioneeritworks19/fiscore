@@ -137,7 +137,7 @@
 
 - [x] T038 [P] Run `node --check index.js` from `apps/fiscore_app/functions`.
 - [x] T039 [P] Run `node --check notifications.js` from `apps/fiscore_app/functions`.
-- [ ] T040 [P] Run `flutter analyze` from `apps/fiscore_app` only if Flutter files are touched.
+- [x] T040 [P] Run `flutter analyze` from `apps/fiscore_app` only if Flutter files are touched.
 - [x] T041 Deploy updated Firebase Functions and Firestore rules/indexes from `apps/fiscore_app` to `fiscore-dev`.
 - [x] T042 Update implementation notes in `docs/product/NOTIFICATION_FLOW.md` after the first provider is selected.
 
