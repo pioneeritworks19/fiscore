@@ -20,7 +20,7 @@ For FiScore version 1, the recommended mobile support policy is:
 
 - **Android:** Android 10 and above
 - **iOS/iPadOS:** iOS 16 and above
-- **Flutter:** Flutter `3.41.5` stable
+- **Flutter:** Flutter `3.41.6` stable
 - **Version pinning:** use `FVM` for local development and CI
 
 This is the recommended product support range, not merely the broadest technical range Flutter can build for.
@@ -101,7 +101,7 @@ See:
 
 Recommended Flutter version:
 
-- **Flutter `3.41.5` stable**
+- **Flutter `3.41.6` stable**
 
 Why:
 
@@ -134,7 +134,7 @@ Recommended policy:
 
 ### Flutter
 
-- use `Flutter 3.41.5`
+- use `Flutter 3.41.6`
 - use the stable channel
 - pin through FVM
 
@@ -240,7 +240,7 @@ For FiScore version 1:
 
 - support **Android 10+**
 - support **iOS 16+**
-- use **Flutter 3.41.5 stable**
+- use **Flutter 3.41.6 stable**
 - pin the version with **FVM**
 
 This gives FiScore a stable, professional, and manageable foundation for mobile development without overextending QA and support effort.
