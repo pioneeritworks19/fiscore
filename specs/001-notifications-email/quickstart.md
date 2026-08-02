@@ -72,6 +72,7 @@ From `apps/fiscore_app/functions`:
 ```powershell
 node --check index.js
 node --check notifications.js
+npm test
 ```
 
 From `apps/fiscore_app` only when app UI files are touched:
